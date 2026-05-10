@@ -1,5 +1,4 @@
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect
-from fastapi.staticfiles import StaticFiles
 from fastapi.responses import HTMLResponse
 from fastapi.middleware.cors import CORSMiddleware
 import asyncio
@@ -8,16 +7,17 @@ import yfinance as yf
 import requests
 import re
 import smtplib
-import winsound
+import sys
+import threading
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 from datetime import datetime, timedelta
 from dotenv import load_dotenv
 import os
-import threading
 
 # ============================================================
 #   SYKES METHOD TRADING AGENT — WEB SERVER
+#   Cloud compatible (no winsound)
 # ============================================================
 
 load_dotenv()
@@ -43,7 +43,6 @@ SCAN_INTERVAL  = int(os.getenv('SCAN_INTERVAL', 10))
 STOP_LOSS_PCT  = float(os.getenv('STOP_LOSS_PCT', 5.0))
 WARNING_PCT    = float(os.getenv('WARNING_PCT', 3.0))
 PROFIT_PCT     = float(os.getenv('PROFIT_TARGET_PCT', 10.0))
-
 EMAIL_ADDRESS  = os.getenv('EMAIL_ADDRESS', '')
 EMAIL_PASSWORD = os.getenv('EMAIL_PASSWORD', '')
 EMAIL_TO       = os.getenv('EMAIL_TO', '')
@@ -83,7 +82,7 @@ DANGER_KEYWORDS = [
 def send_email(subject, body):
     def _send():
         try:
-            msg = MIMEMultipart()
+            msg            = MIMEMultipart()
             msg['From']    = EMAIL_ADDRESS
             msg['To']      = EMAIL_TO
             msg['Subject'] = subject
@@ -123,7 +122,8 @@ async def broadcast(data):
         except:
             disconnected.append(client)
     for c in disconnected:
-        connected_clients.remove(c)
+        if c in connected_clients:
+            connected_clients.remove(c)
 
 # ============================================================
 # NEWS CATALYST
@@ -194,14 +194,15 @@ def get_candidate_tickers():
                        .get('result', [{}])[0]
                        .get('quotes', []))
             for q in quotes:
-                sym   = q.get('symbol', '')
-                price = q.get('regularMarketPrice', 0)
-                pct   = q.get('regularMarketChangePercent', 0)
-                vol   = q.get('regularMarketVolume', 0)
-                dvol  = price * vol
-                if (sym and MIN_PRICE <= price <= MAX_PRICE
-                        and pct >= MIN_GAP_PCT
-                        and dvol >= MIN_DOLLAR_VOL):
+                sym       = q.get('symbol', '')
+                price     = q.get('regularMarketPrice', 0)
+                pct       = q.get('regularMarketChangePercent', 0)
+                vol       = q.get('regularMarketVolume', 0)
+                dollar_vol = price * vol
+                if (sym and
+                        MIN_PRICE <= price <= MAX_PRICE and
+                        pct >= MIN_GAP_PCT and
+                        dollar_vol >= MIN_DOLLAR_VOL):
                     tickers.add(sym)
         except:
             pass
@@ -221,13 +222,13 @@ def get_candidate_tickers():
     return tickers
 
 # ============================================================
-# GET REAL PRE-MARKET PRICE
+# GET REAL PRICE
 # ============================================================
 
 def get_real_price(ticker):
     try:
-        stock = yf.Ticker(ticker)
-        hist  = stock.history(
+        stock      = yf.Ticker(ticker)
+        hist       = stock.history(
             period="1d", interval="1m", prepost=True
         )
         if hist.empty:
@@ -285,7 +286,7 @@ def grade_setup(gap_pct, dollar_vol):
     return grade, notes
 
 # ============================================================
-# MAIN SCANNER LOOP (runs in background thread)
+# MAIN SCANNER LOOP
 # ============================================================
 
 async def scanner_loop():
@@ -301,95 +302,98 @@ async def scanner_loop():
                 f"{datetime.now().strftime('%H:%M:%S')}"
             )
 
-            tickers  = get_candidate_tickers()
-            results  = []
+            tickers = get_candidate_tickers()
+            results = []
 
             for ticker in tickers:
                 if not scanner_running:
                     break
 
-                price, gap_pct, volume, prev_close = \
-                    get_real_price(ticker)
+                try:
+                    price, gap_pct, volume, prev_close = \
+                        get_real_price(ticker)
 
-                if not all([price, gap_pct, volume, prev_close]):
-                    continue
+                    if not all([price, gap_pct, volume, prev_close]):
+                        continue
 
-                dollar_vol = price * volume
+                    dollar_vol = price * volume
 
-                if not (MIN_PRICE <= price <= MAX_PRICE
-                        and gap_pct >= MIN_GAP_PCT
-                        and dollar_vol >= MIN_DOLLAR_VOL):
-                    continue
+                    if not (MIN_PRICE <= price <= MAX_PRICE and
+                            gap_pct >= MIN_GAP_PCT and
+                            dollar_vol >= MIN_DOLLAR_VOL):
+                        continue
 
-                grade, notes = grade_setup(gap_pct, dollar_vol)
-                strength, label, headlines, warning = \
-                    check_catalyst(ticker)
+                    grade, notes = grade_setup(gap_pct, dollar_vol)
+                    strength, label, headlines, warning = \
+                        check_catalyst(ticker)
 
-                # Adjust grade
-                final_grade = grade
-                if warning:
-                    final_grade = "D"
-                elif strength == 'STRONG' and grade == 'A':
-                    final_grade = 'A+'
-                elif strength == 'NONE':
-                    if grade == 'A+': final_grade = 'A'
-                    elif grade == 'A': final_grade = 'B'
+                    # Adjust grade
+                    final_grade = grade
+                    if warning:
+                        final_grade = "D"
+                    elif strength == 'STRONG' and grade == 'A':
+                        final_grade = 'A+'
+                    elif strength == 'NONE':
+                        if grade == 'A+': final_grade = 'A'
+                        elif grade == 'A': final_grade = 'B'
 
-                entry_low  = price * 0.99
-                entry_high = price * 1.02
-                stop_loss  = entry_low * 0.95
-                target1    = entry_high * 1.10
-                target2    = entry_high * 1.20
-                target3    = entry_high * 1.30
+                    entry_low  = round(price * 0.99, 2)
+                    entry_high = round(price * 1.02, 2)
+                    stop_loss  = round(entry_low * 0.95, 2)
+                    target1    = round(entry_high * 1.10, 2)
+                    target2    = round(entry_high * 1.20, 2)
+                    target3    = round(entry_high * 1.30, 2)
 
-                setup = {
-                    'ticker':      ticker,
-                    'price':       round(price, 2),
-                    'prev_close':  round(prev_close, 2),
-                    'gap_pct':     round(gap_pct, 1),
-                    'dollar_vol':  round(dollar_vol, 0),
-                    'grade':       final_grade,
-                    'notes':       notes,
-                    'catalyst':    label,
-                    'headlines':   headlines[:2],
-                    'warning':     warning,
-                    'entry_low':   round(entry_low, 2),
-                    'entry_high':  round(entry_high, 2),
-                    'stop_loss':   round(stop_loss, 2),
-                    'target1':     round(target1, 2),
-                    'target2':     round(target2, 2),
-                    'target3':     round(target3, 2),
-                    'time':        datetime.now().strftime('%H:%M:%S')
-                }
+                    setup = {
+                        'ticker':     ticker,
+                        'price':      round(price, 2),
+                        'prev_close': round(prev_close, 2),
+                        'gap_pct':    round(gap_pct, 1),
+                        'dollar_vol': round(dollar_vol, 0),
+                        'grade':      final_grade,
+                        'notes':      notes,
+                        'catalyst':   label,
+                        'headlines':  headlines[:2],
+                        'warning':    warning,
+                        'entry_low':  entry_low,
+                        'entry_high': entry_high,
+                        'stop_loss':  stop_loss,
+                        'target1':    target1,
+                        'target2':    target2,
+                        'target3':    target3,
+                        'time':       datetime.now().strftime('%H:%M:%S')
+                    }
 
-                results.append(setup)
+                    results.append(setup)
 
-                # Email alert for new A/A+ setups
-                if (final_grade in ['A+', 'A']
-                        and not warning
-                        and ticker not in alerted_tickers):
-                    alerted_tickers.add(ticker)
-                    log_alert(
-                        f"🚀 {final_grade} SETUP: {ticker} "
-                        f"+{gap_pct:.1f}%"
-                    )
-                    send_email(
-                        subject=(
-                            f"🚀 {final_grade} SETUP — "
-                            f"{ticker} +{gap_pct:.1f}%"
-                        ),
-                        body=(
-                            f"Grade: {final_grade}\n"
-                            f"Gap: +{gap_pct:.1f}%\n"
-                            f"Price: ${price:.2f}\n"
-                            f"Catalyst: {label}\n\n"
-                            f"Entry: ${entry_low:.2f}–${entry_high:.2f}\n"
-                            f"Stop: ${stop_loss:.2f}\n"
-                            f"Target 1: ${target1:.2f}\n"
+                    # Email for new A/A+ setups
+                    if (final_grade in ['A+', 'A'] and
+                            not warning and
+                            ticker not in alerted_tickers):
+                        alerted_tickers.add(ticker)
+                        log_alert(
+                            f"🚀 {final_grade} SETUP: {ticker} "
+                            f"+{gap_pct:.1f}%"
                         )
-                    )
+                        send_email(
+                            subject=(
+                                f"🚀 {final_grade} SETUP — "
+                                f"{ticker} +{gap_pct:.1f}%"
+                            ),
+                            body=(
+                                f"Grade: {final_grade}\n"
+                                f"Gap: +{gap_pct:.1f}%\n"
+                                f"Price: ${price:.2f}\n"
+                                f"Catalyst: {label}\n\n"
+                                f"Entry: ${entry_low}–${entry_high}\n"
+                                f"Stop: ${stop_loss}\n"
+                                f"Target 1: ${target1}\n"
+                            )
+                        )
+                except:
+                    continue
 
-            # Sort results
+            # Sort — A+ first, dangerous last
             results.sort(
                 key=lambda x: (
                     0 if x['warning'] else
@@ -400,13 +404,12 @@ async def scanner_loop():
 
             scan_results = results
 
-            # Broadcast to all connected clients
             await broadcast({
-                'type':    'scan_results',
-                'data':    results,
-                'time':    datetime.now().strftime('%H:%M:%S'),
-                'count':   len(results),
-                'alerts':  alert_log[:20]
+                'type':   'scan_results',
+                'data':   results,
+                'time':   datetime.now().strftime('%H:%M:%S'),
+                'count':  len(results),
+                'alerts': alert_log[:20]
             })
 
         except Exception as e:
@@ -424,10 +427,10 @@ async def scanner_loop():
 @app.get("/api/status")
 async def get_status():
     return {
-        'running':  scanner_running,
-        'results':  len(scan_results),
-        'alerts':   len(alert_log),
-        'time':     datetime.now().strftime('%H:%M:%S')
+        'running': scanner_running,
+        'results': len(scan_results),
+        'alerts':  len(alert_log),
+        'time':    datetime.now().strftime('%H:%M:%S')
     }
 
 @app.get("/api/results")
@@ -469,22 +472,22 @@ async def clear_alerts():
 async def websocket_endpoint(websocket: WebSocket):
     await websocket.accept()
     connected_clients.append(websocket)
-    log_alert(f"📱 New client connected")
+    log_alert("📱 New client connected")
 
-    # Send current state immediately
     await websocket.send_json({
-        'type':    'scan_results',
-        'data':    scan_results,
-        'alerts':  alert_log[:20],
-        'time':    datetime.now().strftime('%H:%M:%S'),
-        'count':   len(scan_results)
+        'type':   'scan_results',
+        'data':   scan_results,
+        'alerts': alert_log[:20],
+        'time':   datetime.now().strftime('%H:%M:%S'),
+        'count':  len(scan_results)
     })
 
     try:
         while True:
             await websocket.receive_text()
     except WebSocketDisconnect:
-        connected_clients.remove(websocket)
+        if websocket in connected_clients:
+            connected_clients.remove(websocket)
 
 # ============================================================
 # SERVE DASHBOARD
@@ -492,8 +495,11 @@ async def websocket_endpoint(websocket: WebSocket):
 
 @app.get("/")
 async def serve_dashboard():
-    with open("dashboard.html", "r") as f:
-        return HTMLResponse(f.read())
+    try:
+        with open("dashboard.html", "r") as f:
+            return HTMLResponse(f.read())
+    except:
+        return HTMLResponse("<h1>Dashboard not found</h1>")
 
 if __name__ == "__main__":
     import uvicorn
