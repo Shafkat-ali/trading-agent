@@ -2,23 +2,16 @@ from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 from fastapi.responses import HTMLResponse
 from fastapi.middleware.cors import CORSMiddleware
 import asyncio
-import json
 import yfinance as yf
 import requests
 import re
 import smtplib
-import sys
 import threading
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 from datetime import datetime, timedelta
 from dotenv import load_dotenv
 import os
-
-# ============================================================
-#   SYKES METHOD TRADING AGENT — WEB SERVER
-#   Cloud compatible (no winsound)
-# ============================================================
 
 load_dotenv()
 
@@ -31,32 +24,27 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# ============================================================
-# SETTINGS FROM .ENV
-# ============================================================
-
 MIN_PRICE      = float(os.getenv('MIN_PRICE', 0.10))
 MAX_PRICE      = float(os.getenv('MAX_PRICE', 50.00))
 MIN_GAP_PCT    = float(os.getenv('MIN_GAP_PCT', 20.0))
 MIN_DOLLAR_VOL = float(os.getenv('MIN_DOLLAR_VOL', 50000))
 SCAN_INTERVAL  = int(os.getenv('SCAN_INTERVAL', 10))
 STOP_LOSS_PCT  = float(os.getenv('STOP_LOSS_PCT', 5.0))
-WARNING_PCT    = float(os.getenv('WARNING_PCT', 3.0))
-PROFIT_PCT     = float(os.getenv('PROFIT_TARGET_PCT', 10.0))
 EMAIL_ADDRESS  = os.getenv('EMAIL_ADDRESS', '')
 EMAIL_PASSWORD = os.getenv('EMAIL_PASSWORD', '')
 EMAIL_TO       = os.getenv('EMAIL_TO', '')
 
-# ============================================================
-# STATE
-# ============================================================
-
 scanner_running   = False
 alerted_tickers   = set()
 scan_results      = []
-position_data     = []
 alert_log         = []
 connected_clients = []
+scan_status       = {
+    'phase':    'idle',
+    'message':  'Scanner stopped',
+    'progress': 0,
+    'total':    0
+}
 
 STRONG_KEYWORDS = [
     'fda', 'approval', 'approved', 'breakthrough',
@@ -74,10 +62,6 @@ DANGER_KEYWORDS = [
     'delay', 'failed', 'withdrawn', 'suspended',
     'reverse split', 'compliance'
 ]
-
-# ============================================================
-# EMAIL ALERT
-# ============================================================
 
 def send_email(subject, body):
     def _send():
@@ -97,10 +81,6 @@ def send_email(subject, body):
             log_alert(f"⚠️ Email failed: {e}")
     threading.Thread(target=_send, daemon=True).start()
 
-# ============================================================
-# ALERT LOG
-# ============================================================
-
 def log_alert(message):
     entry = {
         'time':    datetime.now().strftime('%H:%M:%S'),
@@ -109,10 +89,6 @@ def log_alert(message):
     alert_log.insert(0, entry)
     if len(alert_log) > 100:
         alert_log.pop()
-
-# ============================================================
-# BROADCAST TO ALL WEBSOCKET CLIENTS
-# ============================================================
 
 async def broadcast(data):
     disconnected = []
@@ -124,10 +100,6 @@ async def broadcast(data):
     for c in disconnected:
         if c in connected_clients:
             connected_clients.remove(c)
-
-# ============================================================
-# NEWS CATALYST
-# ============================================================
 
 def check_catalyst(ticker):
     try:
@@ -170,10 +142,6 @@ def check_catalyst(ticker):
             return 'WEAK', '⚠️ Weak Catalyst', headlines[:2], False
     except:
         return 'UNKNOWN', '❓ Could not fetch news', [], False
-
-# ============================================================
-# GET CANDIDATE TICKERS
-# ============================================================
 
 def get_candidate_tickers():
     tickers = set()
@@ -221,10 +189,6 @@ def get_candidate_tickers():
 
     return tickers
 
-# ============================================================
-# GET REAL PRICE
-# ============================================================
-
 def get_real_price(ticker):
     try:
         stock      = yf.Ticker(ticker)
@@ -249,10 +213,6 @@ def get_real_price(ticker):
         return price, pct_change, volume, prev_close
     except:
         return None, None, None, None
-
-# ============================================================
-# GRADE SETUP
-# ============================================================
 
 def grade_setup(gap_pct, dollar_vol):
     grade = "B"
@@ -285,29 +245,49 @@ def grade_setup(gap_pct, dollar_vol):
 
     return grade, notes
 
-# ============================================================
-# MAIN SCANNER LOOP
-# ============================================================
-
 async def scanner_loop():
-    global scan_results, scanner_running
+    global scan_results, scanner_running, scan_status
 
     log_alert("🔍 Scanner started")
     await broadcast({'type': 'status', 'running': True})
 
     while scanner_running:
         try:
-            log_alert(
-                f"🔍 Scanning — "
-                f"{datetime.now().strftime('%H:%M:%S')}"
-            )
+            scan_status = {
+                'phase':    'fetching',
+                'message':  'Fetching top gainers...',
+                'progress': 0,
+                'total':    0
+            }
+            await broadcast({'type': 'scan_status', 'status': scan_status})
+            log_alert(f"🔍 Scanning — {datetime.now().strftime('%H:%M:%S')}")
 
             tickers = get_candidate_tickers()
+            total   = len(tickers)
+
+            scan_status = {
+                'phase':    'analyzing',
+                'message':  f'Analyzing {total} candidates...',
+                'progress': 0,
+                'total':    total
+            }
+            await broadcast({'type': 'scan_status', 'status': scan_status})
+
             results = []
+            count   = 0
 
             for ticker in tickers:
                 if not scanner_running:
                     break
+
+                count += 1
+                scan_status = {
+                    'phase':    'analyzing',
+                    'message':  f'Checking {ticker} ({count}/{total})...',
+                    'progress': count,
+                    'total':    total
+                }
+                await broadcast({'type': 'scan_status', 'status': scan_status})
 
                 try:
                     price, gap_pct, volume, prev_close = \
@@ -327,7 +307,6 @@ async def scanner_loop():
                     strength, label, headlines, warning = \
                         check_catalyst(ticker)
 
-                    # Adjust grade
                     final_grade = grade
                     if warning:
                         final_grade = "D"
@@ -366,14 +345,13 @@ async def scanner_loop():
 
                     results.append(setup)
 
-                    # Email for new A/A+ setups
                     if (final_grade in ['A+', 'A'] and
                             not warning and
                             ticker not in alerted_tickers):
                         alerted_tickers.add(ticker)
                         log_alert(
-                            f"🚀 {final_grade} SETUP: {ticker} "
-                            f"+{gap_pct:.1f}%"
+                            f"🚀 {final_grade} SETUP: "
+                            f"{ticker} +{gap_pct:.1f}%"
                         )
                         send_email(
                             subject=(
@@ -393,7 +371,6 @@ async def scanner_loop():
                 except:
                     continue
 
-            # Sort — A+ first, dangerous last
             results.sort(
                 key=lambda x: (
                     0 if x['warning'] else
@@ -403,13 +380,20 @@ async def scanner_loop():
             )
 
             scan_results = results
+            scan_status  = {
+                'phase':    'done',
+                'message':  f'Found {len(results)} setup(s)',
+                'progress': total,
+                'total':    total
+            }
 
             await broadcast({
-                'type':   'scan_results',
-                'data':   results,
-                'time':   datetime.now().strftime('%H:%M:%S'),
-                'count':  len(results),
-                'alerts': alert_log[:20]
+                'type':        'scan_results',
+                'data':        results,
+                'time':        datetime.now().strftime('%H:%M:%S'),
+                'count':       len(results),
+                'alerts':      alert_log[:20],
+                'scan_status': scan_status
             })
 
         except Exception as e:
@@ -419,10 +403,6 @@ async def scanner_loop():
 
     log_alert("⏹️ Scanner stopped")
     await broadcast({'type': 'status', 'running': False})
-
-# ============================================================
-# API ROUTES
-# ============================================================
 
 @app.get("/api/status")
 async def get_status():
@@ -464,10 +444,6 @@ async def clear_alerts():
     log_alert("🗑️ Alerted tickers cleared")
     return {'status': 'cleared'}
 
-# ============================================================
-# WEBSOCKET
-# ============================================================
-
 @app.websocket("/ws")
 async def websocket_endpoint(websocket: WebSocket):
     await websocket.accept()
@@ -488,10 +464,6 @@ async def websocket_endpoint(websocket: WebSocket):
     except WebSocketDisconnect:
         if websocket in connected_clients:
             connected_clients.remove(websocket)
-
-# ============================================================
-# SERVE DASHBOARD
-# ============================================================
 
 @app.get("/")
 async def serve_dashboard():
