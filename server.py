@@ -104,6 +104,16 @@ async def broadcast(data):
 # ============================================================
 # FINNHUB ENDPOINTS (server-side — avoids CORS)
 # ============================================================
+@app.get("/api/debug")
+async def debug():
+    """Check environment variables are loaded"""
+    return {
+        'finnhub_key_set':     bool(FINNHUB_KEY),
+        'finnhub_key_length':  len(FINNHUB_KEY),
+        'finnhub_key_preview': FINNHUB_KEY[:8] + '...' if FINNHUB_KEY else 'NOT SET',
+        'polygon_key_set':     bool(POLYGON_API_KEY),
+    }
+
 
 @app.get("/api/stock/quote/{ticker}")
 async def get_stock_quote(ticker: str):
