@@ -12,7 +12,8 @@ from datetime import datetime, timedelta
 from dotenv import load_dotenv
 import os
 
-load_dotenv()
+from dotenv import load_dotenv
+load_dotenv(override=False)  # Railway env vars take priority
 
 app = FastAPI(title="Payda x UyghurKid Trading Agent")
 
