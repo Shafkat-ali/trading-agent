@@ -32,6 +32,7 @@ EMAIL_ADDRESS   = os.getenv('EMAIL_ADDRESS', '')
 EMAIL_PASSWORD  = os.getenv('EMAIL_PASSWORD', '')
 EMAIL_TO        = os.getenv('EMAIL_TO', '')
 POLYGON_API_KEY = os.getenv('POLYGON_API_KEY', '')
+FINNHUB_KEY     = os.getenv('FINNHUB_API_KEY', '')
 
 scanner_running   = False
 alerted_tickers   = set()
@@ -58,6 +59,10 @@ DANGER_KEYWORDS = [
     'lawsuit', 'sec', 'subpoena', 'delay', 'failed', 'withdrawn',
     'suspended', 'reverse split', 'compliance'
 ]
+
+# ============================================================
+# EMAIL
+# ============================================================
 
 def send_email(subject, body):
     def _send():
@@ -98,36 +103,146 @@ async def broadcast(data):
         if c in connected_clients:
             connected_clients.remove(c)
 
+# ============================================================
+# FINNHUB API ENDPOINTS (server-side to avoid CORS)
+# ============================================================
+
+@app.get("/api/stock/quote/{ticker}")
+async def get_stock_quote(ticker: str):
+    """Get real-time quote from Finnhub"""
+    try:
+        r = requests.get(
+            f"https://finnhub.io/api/v1/quote",
+            params={'symbol': ticker, 'token': FINNHUB_KEY},
+            timeout=8
+        )
+        if r.status_code == 200:
+            return r.json()
+        return {'error': f'Status {r.status_code}'}
+    except Exception as e:
+        return {'error': str(e)}
+
+@app.get("/api/stock/profile/{ticker}")
+async def get_stock_profile(ticker: str):
+    """Get company profile from Finnhub"""
+    try:
+        r = requests.get(
+            f"https://finnhub.io/api/v1/stock/profile2",
+            params={'symbol': ticker, 'token': FINNHUB_KEY},
+            timeout=8
+        )
+        if r.status_code == 200:
+            return r.json()
+        return {'error': f'Status {r.status_code}'}
+    except Exception as e:
+        return {'error': str(e)}
+
+@app.get("/api/stock/metrics/{ticker}")
+async def get_stock_metrics(ticker: str):
+    """Get key metrics from Finnhub"""
+    try:
+        r = requests.get(
+            f"https://finnhub.io/api/v1/stock/metric",
+            params={'symbol': ticker, 'metric': 'all', 'token': FINNHUB_KEY},
+            timeout=8
+        )
+        if r.status_code == 200:
+            return r.json()
+        return {'error': f'Status {r.status_code}'}
+    except Exception as e:
+        return {'error': str(e)}
+
+@app.get("/api/stock/news/{ticker}")
+async def get_stock_news(ticker: str):
+    """Get company news from Finnhub"""
+    try:
+        today = datetime.now()
+        from_date = (today - timedelta(days=7)).strftime('%Y-%m-%d')
+        to_date   = today.strftime('%Y-%m-%d')
+        r = requests.get(
+            f"https://finnhub.io/api/v1/company-news",
+            params={
+                'symbol': ticker,
+                'from':   from_date,
+                'to':     to_date,
+                'token':  FINNHUB_KEY
+            },
+            timeout=8
+        )
+        if r.status_code == 200:
+            return {'news': r.json()}
+        return {'news': [], 'error': f'Status {r.status_code}'}
+    except Exception as e:
+        return {'news': [], 'error': str(e)}
+
+# ============================================================
+# CATALYST CHECK (for scanner)
+# ============================================================
+
 def check_catalyst(ticker):
     try:
-        news = yf.Ticker(ticker).news
-        if not news:
-            return 'NONE', '❌ No Catalyst', [], False
-        cutoff = datetime.now() - timedelta(hours=48)
-        recent = [n for n in news[:10]
-                  if n.get('providerPublishTime', 0) and
-                  datetime.fromtimestamp(n['providerPublishTime']) >= cutoff]
-        if not recent:
-            return 'NONE', '❌ No Recent News', [], False
-        headlines, strong_hits, danger_hits, warning = [], 0, 0, False
-        for item in recent[:5]:
-            title = item.get('title', '').lower()
-            headlines.append(item.get('title', ''))
-            if any(kw in title for kw in STRONG_KEYWORDS):
-                strong_hits += 1
-            if any(kw in title for kw in DANGER_KEYWORDS):
-                danger_hits += 1
-                warning = True
+        # Try Finnhub news first
+        today     = datetime.now()
+        from_date = (today - timedelta(days=2)).strftime('%Y-%m-%d')
+        to_date   = today.strftime('%Y-%m-%d')
+
+        r = requests.get(
+            'https://finnhub.io/api/v1/company-news',
+            params={
+                'symbol': ticker,
+                'from':   from_date,
+                'to':     to_date,
+                'token':  FINNHUB_KEY
+            },
+            timeout=8
+        )
+
+        news_items = []
+        if r.status_code == 200:
+            news_items = r.json()[:10]
+
+        # Fallback to yfinance if no results
+        if not news_items:
+            yf_news = yf.Ticker(ticker).news or []
+            cutoff  = datetime.now() - timedelta(hours=48)
+            for n in yf_news[:10]:
+                pub = n.get('providerPublishTime', 0)
+                if pub and datetime.fromtimestamp(pub) >= cutoff:
+                    news_items.append({'headline': n.get('title',''), 'source': 'yf'})
+
+        if not news_items:
+            return 'NONE', '❌ No Recent News', [], False, 0
+
+        headlines   = []
+        strong_hits = 0
+        danger_hits = 0
+        warning     = False
+
+        for item in news_items[:5]:
+            title = (item.get('headline') or item.get('title') or '').lower()
+            headlines.append(item.get('headline') or item.get('title') or '')
+            if any(kw in title for kw in STRONG_KEYWORDS): strong_hits += 1
+            if any(kw in title for kw in DANGER_KEYWORDS): danger_hits += 1; warning = True
+
+        news_count = len(news_items)
+
         if warning and danger_hits > strong_hits:
-            return 'DANGER', '☠️ DANGER: Dilution/Legal Risk', headlines[:2], True
+            return 'DANGER', f'☠️ DANGER: Dilution/Legal Risk ({news_count} articles)', headlines[:2], True, news_count
         elif strong_hits >= 2:
-            return 'STRONG', '🔥 STRONG Catalyst', headlines[:2], False
+            return 'STRONG', f'🔥 STRONG Catalyst ({news_count} articles today)', headlines[:2], False, news_count
         elif strong_hits == 1:
-            return 'MODERATE', '✅ Moderate Catalyst', headlines[:2], False
+            return 'MODERATE', f'✅ Moderate Catalyst ({news_count} articles)', headlines[:2], False, news_count
+        elif news_count > 0:
+            return 'WEAK', f'📰 {news_count} article(s) — weak catalyst', headlines[:2], False, news_count
         else:
-            return 'WEAK', '⚠️ Weak Catalyst', headlines[:2], False
-    except:
-        return 'UNKNOWN', '❓ Could not fetch news', [], False
+            return 'NONE', '❌ No Recent News', [], False, 0
+
+    except Exception as e:
+        return 'UNKNOWN', '❓ Could not fetch news', [], False, 0
+
+# ============================================================
+# DATA SOURCES
+# ============================================================
 
 def get_massive_gainers():
     try:
@@ -196,12 +311,16 @@ def get_yahoo_gainers():
                         'gap_pct': round(float(pct), 1),
                         'volume': float(vol),
                         'dollar_vol': float(dollar_vol),
-                        'source': 'Yahoo'
+                        'source': 'Live'
                     })
         except:
             pass
     log_alert(f"📡 Yahoo: {len(candidates)} stocks")
     return candidates
+
+# ============================================================
+# GRADE + PROCESS
+# ============================================================
 
 def grade_setup(gap_pct, dollar_vol):
     grade, notes = "B", []
@@ -229,14 +348,14 @@ def process_ticker(stock_data):
         source     = stock_data.get('source', 'Live')
 
         grade, notes = grade_setup(gap_pct, dollar_vol)
-        strength, label, headlines, warning = check_catalyst(ticker)
+        strength, label, headlines, warning, news_count = check_catalyst(ticker)
 
         final_grade = grade
         if warning:                                   final_grade = "D"
         elif strength == 'STRONG' and grade == 'A':  final_grade = "A+"
         elif strength == 'NONE':
-            if grade == 'A+':   final_grade = 'A'
-            elif grade == 'A':  final_grade = 'B'
+            if grade == 'A+':  final_grade = 'A'
+            elif grade == 'A': final_grade = 'B'
 
         entry_low  = round(price * 0.99, 2)
         entry_high = round(price * 1.02, 2)
@@ -254,6 +373,7 @@ def process_ticker(stock_data):
             'grade':      final_grade,
             'notes':      notes,
             'catalyst':   label,
+            'news_count': news_count,
             'headlines':  headlines[:2],
             'warning':    warning,
             'entry_low':  entry_low,
@@ -268,11 +388,13 @@ def process_ticker(stock_data):
     except:
         return None
 
+# ============================================================
+# SCANNER LOOP
+# ============================================================
+
 async def do_scan():
-    """Run one complete scan and return results"""
     global current_scan_status
 
-    # Step 1 fetch
     current_scan_status = {
         'phase': 'fetching',
         'message': '📡 Fetching gainers from Massive.com...',
@@ -291,7 +413,6 @@ async def do_scan():
     total = len(candidates)
     log_alert(f"📊 {total} candidates")
 
-    # Step 2 analyze
     current_scan_status = {
         'phase': 'analyzing',
         'message': f'Analyzing {total} candidates...',
@@ -317,13 +438,11 @@ async def do_scan():
             'total':    total
         }
         await broadcast({'type': 'scan_status', 'status': current_scan_status})
-        # Yield to event loop so WS messages actually get sent
         await asyncio.sleep(0.05)
 
         setup = process_ticker(stock_data)
         if setup:
             results.append(setup)
-            # Broadcast immediately
             await broadcast({'type': 'new_ticker', 'setup': setup})
             await asyncio.sleep(0)
 
@@ -345,7 +464,6 @@ async def do_scan():
                     )
                 )
 
-    # Sort and finalize
     results.sort(
         key=lambda x: (
             0 if x['warning'] else
@@ -370,7 +488,7 @@ async def scanner_loop():
 
     while scanner_running:
         try:
-            results    = await do_scan()
+            results      = await do_scan()
             scan_results = results
 
             await broadcast({
@@ -390,8 +508,15 @@ async def scanner_loop():
             await asyncio.sleep(SCAN_INTERVAL)
 
     log_alert("⏹️ Scanner stopped")
-    current_scan_status = {'phase': 'idle', 'message': 'Scanner stopped', 'progress': 0, 'total': 0}
+    current_scan_status = {
+        'phase': 'idle', 'message': 'Scanner stopped',
+        'progress': 0, 'total': 0
+    }
     await broadcast({'type': 'status', 'running': False})
+
+# ============================================================
+# API ROUTES
+# ============================================================
 
 @app.get("/api/status")
 async def get_status():
@@ -438,8 +563,6 @@ async def websocket_endpoint(websocket: WebSocket):
     await websocket.accept()
     connected_clients.append(websocket)
     log_alert("📱 Client connected")
-
-    # Send current state immediately on connect
     await websocket.send_json({
         'type':        'scan_results',
         'data':        scan_results,
@@ -448,13 +571,9 @@ async def websocket_endpoint(websocket: WebSocket):
         'count':       len(scan_results),
         'scan_status': current_scan_status
     })
-
-    # Also send running status
     await websocket.send_json({
-        'type':    'status',
-        'running': scanner_running
+        'type': 'status', 'running': scanner_running
     })
-
     try:
         while True:
             await websocket.receive_text()
