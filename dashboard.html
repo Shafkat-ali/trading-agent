@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>🔥 Sykes Trading Agent</title>
+  <title>Payda x UyghurKid — Capital Trading Agent</title>
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
 
@@ -14,10 +14,11 @@
       min-height: 100vh;
     }
 
+    /* HEADER */
     .header {
-      background: linear-gradient(135deg, #0f1729 0%, #1a2444 100%);
-      border-bottom: 2px solid #2a3f6f;
-      padding: 16px 24px;
+      background: linear-gradient(135deg, #0a0f1e 0%, #111827 100%);
+      border-bottom: 2px solid #1a2a4a;
+      padding: 12px 24px;
       display: flex;
       align-items: center;
       justify-content: space-between;
@@ -26,29 +27,68 @@
       z-index: 100;
     }
 
-    .header-left h1 {
-      font-size: 1.4rem;
-      font-weight: 700;
-      background: linear-gradient(90deg, #00d4ff, #7b61ff);
-      -webkit-background-clip: text;
-      -webkit-text-fill-color: transparent;
+    .header-brand {
+      display: flex;
+      align-items: center;
+      gap: 16px;
     }
 
-    .header-left p {
-      font-size: 0.75rem;
-      color: #6b7fa3;
-      margin-top: 2px;
+    .logos {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .logo-img {
+      width: 48px;
+      height: 48px;
+      border-radius: 50%;
+      object-fit: cover;
+      border: 2px solid #2a3f6f;
+    }
+
+    .logo-divider {
+      color: #ffd700;
+      font-size: 1.2rem;
+      font-weight: 700;
+    }
+
+    .brand-text h1 {
+      font-size: 1.1rem;
+      font-weight: 800;
+      background: linear-gradient(90deg, #ffd700, #00d4ff, #00ff88);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      letter-spacing: 0.5px;
+    }
+
+    .brand-text p {
+      font-size: 0.65rem;
+      color: #4a6a9a;
+      text-transform: uppercase;
+      letter-spacing: 2px;
+      margin-top: 1px;
     }
 
     .header-right {
       display: flex;
       align-items: center;
-      gap: 12px;
+      gap: 16px;
+    }
+
+    .status-pill {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 6px 14px;
+      border-radius: 20px;
+      background: #0f1729;
+      border: 1px solid #1e2d4a;
     }
 
     .status-dot {
-      width: 10px;
-      height: 10px;
+      width: 8px;
+      height: 8px;
       border-radius: 50%;
       background: #ff4444;
     }
@@ -60,21 +100,25 @@
 
     @keyframes pulse {
       0%, 100% { opacity: 1; transform: scale(1); }
-      50% { opacity: 0.6; transform: scale(1.3); }
+      50% { opacity: 0.5; transform: scale(1.4); }
     }
 
-    .status-text { font-size: 0.85rem; font-weight: 600; }
+    .status-text {
+      font-size: 0.78rem;
+      font-weight: 600;
+    }
 
     .clock {
-      font-size: 0.85rem;
+      font-size: 0.78rem;
       color: #6b7fa3;
       font-family: monospace;
     }
 
+    /* SCANNING BAR */
     .scanning-bar {
-      height: 3px;
-      background: linear-gradient(90deg, #00d4ff, #7b61ff, #00d4ff);
-      background-size: 200%;
+      height: 2px;
+      background: linear-gradient(90deg, #ffd700, #00d4ff, #00ff88, #ffd700);
+      background-size: 300%;
       animation: scan 2s linear infinite;
     }
 
@@ -82,13 +126,14 @@
 
     @keyframes scan {
       0% { background-position: 0%; }
-      100% { background-position: 200%; }
+      100% { background-position: 300%; }
     }
 
+    /* CONTROLS */
     .controls {
-      padding: 16px 24px;
+      padding: 12px 24px;
       display: flex;
-      gap: 12px;
+      gap: 10px;
       flex-wrap: wrap;
       background: #0d1220;
       border-bottom: 1px solid #1e2d4a;
@@ -96,13 +141,16 @@
     }
 
     .btn {
-      padding: 10px 24px;
+      padding: 8px 20px;
       border: none;
       border-radius: 8px;
-      font-size: 0.9rem;
+      font-size: 0.85rem;
       font-weight: 600;
       cursor: pointer;
       transition: all 0.2s;
+      display: flex;
+      align-items: center;
+      gap: 6px;
     }
 
     .btn-start {
@@ -135,6 +183,11 @@
       color: #fff;
     }
 
+    .btn-toggle-log {
+      background: linear-gradient(135deg, #6200ea, #9c27b0);
+      color: #fff;
+    }
+
     .stats-bar {
       margin-left: auto;
       display: flex;
@@ -145,21 +198,21 @@
     .stat { text-align: center; }
 
     .stat-val {
-      font-size: 1.2rem;
+      font-size: 1.1rem;
       font-weight: 700;
       color: #00d4ff;
     }
 
     .stat-label {
-      font-size: 0.65rem;
+      font-size: 0.6rem;
       color: #6b7fa3;
       text-transform: uppercase;
     }
 
-    /* SCAN PROGRESS BAR */
+    /* PROGRESS BAR */
     .scan-progress-bar {
-      padding: 8px 24px;
-      background: #0a0e1a;
+      padding: 6px 24px;
+      background: #080c18;
       border-bottom: 1px solid #1e2d4a;
       display: none;
     }
@@ -167,15 +220,15 @@
     .scan-progress-bar.visible { display: block; }
 
     .progress-label {
-      font-size: 0.78rem;
+      font-size: 0.72rem;
       color: #6b7fa3;
-      margin-bottom: 6px;
+      margin-bottom: 4px;
       display: flex;
       justify-content: space-between;
     }
 
     .progress-track {
-      height: 4px;
+      height: 3px;
       background: #1e2d4a;
       border-radius: 2px;
       overflow: hidden;
@@ -183,49 +236,55 @@
 
     .progress-fill {
       height: 100%;
-      background: linear-gradient(90deg, #00d4ff, #7b61ff);
+      background: linear-gradient(90deg, #ffd700, #00d4ff);
       border-radius: 2px;
       transition: width 0.3s ease;
-      min-width: 5%;
     }
 
     .progress-fill.indeterminate {
-      width: 40% !important;
+      width: 35% !important;
       animation: indeterminate 1.5s ease-in-out infinite;
     }
 
     @keyframes indeterminate {
-      0% { transform: translateX(-150%); }
-      100% { transform: translateX(350%); }
+      0% { transform: translateX(-200%); }
+      100% { transform: translateX(400%); }
     }
 
+    /* MAIN LAYOUT */
     .main {
       display: grid;
-      grid-template-columns: 1fr 320px;
+      grid-template-columns: 1fr 300px;
       gap: 0;
-      height: calc(100vh - 160px);
+      height: calc(100vh - 150px);
+      transition: grid-template-columns 0.3s ease;
     }
 
+    .main.log-hidden {
+      grid-template-columns: 1fr 0px;
+    }
+
+    /* RESULTS */
     .results-panel {
       overflow-y: auto;
-      padding: 20px;
+      padding: 16px;
     }
 
     .results-header {
       display: flex;
       align-items: center;
       justify-content: space-between;
-      margin-bottom: 16px;
+      margin-bottom: 12px;
     }
 
     .results-title {
-      font-size: 1rem;
+      font-size: 0.9rem;
       font-weight: 600;
       color: #a0b0d0;
     }
 
     .last-scan {
-      font-size: 0.75rem;
+      font-size: 0.72rem;
       color: #4a5a7a;
     }
 
@@ -235,37 +294,47 @@
       color: #3a4a6a;
     }
 
-    .no-results .icon { font-size: 3rem; margin-bottom: 16px; }
+    .no-results .icon {
+      font-size: 3rem;
+      margin-bottom: 16px;
+    }
 
     .loading-bar {
-      width: 200px;
-      height: 6px;
+      width: 180px;
+      height: 4px;
       background: #1e2d4a;
-      border-radius: 3px;
+      border-radius: 2px;
       margin: 16px auto 0;
       overflow: hidden;
     }
 
     .loading-fill {
       height: 100%;
-      width: 40%;
-      background: linear-gradient(90deg, #00d4ff, #7b61ff);
-      border-radius: 3px;
+      width: 35%;
+      background: linear-gradient(90deg, #ffd700, #00d4ff);
+      border-radius: 2px;
       animation: loading 1.5s ease-in-out infinite;
     }
 
     @keyframes loading {
       0% { transform: translateX(-100%); }
-      100% { transform: translateX(350%); }
+      100% { transform: translateX(400%); }
     }
 
+    /* SETUP CARD */
     .setup-card {
       background: #0f1729;
       border: 1px solid #1e2d4a;
       border-radius: 12px;
-      padding: 16px;
-      margin-bottom: 12px;
+      padding: 14px;
+      margin-bottom: 10px;
       transition: all 0.2s;
+      animation: fadeIn 0.4s ease;
+    }
+
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(10px); }
+      to   { opacity: 1; transform: translateY(0); }
     }
 
     .setup-card:hover {
@@ -275,8 +344,8 @@
     }
 
     .setup-card.grade-aplus {
-      border-left: 4px solid #00ff88;
-      background: linear-gradient(135deg, #0f1729, #0a1f12);
+      border-left: 4px solid #ffd700;
+      background: linear-gradient(135deg, #0f1729, #1a1400);
     }
 
     .setup-card.grade-a {
@@ -285,44 +354,44 @@
     }
 
     .setup-card.grade-b {
-      border-left: 4px solid #ffd600;
-      background: linear-gradient(135deg, #0f1729, #1a1800);
+      border-left: 4px solid #00ff88;
+      background: linear-gradient(135deg, #0f1729, #0a1f12);
     }
 
     .setup-card.grade-d {
       border-left: 4px solid #ff1744;
-      opacity: 0.6;
+      opacity: 0.5;
     }
 
     .card-header {
       display: flex;
       align-items: center;
       justify-content: space-between;
-      margin-bottom: 12px;
+      margin-bottom: 10px;
     }
 
     .ticker-info {
       display: flex;
       align-items: center;
-      gap: 10px;
+      gap: 8px;
     }
 
     .ticker {
-      font-size: 1.3rem;
+      font-size: 1.2rem;
       font-weight: 800;
       color: #fff;
     }
 
     .grade-badge {
-      padding: 3px 10px;
+      padding: 2px 10px;
       border-radius: 20px;
-      font-size: 0.75rem;
+      font-size: 0.72rem;
       font-weight: 700;
     }
 
-    .grade-badge.aplus { background: #00ff88; color: #000; }
+    .grade-badge.aplus { background: #ffd700; color: #000; }
     .grade-badge.a     { background: #00d4ff; color: #000; }
-    .grade-badge.b     { background: #ffd600; color: #000; }
+    .grade-badge.b     { background: #00ff88; color: #000; }
     .grade-badge.d     { background: #ff1744; color: #fff; }
 
     .gap-pct {
@@ -334,57 +403,56 @@
     .card-metrics {
       display: grid;
       grid-template-columns: repeat(3, 1fr);
-      gap: 8px;
-      margin-bottom: 12px;
-    }
-
-    .metric {
-      background: #0a0e1a;
-      border-radius: 6px;
-      padding: 8px;
-      text-align: center;
-    }
-
-    .metric-val {
-      font-size: 0.95rem;
-      font-weight: 700;
-      color: #e0e6f0;
-    }
-
-    .metric-label {
-      font-size: 0.6rem;
-      color: #4a5a7a;
-      text-transform: uppercase;
-      margin-top: 2px;
-    }
-
-    .catalyst {
-      font-size: 0.78rem;
-      padding: 6px 10px;
-      background: #0a0e1a;
-      border-radius: 6px;
+      gap: 6px;
       margin-bottom: 10px;
     }
 
-    .trade-plan {
-      display: grid;
-      grid-template-columns: repeat(4, 1fr);
-      gap: 6px;
-    }
-
-    .trade-item {
+    .metric {
       background: #0a0e1a;
       border-radius: 6px;
       padding: 6px;
       text-align: center;
     }
 
-    .trade-val { font-size: 0.85rem; font-weight: 700; }
-    .trade-label {
-      font-size: 0.55rem;
+    .metric-val {
+      font-size: 0.9rem;
+      font-weight: 700;
+    }
+
+    .metric-label {
+      font-size: 0.58rem;
       color: #4a5a7a;
       text-transform: uppercase;
-      margin-top: 2px;
+      margin-top: 1px;
+    }
+
+    .catalyst {
+      font-size: 0.75rem;
+      padding: 5px 8px;
+      background: #0a0e1a;
+      border-radius: 6px;
+      margin-bottom: 8px;
+    }
+
+    .trade-plan {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 5px;
+    }
+
+    .trade-item {
+      background: #0a0e1a;
+      border-radius: 6px;
+      padding: 5px;
+      text-align: center;
+    }
+
+    .trade-val { font-size: 0.8rem; font-weight: 700; }
+    .trade-label {
+      font-size: 0.52rem;
+      color: #4a5a7a;
+      text-transform: uppercase;
+      margin-top: 1px;
     }
 
     .entry-val  { color: #00d4ff; }
@@ -395,66 +463,86 @@
       background: rgba(255,23,68,0.15);
       border: 1px solid #ff1744;
       border-radius: 6px;
-      padding: 6px 10px;
-      font-size: 0.78rem;
+      padding: 5px 8px;
+      font-size: 0.72rem;
       color: #ff5252;
-      margin-top: 8px;
+      margin-top: 6px;
       text-align: center;
     }
 
     .headline {
-      font-size: 0.72rem;
+      font-size: 0.68rem;
       color: #4a6a9a;
-      padding: 3px 0;
+      padding: 2px 0;
       border-top: 1px solid #1e2d4a;
-      margin-top: 4px;
+      margin-top: 3px;
     }
 
+    /* SIDEBAR */
     .sidebar {
       background: #0d1220;
       border-left: 1px solid #1e2d4a;
       overflow-y: auto;
       padding: 16px;
+      transition: all 0.3s ease;
+    }
+
+    .main.log-hidden .sidebar {
+      display: none;
     }
 
     .sidebar-title {
-      font-size: 0.85rem;
+      font-size: 0.8rem;
       font-weight: 600;
       color: #6b7fa3;
       text-transform: uppercase;
       letter-spacing: 1px;
-      margin-bottom: 12px;
+      margin-bottom: 10px;
     }
 
     .alert-item {
-      padding: 8px 10px;
+      padding: 6px 8px;
       background: #0f1729;
       border-radius: 6px;
-      margin-bottom: 6px;
-      border-left: 3px solid #2a3f6f;
+      margin-bottom: 5px;
+      border-left: 2px solid #2a3f6f;
     }
 
     .alert-time {
-      font-size: 0.65rem;
+      font-size: 0.62rem;
       color: #4a5a7a;
       font-family: monospace;
     }
 
     .alert-msg {
-      font-size: 0.78rem;
+      font-size: 0.72rem;
       color: #a0b0d0;
-      margin-top: 2px;
+      margin-top: 1px;
     }
 
+    /* DATA SOURCE BADGE */
+    .data-source {
+      font-size: 0.62rem;
+      padding: 2px 6px;
+      border-radius: 4px;
+      background: rgba(0,212,255,0.15);
+      color: #00d4ff;
+      margin-left: 6px;
+    }
+
+    /* SCROLLBAR */
     ::-webkit-scrollbar { width: 4px; }
     ::-webkit-scrollbar-track { background: #0a0e1a; }
     ::-webkit-scrollbar-thumb { background: #2a3f6f; border-radius: 4px; }
 
+    /* MOBILE */
     @media (max-width: 768px) {
-      .main { grid-template-columns: 1fr; height: auto; }
-      .sidebar { border-left: none; border-top: 1px solid #1e2d4a; }
+      .main { grid-template-columns: 1fr !important; height: auto; }
+      .sidebar { display: none !important; }
       .stats-bar { display: none; }
       .trade-plan { grid-template-columns: repeat(2, 1fr); }
+      .logo-img { width: 36px; height: 36px; }
+      .brand-text h1 { font-size: 0.9rem; }
     }
   </style>
 </head>
@@ -462,23 +550,37 @@
 
 <div class="scanning-bar hidden" id="scanBar"></div>
 
+<!-- HEADER -->
 <div class="header">
-  <div class="header-left">
-    <h1>🔥 Sykes Trading Agent</h1>
-    <p>Small Cap Scanner — Sykes Method</p>
+  <div class="header-brand">
+    <div class="logos">
+      <img id="paydaLogo" class="logo-img" src="" alt="Payda Capital">
+      <span class="logo-divider">×</span>
+      <img id="uyghurLogo" class="logo-img" src="" alt="UyghurKid">
+    </div>
+    <div class="brand-text">
+      <h1>Payda × UyghurKid Capital Trading Agent</h1>
+      <p>Small Cap Scanner • Sykes Method • Real-Time</p>
+    </div>
   </div>
   <div class="header-right">
-    <div class="status-dot" id="statusDot"></div>
-    <span class="status-text" id="statusText">Offline</span>
-    <span class="clock" id="clock">--:--:--</span>
+    <div class="status-pill">
+      <div class="status-dot" id="statusDot"></div>
+      <span class="status-text" id="statusText">Offline</span>
+    </div>
+    <span class="clock" id="clock">--:--:-- EST</span>
   </div>
 </div>
 
+<!-- CONTROLS -->
 <div class="controls">
-  <button class="btn btn-start" onclick="startScanner()">▶ Start Scanner</button>
-  <button class="btn btn-stop" onclick="stopScanner()">⏹ Stop Scanner</button>
-  <button class="btn btn-clear" onclick="clearAlerts()">🗑 Clear Alerts</button>
-  <button class="btn btn-refresh" onclick="loadResults()">🔄 Refresh</button>
+  <button class="btn btn-start"      onclick="startScanner()">▶ Start Scanner</button>
+  <button class="btn btn-stop"       onclick="stopScanner()">⏹ Stop</button>
+  <button class="btn btn-clear"      onclick="clearAlerts()">🗑 Clear</button>
+  <button class="btn btn-refresh"    onclick="loadResults()">🔄 Refresh</button>
+  <button class="btn btn-toggle-log" onclick="toggleLog()" id="toggleLogBtn">
+    📋 Hide Log
+  </button>
   <div class="stats-bar">
     <div class="stat">
       <div class="stat-val" id="statSetups">0</div>
@@ -510,10 +612,16 @@
   </div>
 </div>
 
-<div class="main">
+<!-- MAIN -->
+<div class="main" id="mainLayout">
+
+  <!-- RESULTS -->
   <div class="results-panel">
     <div class="results-header">
-      <span class="results-title">📊 Scanner Results</span>
+      <span class="results-title">
+        📊 Live Scanner Results
+        <span class="data-source">⚡ Polygon.io Real-Time</span>
+      </span>
       <span class="last-scan" id="lastScan">Waiting for scan...</span>
     </div>
     <div id="results">
@@ -521,13 +629,14 @@
         <div class="icon">🔍</div>
         <p>Press Start Scanner to begin</p>
         <p style="font-size:0.8rem;margin-top:8px;color:#3a4a6a">
-          Scans every 10 seconds for Sykes setups
+          Real-time data • Pre-market • After-hours
         </p>
       </div>
     </div>
   </div>
 
-  <div class="sidebar">
+  <!-- SIDEBAR -->
+  <div class="sidebar" id="sidebar">
     <div class="sidebar-title">📋 Activity Log</div>
     <div id="alertLog">
       <div class="alert-item">
@@ -536,15 +645,34 @@
       </div>
     </div>
   </div>
+
 </div>
 
 <script>
+  // ============================================================
+  // CONFIG
+  // ============================================================
   const WS_URL  = `ws://${location.host}/ws`;
   const API_URL = `${location.protocol}//${location.host}`;
 
-  let ws        = null;
-  let isRunning = false;
+  let ws         = null;
+  let isRunning  = false;
+  let logVisible = true;
+  let allResults = [];
 
+  // ============================================================
+  // LOAD LOGOS FROM GITHUB
+  // ============================================================
+  // Since logos are uploaded to GitHub repo, reference them directly
+  // Update these paths to match your GitHub repo structure
+  document.getElementById('paydaLogo').src  =
+    'https://raw.githubusercontent.com/uyghurkid/trading-agent/main/payda.png';
+  document.getElementById('uyghurLogo').src =
+    'https://raw.githubusercontent.com/uyghurkid/trading-agent/main/UYGHURKID.png';
+
+  // ============================================================
+  // WEBSOCKET
+  // ============================================================
   function connectWS() {
     ws = new WebSocket(WS_URL);
 
@@ -566,13 +694,18 @@
         updateProgress(msg.status);
       }
 
+      // NEW — add ticker as it's found in real time!
+      if (msg.type === 'new_ticker') {
+        addTickerToResults(msg.setup);
+        updateStatsFromResults();
+      }
+
       if (msg.type === 'scan_results') {
-        renderResults(msg.data);
+        allResults = msg.data || [];
+        renderResults(allResults);
         renderAlerts(msg.alerts);
         updateStats(msg);
-        if (msg.scan_status) {
-          updateProgress(msg.scan_status);
-        }
+        if (msg.scan_status) updateProgress(msg.scan_status);
       }
     };
 
@@ -584,6 +717,159 @@
     ws.onerror = () => ws.close();
   }
 
+  // ============================================================
+  // ADD TICKER IN REAL TIME
+  // ============================================================
+  function addTickerToResults(setup) {
+    // Remove loading screen if still showing
+    const container = document.getElementById('results');
+    if (container.querySelector('.no-results')) {
+      container.innerHTML = '';
+      allResults = [];
+    }
+
+    // Check if ticker already exists
+    const existing = document.getElementById(`card-${setup.ticker}`);
+    if (existing) {
+      existing.outerHTML = buildCard(setup);
+      return;
+    }
+
+    // Add new card at the top if A+, otherwise append
+    allResults.push(setup);
+    const card = document.createElement('div');
+    card.innerHTML = buildCard(setup);
+    const cardEl = card.firstElementChild;
+
+    if (setup.grade === 'A+' && !setup.warning) {
+      container.insertBefore(cardEl, container.firstChild);
+    } else {
+      container.appendChild(cardEl);
+    }
+  }
+
+  function updateStatsFromResults() {
+    document.getElementById('statSetups').textContent =
+      allResults.length;
+    document.getElementById('statAplus').textContent  =
+      allResults.filter(s => s.grade === 'A+').length;
+  }
+
+  // ============================================================
+  // BUILD CARD HTML
+  // ============================================================
+  function buildCard(s) {
+    const gradeClass = {
+      'A+': 'aplus', 'A': 'a', 'B': 'b', 'D': 'd'
+    }[s.grade] || 'b';
+
+    const cardClass = {
+      'A+': 'grade-aplus', 'A': 'grade-a',
+      'B':  'grade-b',     'D': 'grade-d'
+    }[s.grade] || 'grade-b';
+
+    const headlines = (s.headlines || []).map(h =>
+      `<div class="headline">📰 ${h.substring(0,85)}...</div>`
+    ).join('');
+
+    const notes = (s.notes || []).map(n =>
+      `<span style="font-size:0.68rem;color:#6b8ab0">📌 ${n}</span> `
+    ).join('');
+
+    const skipBanner = s.warning
+      ? `<div class="skip-banner">⛔ SKIP — Dangerous catalyst!</div>`
+      : '';
+
+    const strongSetup = ['A+','A'].includes(s.grade) && !s.warning
+      ? `<div style="font-size:0.68rem;color:#00ff88;margin-top:4px">
+           ✅ STRONG SETUP — Watch for continuation!
+         </div>`
+      : '';
+
+    return `
+      <div class="setup-card ${cardClass}" id="card-${s.ticker}">
+        <div class="card-header">
+          <div class="ticker-info">
+            <span class="ticker">${s.ticker}</span>
+            <span class="grade-badge ${gradeClass}">${s.grade}</span>
+          </div>
+          <span class="gap-pct">+${s.gap_pct}%</span>
+        </div>
+
+        <div class="card-metrics">
+          <div class="metric">
+            <div class="metric-val">$${s.price}</div>
+            <div class="metric-label">Price Now</div>
+          </div>
+          <div class="metric">
+            <div class="metric-val">$${s.prev_close}</div>
+            <div class="metric-label">Prev Close</div>
+          </div>
+          <div class="metric">
+            <div class="metric-val">
+              $${(s.dollar_vol/1000).toFixed(0)}K
+            </div>
+            <div class="metric-label">$ Volume</div>
+          </div>
+        </div>
+
+        <div class="catalyst">${s.catalyst}</div>
+
+        <div class="trade-plan">
+          <div class="trade-item">
+            <div class="trade-val entry-val">
+              $${s.entry_low}–$${s.entry_high}
+            </div>
+            <div class="trade-label">Entry</div>
+          </div>
+          <div class="trade-item">
+            <div class="trade-val stop-val">$${s.stop_loss}</div>
+            <div class="trade-label">Stop -5%</div>
+          </div>
+          <div class="trade-item">
+            <div class="trade-val target-val">$${s.target1}</div>
+            <div class="trade-label">T1 +10%</div>
+          </div>
+          <div class="trade-item">
+            <div class="trade-val target-val">$${s.target2}</div>
+            <div class="trade-label">T2 +20%</div>
+          </div>
+        </div>
+
+        <div style="margin-top:6px">${notes}</div>
+        ${headlines}
+        ${skipBanner}
+        ${strongSetup}
+
+        <div style="font-size:0.6rem;color:#3a4a6a;
+                    margin-top:6px;text-align:right">
+          ${s.time}
+        </div>
+      </div>`;
+  }
+
+  // ============================================================
+  // RENDER ALL RESULTS
+  // ============================================================
+  function renderResults(data) {
+    const container = document.getElementById('results');
+    if (!data || data.length === 0) {
+      container.innerHTML = `
+        <div class="no-results">
+          <div class="icon">📭</div>
+          <p>No qualifying setups found this scan</p>
+          <p style="font-size:0.8rem;margin-top:8px;color:#3a4a6a">
+            Scanner is running — next scan soon
+          </p>
+        </div>`;
+      return;
+    }
+    container.innerHTML = data.map(s => buildCard(s)).join('');
+  }
+
+  // ============================================================
+  // PROGRESS BAR
+  // ============================================================
   function updateProgress(status) {
     const bar   = document.getElementById('progressBar');
     const msg   = document.getElementById('progressMsg');
@@ -606,11 +892,11 @@
     } else {
       count.textContent = '';
       fill.classList.add('indeterminate');
-      fill.style.width = '40%';
+      fill.style.width  = '35%';
     }
 
     if (status.phase === 'done') {
-      setTimeout(hideProgress, 2000);
+      setTimeout(hideProgress, 3000);
     }
   }
 
@@ -618,112 +904,9 @@
     document.getElementById('progressBar').classList.remove('visible');
   }
 
-  function renderResults(data) {
-    const container = document.getElementById('results');
-
-    if (!data || data.length === 0) {
-      container.innerHTML = `
-        <div class="no-results">
-          <div class="icon">📭</div>
-          <p>No qualifying setups found</p>
-          <p style="font-size:0.8rem;margin-top:8px;color:#3a4a6a">
-            Scanner is running — next scan soon
-          </p>
-        </div>`;
-      return;
-    }
-
-    container.innerHTML = data.map(s => {
-      const gradeClass = {
-        'A+': 'aplus', 'A': 'a', 'B': 'b', 'D': 'd'
-      }[s.grade] || 'b';
-
-      const cardClass = {
-        'A+': 'grade-aplus', 'A': 'grade-a',
-        'B':  'grade-b',     'D': 'grade-d'
-      }[s.grade] || 'grade-b';
-
-      const headlines = (s.headlines || []).map(h =>
-        `<div class="headline">📰 ${h.substring(0,80)}...</div>`
-      ).join('');
-
-      const notes = (s.notes || []).map(n =>
-        `<span style="font-size:0.72rem;color:#6b8ab0">📌 ${n}</span> `
-      ).join('');
-
-      const skipBanner = s.warning
-        ? `<div class="skip-banner">⛔ SKIP — Dangerous catalyst!</div>`
-        : '';
-
-      const strongSetup = ['A+','A'].includes(s.grade) && !s.warning
-        ? `<div style="font-size:0.72rem;color:#00ff88;margin-top:6px">
-             ✅ STRONG SETUP — Watch for continuation!
-           </div>`
-        : '';
-
-      return `
-        <div class="setup-card ${cardClass}">
-          <div class="card-header">
-            <div class="ticker-info">
-              <span class="ticker">${s.ticker}</span>
-              <span class="grade-badge ${gradeClass}">${s.grade}</span>
-            </div>
-            <span class="gap-pct">+${s.gap_pct}%</span>
-          </div>
-
-          <div class="card-metrics">
-            <div class="metric">
-              <div class="metric-val">$${s.price}</div>
-              <div class="metric-label">Price Now</div>
-            </div>
-            <div class="metric">
-              <div class="metric-val">$${s.prev_close}</div>
-              <div class="metric-label">Prev Close</div>
-            </div>
-            <div class="metric">
-              <div class="metric-val">
-                $${(s.dollar_vol/1000).toFixed(0)}K
-              </div>
-              <div class="metric-label">$ Volume</div>
-            </div>
-          </div>
-
-          <div class="catalyst">${s.catalyst}</div>
-
-          <div class="trade-plan">
-            <div class="trade-item">
-              <div class="trade-val entry-val">
-                $${s.entry_low}–$${s.entry_high}
-              </div>
-              <div class="trade-label">Entry</div>
-            </div>
-            <div class="trade-item">
-              <div class="trade-val stop-val">$${s.stop_loss}</div>
-              <div class="trade-label">Stop -5%</div>
-            </div>
-            <div class="trade-item">
-              <div class="trade-val target-val">$${s.target1}</div>
-              <div class="trade-label">T1 +10%</div>
-            </div>
-            <div class="trade-item">
-              <div class="trade-val target-val">$${s.target2}</div>
-              <div class="trade-label">T2 +20%</div>
-            </div>
-          </div>
-
-          <div style="margin-top:8px">${notes}</div>
-          ${headlines}
-          ${skipBanner}
-          ${strongSetup}
-
-          <div style="font-size:0.65rem;color:#3a4a6a;
-                      margin-top:8px;text-align:right">
-            ${s.time}
-          </div>
-        </div>`;
-    }).join('');
-  }
-
+  // ============================================================
+  // ALERTS / STATS
+  // ============================================================
   function renderAlerts(alerts) {
     if (!alerts || alerts.length === 0) return;
     document.getElementById('alertLog').innerHTML = alerts.map(a => `
@@ -741,11 +924,15 @@
     document.getElementById('statAplus').textContent  =
       data.filter(s => s.grade === 'A+').length;
     document.getElementById('statAlerts').textContent = alerts.length;
-    document.getElementById('statTime').textContent   = msg.time || '--:--';
+    document.getElementById('statTime').textContent   =
+      msg.time || '--:--';
     document.getElementById('lastScan').textContent   =
-      `Last scan: ${msg.time} — ${data.length} setup(s)`;
+      `Last scan: ${msg.time} — ${data.length} setup(s) found`;
   }
 
+  // ============================================================
+  // STATUS
+  // ============================================================
   function updateStatus(running) {
     const dot  = document.getElementById('statusDot');
     const text = document.getElementById('statusText');
@@ -753,50 +940,66 @@
 
     if (running) {
       dot.classList.add('active');
-      text.textContent = '● Scanner Active';
+      text.textContent = '● Live';
       text.style.color = '#00ff88';
       bar.classList.remove('hidden');
     } else {
       dot.classList.remove('active');
-      text.textContent = 'Scanner Stopped';
+      text.textContent = 'Stopped';
       text.style.color = '#ff4444';
       bar.classList.add('hidden');
       hideProgress();
     }
   }
 
+  // ============================================================
+  // TOGGLE LOG
+  // ============================================================
+  function toggleLog() {
+    logVisible = !logVisible;
+    const layout = document.getElementById('mainLayout');
+    const btn    = document.getElementById('toggleLogBtn');
+
+    if (logVisible) {
+      layout.classList.remove('log-hidden');
+      btn.textContent = '📋 Hide Log';
+    } else {
+      layout.classList.add('log-hidden');
+      btn.textContent = '📋 Show Log';
+    }
+  }
+
+  // ============================================================
+  // BUTTONS
+  // ============================================================
   async function startScanner() {
     try {
       await fetch(`${API_URL}/api/scanner/start`, { method: 'POST' });
-      isRunning = true;
+      isRunning  = true;
+      allResults = [];
       updateStatus(true);
+
       document.getElementById('results').innerHTML = `
         <div class="no-results">
           <div class="icon">⚡</div>
-          <p style="color:#00d4ff;font-size:1.1rem;font-weight:600">
-            Scanner starting...
+          <p style="color:#ffd700;font-size:1rem;font-weight:700">
+            Connecting to Polygon.io...
           </p>
-          <p style="font-size:0.85rem;margin-top:8px;color:#6b7fa3">
-            Step 1: Fetching top gainers from Yahoo Finance + Finviz
+          <p style="font-size:0.82rem;margin-top:8px;color:#6b7fa3">
+            Fetching real-time pre/after market gainers
           </p>
-          <p style="font-size:0.85rem;margin-top:4px;color:#6b7fa3">
-            Step 2: Getting real pre-market prices
-          </p>
-          <p style="font-size:0.85rem;margin-top:4px;color:#6b7fa3">
-            Step 3: Checking news catalysts
-          </p>
-          <p style="font-size:0.85rem;margin-top:4px;color:#6b7fa3">
-            Step 4: Grading setups — Sykes method
+          <p style="font-size:0.82rem;margin-top:4px;color:#6b7fa3">
+            Stocks will appear here as they are found ⚡
           </p>
           <div class="loading-bar">
             <div class="loading-fill"></div>
           </div>
-          <p style="font-size:0.75rem;margin-top:12px;color:#4a5a7a">
-            First scan takes 30–60 seconds ⏱
+          <p style="font-size:0.72rem;margin-top:10px;color:#4a5a7a">
+            First scan takes 15–30 seconds
           </p>
         </div>`;
     } catch(e) {
-      alert('Could not connect to server.');
+      alert('Could not connect to server. Is it running?');
     }
   }
 
@@ -820,15 +1023,19 @@
     try {
       const r    = await fetch(`${API_URL}/api/results`);
       const data = await r.json();
-      renderResults(data.data);
+      allResults = data.data || [];
+      renderResults(allResults);
       renderAlerts(data.alerts);
     } catch(e) {}
   }
 
+  // ============================================================
+  // CLOCK
+  // ============================================================
   function updateClock() {
     document.getElementById('clock').textContent =
       new Date().toLocaleTimeString('en-US', {
-        hour12: true,
+        hour12:   true,
         timeZone: 'America/New_York'
       }) + ' EST';
   }
