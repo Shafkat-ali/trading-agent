@@ -22,72 +22,35 @@
     }
 
     .header-brand { display: flex; align-items: center; gap: 14px; }
-
     .logos { display: flex; align-items: center; gap: 8px; }
-
-    .logo-img {
-      width: 44px;
-      height: 44px;
-      border-radius: 50%;
-      object-fit: cover;
-      border: 2px solid #2a3f6f;
-      background: #0f1729;
-    }
-
+    .logo-img { width: 44px; height: 44px; border-radius: 50%; object-fit: cover; border: 2px solid #2a3f6f; background: #0f1729; }
     .logo-x { color: #ffd700; font-size: 1rem; font-weight: 800; }
-
-    .brand-text h1 {
-      font-size: 1rem;
-      font-weight: 800;
-      background: linear-gradient(90deg, #ffd700, #00d4ff, #00ff88);
-      -webkit-background-clip: text;
-      -webkit-text-fill-color: transparent;
-    }
-
+    .brand-text h1 { font-size: 1rem; font-weight: 800; background: linear-gradient(90deg, #ffd700, #00d4ff, #00ff88); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
     .brand-text p { font-size: 0.6rem; color: #3a5a7a; text-transform: uppercase; letter-spacing: 2px; margin-top: 1px; }
 
     .header-right { display: flex; align-items: center; gap: 12px; }
-
-    .status-pill {
-      display: flex; align-items: center; gap: 6px;
-      padding: 5px 12px; border-radius: 20px;
-      background: #0f1729; border: 1px solid #1e2d4a;
-    }
-
+    .status-pill { display: flex; align-items: center; gap: 6px; padding: 5px 12px; border-radius: 20px; background: #0f1729; border: 1px solid #1e2d4a; }
     .status-dot { width: 7px; height: 7px; border-radius: 50%; background: #ff4444; }
     .status-dot.active { background: #00ff88; animation: pulse 1.5s infinite; }
-
-    @keyframes pulse {
-      0%, 100% { opacity: 1; transform: scale(1); }
-      50% { opacity: 0.4; transform: scale(1.5); }
-    }
-
+    @keyframes pulse { 0%,100%{opacity:1;transform:scale(1)}50%{opacity:.4;transform:scale(1.5)} }
     .status-text { font-size: 0.75rem; font-weight: 600; }
     .clock { font-size: 0.72rem; color: #4a6a8a; font-family: monospace; }
 
     /* SCANNING BAR */
-    .scanning-bar { height: 2px; background: linear-gradient(90deg, #ffd700, #00d4ff, #00ff88, #ffd700); background-size: 300%; animation: scan 1.5s linear infinite; }
+    .scanning-bar { height: 2px; background: linear-gradient(90deg,#ffd700,#00d4ff,#00ff88,#ffd700); background-size: 300%; animation: scan 1.5s linear infinite; }
     .scanning-bar.hidden { display: none; }
-    @keyframes scan { 0% { background-position: 0%; } 100% { background-position: 300%; } }
+    @keyframes scan { 0%{background-position:0%}100%{background-position:300%} }
 
     /* CONTROLS */
-    .controls {
-      padding: 10px 20px; display: flex; gap: 8px; flex-wrap: wrap;
-      background: #0d1220; border-bottom: 1px solid #1a2035; align-items: center;
-    }
-
-    .btn {
-      padding: 7px 16px; border: none; border-radius: 7px;
-      font-size: 0.8rem; font-weight: 600; cursor: pointer; transition: all 0.2s;
-    }
-
-    .btn-start  { background: linear-gradient(135deg, #00c853, #00e676); color: #000; }
-    .btn-stop   { background: linear-gradient(135deg, #ff1744, #ff5252); color: #fff; }
-    .btn-clear  { background: linear-gradient(135deg, #ff6d00, #ff9100); color: #000; }
-    .btn-refresh{ background: linear-gradient(135deg, #2979ff, #448aff); color: #fff; }
-    .btn-log    { background: linear-gradient(135deg, #6200ea, #9c27b0); color: #fff; }
-
+    .controls { padding: 10px 20px; display: flex; gap: 8px; flex-wrap: wrap; background: #0d1220; border-bottom: 1px solid #1a2035; align-items: center; }
+    .btn { padding: 7px 16px; border: none; border-radius: 7px; font-size: 0.8rem; font-weight: 600; cursor: pointer; transition: all 0.2s; display: flex; align-items: center; gap: 5px; }
     .btn:hover { transform: translateY(-1px); filter: brightness(1.1); }
+    .btn-start   { background: linear-gradient(135deg,#00c853,#00e676); color: #000; }
+    .btn-pause   { background: linear-gradient(135deg,#ff6d00,#ff9100); color: #000; }
+    .btn-rescan  { background: linear-gradient(135deg,#2979ff,#448aff); color: #fff; }
+    .btn-clear   { background: linear-gradient(135deg,#6200ea,#9c27b0); color: #fff; }
+    .btn-tab     { background: transparent; border: 1px solid #1e2d4a; color: #6b7fa3; border-radius: 6px; padding: 6px 14px; font-size: 0.78rem; font-weight: 600; cursor: pointer; transition: all 0.2s; }
+    .btn-tab.active { background: #1e2d4a; color: #00d4ff; border-color: #00d4ff; }
 
     .stats-bar { margin-left: auto; display: flex; gap: 16px; align-items: center; }
     .stat { text-align: center; }
@@ -99,17 +62,15 @@
     .scan-progress-bar.visible { display: block; }
     .progress-label { font-size: 0.68rem; color: #4a6a8a; margin-bottom: 3px; display: flex; justify-content: space-between; }
     .progress-track { height: 3px; background: #1a2035; border-radius: 2px; overflow: hidden; }
-    .progress-fill { height: 100%; background: linear-gradient(90deg, #ffd700, #00d4ff); border-radius: 2px; transition: width 0.3s; }
-    .progress-fill.indeterminate { width: 30% !important; animation: ind 1.5s ease-in-out infinite; }
-    @keyframes ind { 0% { transform: translateX(-200%); } 100% { transform: translateX(450%); } }
+    .progress-fill { height: 100%; background: linear-gradient(90deg,#ffd700,#00d4ff); border-radius: 2px; transition: width 0.3s; }
+    .progress-fill.indeterminate { width: 30%!important; animation: ind 1.5s ease-in-out infinite; }
+    @keyframes ind { 0%{transform:translateX(-200%)}100%{transform:translateX(450%)} }
 
     /* MAIN */
-    .main { display: grid; grid-template-columns: 1fr 280px; height: calc(100vh - 130px); transition: grid-template-columns 0.3s; }
-    .main.log-hidden { grid-template-columns: 1fr 0; }
+    .main { display: grid; grid-template-columns: 1fr 300px; height: calc(100vh - 135px); }
 
     /* RESULTS */
     .results-panel { overflow-y: auto; padding: 14px; }
-
     .results-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; }
     .results-title { font-size: 0.85rem; font-weight: 600; color: #8090b0; }
     .data-badge { font-size: 0.58rem; padding: 2px 6px; border-radius: 4px; background: rgba(0,212,255,0.1); color: #00d4ff; margin-left: 6px; }
@@ -117,79 +78,105 @@
 
     .no-results { text-align: center; padding: 50px 20px; color: #2a3a5a; }
     .no-results .icon { font-size: 2.5rem; margin-bottom: 12px; }
-
     .loading-bar { width: 160px; height: 3px; background: #1a2035; border-radius: 2px; margin: 14px auto 0; overflow: hidden; }
-    .loading-fill { height: 100%; width: 30%; background: linear-gradient(90deg, #ffd700, #00d4ff); animation: loading 1.5s ease-in-out infinite; }
-    @keyframes loading { 0% { transform: translateX(-100%); } 100% { transform: translateX(450%); } }
+    .loading-fill { height: 100%; width: 30%; background: linear-gradient(90deg,#ffd700,#00d4ff); animation: loading 1.5s ease-in-out infinite; }
+    @keyframes loading { 0%{transform:translateX(-100%)}100%{transform:translateX(450%)} }
 
-    /* CARD */
-    .setup-card {
-      background: #0d1525;
-      border: 1px solid #1a2035;
-      border-radius: 10px;
-      padding: 12px;
-      margin-bottom: 8px;
-      transition: all 0.2s;
-      animation: fadeIn 0.3s ease;
-    }
-
-    @keyframes fadeIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
-
-    .setup-card:hover { border-color: #2a4a8a; transform: translateY(-1px); box-shadow: 0 3px 15px rgba(0,0,0,0.3); }
-    .setup-card.grade-aplus { border-left: 3px solid #ffd700; background: linear-gradient(135deg, #0d1525, #1a1200); }
-    .setup-card.grade-a     { border-left: 3px solid #00d4ff; background: linear-gradient(135deg, #0d1525, #081520); }
-    .setup-card.grade-b     { border-left: 3px solid #00ff88; background: linear-gradient(135deg, #0d1525, #081a10); }
-    .setup-card.grade-d     { border-left: 3px solid #ff1744; opacity: 0.5; }
+    /* SETUP CARD */
+    .setup-card { background: #0d1525; border: 1px solid #1a2035; border-radius: 10px; padding: 12px; margin-bottom: 8px; transition: all 0.2s; animation: fadeIn 0.3s ease; }
+    @keyframes fadeIn { from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)} }
+    .setup-card:hover { border-color: #2a4a8a; transform: translateY(-1px); box-shadow: 0 3px 15px rgba(0,0,0,.3); }
+    .setup-card.grade-aplus { border-left: 3px solid #ffd700; background: linear-gradient(135deg,#0d1525,#1a1200); }
+    .setup-card.grade-a     { border-left: 3px solid #00d4ff; background: linear-gradient(135deg,#0d1525,#081520); }
+    .setup-card.grade-b     { border-left: 3px solid #00ff88; background: linear-gradient(135deg,#0d1525,#081a10); }
+    .setup-card.grade-d     { border-left: 3px solid #ff1744; opacity: .5; }
 
     .card-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; }
     .ticker-info { display: flex; align-items: center; gap: 7px; }
     .ticker { font-size: 1.1rem; font-weight: 800; color: #fff; }
-
     .grade-badge { padding: 2px 8px; border-radius: 12px; font-size: 0.68rem; font-weight: 700; }
-    .grade-badge.aplus { background: #ffd700; color: #000; }
-    .grade-badge.a     { background: #00d4ff; color: #000; }
-    .grade-badge.b     { background: #00ff88; color: #000; }
-    .grade-badge.d     { background: #ff1744; color: #fff; }
-
-    .source-tag { font-size: 0.55rem; padding: 1px 5px; border-radius: 3px; background: rgba(255,215,0,0.15); color: #ffd700; }
+    .grade-badge.aplus{background:#ffd700;color:#000}
+    .grade-badge.a    {background:#00d4ff;color:#000}
+    .grade-badge.b    {background:#00ff88;color:#000}
+    .grade-badge.d    {background:#ff1744;color:#fff}
+    .source-tag { font-size: 0.55rem; padding: 1px 5px; border-radius: 3px; background: rgba(255,215,0,.15); color: #ffd700; }
     .gap-pct { font-size: 1rem; font-weight: 700; color: #00ff88; }
 
-    .card-metrics { display: grid; grid-template-columns: repeat(3, 1fr); gap: 5px; margin-bottom: 8px; }
+    .card-metrics { display: grid; grid-template-columns: repeat(3,1fr); gap: 5px; margin-bottom: 8px; }
     .metric { background: #080c18; border-radius: 5px; padding: 5px; text-align: center; }
     .metric-val { font-size: 0.85rem; font-weight: 700; }
     .metric-label { font-size: 0.55rem; color: #3a4a6a; text-transform: uppercase; margin-top: 1px; }
 
     .catalyst { font-size: 0.72rem; padding: 4px 7px; background: #080c18; border-radius: 5px; margin-bottom: 7px; }
-
-    .trade-plan { display: grid; grid-template-columns: repeat(4, 1fr); gap: 4px; }
+    .trade-plan { display: grid; grid-template-columns: repeat(4,1fr); gap: 4px; }
     .trade-item { background: #080c18; border-radius: 5px; padding: 4px; text-align: center; }
     .trade-val { font-size: 0.75rem; font-weight: 700; }
     .trade-label { font-size: 0.5rem; color: #3a4a6a; text-transform: uppercase; margin-top: 1px; }
-    .entry-val { color: #00d4ff; }
-    .stop-val  { color: #ff4444; }
-    .t-val     { color: #00ff88; }
+    .entry-val{color:#00d4ff}.stop-val{color:#ff4444}.t-val{color:#00ff88}
+    .skip-banner { background: rgba(255,23,68,.12); border: 1px solid #ff1744; border-radius: 5px; padding: 4px 7px; font-size: .68rem; color: #ff5252; margin-top: 5px; text-align: center; }
+    .headline { font-size: .65rem; color: #3a5a7a; padding: 2px 0; border-top: 1px solid #1a2035; margin-top: 3px; }
 
-    .skip-banner { background: rgba(255,23,68,0.12); border: 1px solid #ff1744; border-radius: 5px; padding: 4px 7px; font-size: 0.68rem; color: #ff5252; margin-top: 5px; text-align: center; }
-    .headline { font-size: 0.65rem; color: #3a5a7a; padding: 2px 0; border-top: 1px solid #1a2035; margin-top: 3px; }
+    /* RIGHT PANEL - TABS */
+    .right-panel { background: #0d1220; border-left: 1px solid #1a2035; display: flex; flex-direction: column; overflow: hidden; }
 
-    /* SIDEBAR */
-    .sidebar { background: #0d1220; border-left: 1px solid #1a2035; overflow-y: auto; padding: 14px; transition: all 0.3s; }
-    .main.log-hidden .sidebar { display: none; }
-    .sidebar-title { font-size: 0.75rem; font-weight: 600; color: #4a6a8a; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 8px; }
-    .alert-item { padding: 5px 7px; background: #0d1525; border-radius: 5px; margin-bottom: 4px; border-left: 2px solid #1e2d4a; }
+    .tab-header { display: flex; border-bottom: 1px solid #1a2035; }
+    .tab-btn { flex: 1; padding: 10px 8px; background: transparent; border: none; color: #4a6a8a; font-size: 0.72rem; font-weight: 600; cursor: pointer; transition: all 0.2s; text-transform: uppercase; letter-spacing: 0.5px; }
+    .tab-btn.active { color: #00d4ff; border-bottom: 2px solid #00d4ff; background: rgba(0,212,255,0.05); }
+    .tab-btn:hover { color: #a0b0d0; background: rgba(255,255,255,0.03); }
+
+    .tab-content { flex: 1; overflow-y: auto; padding: 12px; display: none; }
+    .tab-content.active { display: block; }
+
+    /* SCREENER LIST */
+    .screener-item {
+      padding: 8px 10px;
+      background: #0f1729;
+      border-radius: 6px;
+      margin-bottom: 6px;
+      border-left: 3px solid #1e2d4a;
+      cursor: pointer;
+      transition: all 0.2s;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+    .screener-item:hover { background: #142040; border-left-color: #00d4ff; }
+    .screener-item.aplus { border-left-color: #ffd700; }
+    .screener-item.a     { border-left-color: #00d4ff; }
+    .screener-item.b     { border-left-color: #00ff88; }
+    .screener-item.danger{ border-left-color: #ff1744; opacity: 0.6; }
+
+    .screener-ticker { font-size: 0.85rem; font-weight: 700; color: #fff; }
+    .screener-meta { font-size: 0.62rem; color: #4a6a8a; margin-top: 1px; }
+    .screener-right { text-align: right; }
+    .screener-gap { font-size: 0.85rem; font-weight: 700; color: #00ff88; }
+    .screener-grade { font-size: 0.6rem; padding: 1px 5px; border-radius: 3px; font-weight: 700; margin-top: 2px; display: inline-block; }
+    .screener-grade.aplus{background:#ffd700;color:#000}
+    .screener-grade.a    {background:#00d4ff;color:#000}
+    .screener-grade.b    {background:#00ff88;color:#000}
+    .screener-grade.d    {background:#ff1744;color:#fff}
+
+    .screener-empty { text-align: center; padding: 40px 10px; color: #2a3a5a; font-size: 0.78rem; }
+
+    /* ACTIVITY LOG */
+    .alert-item { padding: 6px 8px; background: #0f1729; border-radius: 5px; margin-bottom: 4px; border-left: 2px solid #1e2d4a; }
     .alert-time { font-size: 0.58rem; color: #3a4a6a; font-family: monospace; }
     .alert-msg  { font-size: 0.68rem; color: #8090b0; margin-top: 1px; }
 
-    ::-webkit-scrollbar { width: 3px; }
-    ::-webkit-scrollbar-track { background: #080c18; }
-    ::-webkit-scrollbar-thumb { background: #1e2d4a; border-radius: 2px; }
+    /* PAUSED BANNER */
+    .paused-banner { background: rgba(255,109,0,0.15); border: 1px solid #ff6d00; border-radius: 6px; padding: 6px 10px; font-size: 0.72rem; color: #ff9100; margin-bottom: 8px; text-align: center; display: none; }
+    .paused-banner.visible { display: block; }
 
-    @media (max-width: 768px) {
-      .main { grid-template-columns: 1fr !important; height: auto; }
-      .sidebar { display: none !important; }
-      .stats-bar { display: none; }
-      .trade-plan { grid-template-columns: repeat(2, 1fr); }
-      .logo-img { width: 34px; height: 34px; }
+    ::-webkit-scrollbar{width:3px}
+    ::-webkit-scrollbar-track{background:#080c18}
+    ::-webkit-scrollbar-thumb{background:#1e2d4a;border-radius:2px}
+
+    @media(max-width:768px){
+      .main{grid-template-columns:1fr;height:auto}
+      .right-panel{display:none}
+      .stats-bar{display:none}
+      .trade-plan{grid-template-columns:repeat(2,1fr)}
+      .logo-img{width:34px;height:34px}
     }
   </style>
 </head>
@@ -197,10 +184,11 @@
 
 <div class="scanning-bar hidden" id="scanBar"></div>
 
+<!-- HEADER -->
 <div class="header">
   <div class="header-brand">
     <div class="logos">
-      <img class="logo-img" id="paydaLogo"  src="" alt="Payda Capital">
+      <img class="logo-img" id="paydaLogo"  src="" alt="Payda">
       <span class="logo-x">×</span>
       <img class="logo-img" id="uyghurLogo" src="" alt="UyghurKid">
     </div>
@@ -218,20 +206,21 @@
   </div>
 </div>
 
+<!-- CONTROLS -->
 <div class="controls">
-  <button class="btn btn-start"   onclick="startScanner()">▶ Start</button>
-  <button class="btn btn-stop"    onclick="stopScanner()">⏹ Stop</button>
-  <button class="btn btn-clear"   onclick="clearAlerts()">🗑 Clear</button>
-  <button class="btn btn-refresh" onclick="loadResults()">🔄 Refresh</button>
-  <button class="btn btn-log"     onclick="toggleLog()" id="logBtn">📋 Hide Log</button>
+  <button class="btn btn-start"  id="startBtn"  onclick="startScanner()">▶ Start</button>
+  <button class="btn btn-pause"  id="pauseBtn"  onclick="togglePause()" style="display:none">⏸ Pause</button>
+  <button class="btn btn-rescan" id="rescanBtn" onclick="rescan()">🔄 Rescan</button>
+  <button class="btn btn-clear"  onclick="clearResults()">🗑 Clear</button>
+
   <div class="stats-bar">
     <div class="stat"><div class="stat-val" id="statSetups">0</div><div class="stat-label">Setups</div></div>
     <div class="stat"><div class="stat-val" id="statAplus">0</div><div class="stat-label">A+ Grade</div></div>
-    <div class="stat"><div class="stat-val" id="statAlerts">0</div><div class="stat-label">Alerts</div></div>
     <div class="stat"><div class="stat-val" id="statTime">--:--</div><div class="stat-label">Last Scan</div></div>
   </div>
 </div>
 
+<!-- PROGRESS BAR -->
 <div class="scan-progress-bar" id="progressBar">
   <div class="progress-label">
     <span id="progressMsg">Scanning...</span>
@@ -242,7 +231,10 @@
   </div>
 </div>
 
-<div class="main" id="mainLayout">
+<!-- MAIN -->
+<div class="main">
+
+  <!-- LEFT — RESULTS -->
   <div class="results-panel">
     <div class="results-header">
       <span class="results-title">
@@ -251,6 +243,7 @@
       </span>
       <span class="last-scan" id="lastScan">Waiting...</span>
     </div>
+    <div class="paused-banner" id="pausedBanner">⏸ Scanner paused — press Resume to continue</div>
     <div id="results">
       <div class="no-results">
         <div class="icon">🔍</div>
@@ -260,37 +253,67 @@
     </div>
   </div>
 
-  <div class="sidebar" id="sidebar">
-    <div class="sidebar-title">📋 Activity Log</div>
-    <div id="alertLog">
-      <div class="alert-item">
-        <div class="alert-time">--:--:--</div>
-        <div class="alert-msg">Waiting to connect...</div>
+  <!-- RIGHT — TABS -->
+  <div class="right-panel">
+    <div class="tab-header">
+      <button class="tab-btn active" onclick="switchTab('screener')">📋 Screener</button>
+      <button class="tab-btn"        onclick="switchTab('log')">📝 Log</button>
+    </div>
+
+    <!-- SCREENER TAB -->
+    <div class="tab-content active" id="tab-screener">
+      <div style="font-size:0.65rem;color:#3a5a7a;margin-bottom:8px;text-align:center">
+        Live watchlist — updates as scanner runs
+      </div>
+      <div id="screenerList">
+        <div class="screener-empty">No stocks found yet.<br>Press Start to scan.</div>
+      </div>
+    </div>
+
+    <!-- LOG TAB -->
+    <div class="tab-content" id="tab-log">
+      <div id="alertLog">
+        <div class="alert-item">
+          <div class="alert-time">--:--:--</div>
+          <div class="alert-msg">Waiting to connect...</div>
+        </div>
       </div>
     </div>
   </div>
+
 </div>
 
 <script>
   const WS_URL  = `ws://${location.host}/ws`;
   const API_URL = `${location.protocol}//${location.host}`;
 
-  let ws         = null;
-  let isRunning  = false;
-  let logVisible = true;
-  let allResults = [];
-
-  // ── LOGOS ──
-  // Update these if your GitHub username or filenames differ
   const GITHUB_RAW = 'https://raw.githubusercontent.com/Shafkat-ali/trading-agent/main/';
   document.getElementById('paydaLogo').src  = GITHUB_RAW + 'payda.png';
   document.getElementById('uyghurLogo').src = GITHUB_RAW + 'UYGHURKID.png';
+
+  let ws           = null;
+  let isRunning    = false;
+  let isPaused     = false;
+  let allResults   = [];
+  let scannerStarted = false;
+
+  // ── TABS ──
+  function switchTab(name) {
+    document.querySelectorAll('.tab-btn').forEach((b,i) => {
+      b.classList.toggle('active', (i===0&&name==='screener')||(i===1&&name==='log'));
+    });
+    document.getElementById('tab-screener').classList.toggle('active', name==='screener');
+    document.getElementById('tab-log').classList.toggle('active', name==='log');
+  }
 
   // ── WEBSOCKET ──
   function connectWS() {
     ws = new WebSocket(WS_URL);
 
-    ws.onopen = () => updateStatus(isRunning);
+    ws.onopen = () => {
+      console.log('WS connected');
+      updateStatus(isRunning);
+    };
 
     ws.onmessage = (event) => {
       const msg = JSON.parse(event.data);
@@ -305,14 +328,21 @@
         updateProgress(msg.status);
       }
 
-      // ✅ Real-time — ticker appears immediately as found
+      // ✅ KEY FIX — ticker arrives live, add immediately
       if (msg.type === 'new_ticker') {
+        // Remove loading screen if showing
+        clearLoadingScreen();
         addTicker(msg.setup);
+        updateScreener();
       }
 
       if (msg.type === 'scan_results') {
         allResults = msg.data || [];
-        renderResults(allResults);
+        // Only re-render full list if not mid-scan (avoids flicker)
+        if (msg.scan_status && msg.scan_status.phase === 'done') {
+          renderResults(allResults);
+          updateScreener();
+        }
         renderAlerts(msg.alerts);
         updateStats(msg);
         if (msg.scan_status) updateProgress(msg.scan_status);
@@ -323,17 +353,18 @@
     ws.onerror = () => ws.close();
   }
 
-  // ── ADD TICKER IN REAL TIME ──
-  function addTicker(setup) {
+  // ── CLEAR LOADING SCREEN ──
+  function clearLoadingScreen() {
     const container = document.getElementById('results');
-
-    // Clear loading screen
     if (container.querySelector('.no-results')) {
       container.innerHTML = '';
       allResults = [];
     }
+  }
 
-    // Skip if already shown
+  // ── ADD TICKER LIVE ──
+  function addTicker(setup) {
+    // Avoid duplicates
     if (document.getElementById('card-' + setup.ticker)) return;
 
     allResults.push(setup);
@@ -342,37 +373,82 @@
     div.innerHTML = buildCard(setup);
     const card = div.firstElementChild;
 
-    // A+ goes to top, others append
+    const container = document.getElementById('results');
+
+    // A+ goes to top
     if (setup.grade === 'A+' && !setup.warning) {
       container.insertBefore(card, container.firstChild);
     } else {
       container.appendChild(card);
     }
 
-    // Update stat counters live
+    // Live stat update
     document.getElementById('statSetups').textContent = allResults.length;
     document.getElementById('statAplus').textContent  =
       allResults.filter(s => s.grade === 'A+').length;
   }
 
+  // ── SCREENER LIST ──
+  function updateScreener() {
+    const container = document.getElementById('screenerList');
+    if (!allResults.length) {
+      container.innerHTML = '<div class="screener-empty">No stocks found yet.</div>';
+      return;
+    }
+
+    // Sort — A+ first
+    const sorted = [...allResults].sort((a,b) => {
+      if (a.warning && !b.warning) return 1;
+      if (!a.warning && b.warning) return -1;
+      const order = {'A+':4,'A':3,'B':2,'D':0};
+      return (order[b.grade]||0) - (order[a.grade]||0);
+    });
+
+    container.innerHTML = sorted.map(s => {
+      const gc  = {'A+':'aplus','A':'a','B':'b','D':'d'}[s.grade]||'b';
+      const lc  = s.warning ? 'danger' : gc;
+      return `
+        <div class="screener-item ${lc}" onclick="scrollToCard('${s.ticker}')">
+          <div>
+            <div class="screener-ticker">${s.ticker}</div>
+            <div class="screener-meta">$${s.price} · $${(s.dollar_vol/1000).toFixed(0)}K · ${s.time}</div>
+          </div>
+          <div class="screener-right">
+            <div class="screener-gap">+${s.gap_pct}%</div>
+            <span class="screener-grade ${gc}">${s.grade}</span>
+          </div>
+        </div>`;
+    }).join('');
+  }
+
+  function scrollToCard(ticker) {
+    // Switch to results view and scroll to card
+    const card = document.getElementById('card-' + ticker);
+    if (card) {
+      card.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      card.style.boxShadow = '0 0 20px rgba(255,215,0,0.5)';
+      setTimeout(() => card.style.boxShadow = '', 2000);
+    }
+  }
+
   // ── BUILD CARD ──
   function buildCard(s) {
-    const gc = {'A+':'aplus','A':'a','B':'b','D':'d'}[s.grade] || 'b';
-    const cc = {'A+':'grade-aplus','A':'grade-a','B':'grade-b','D':'grade-d'}[s.grade] || 'grade-b';
+    const gc = {'A+':'aplus','A':'a','B':'b','D':'d'}[s.grade]||'b';
+    const cc = {'A+':'grade-aplus','A':'grade-a','B':'grade-b','D':'grade-d'}[s.grade]||'grade-b';
 
     const headlines = (s.headlines||[]).map(h =>
       `<div class="headline">📰 ${h.substring(0,80)}...</div>`
     ).join('');
 
     const notes = (s.notes||[]).map(n =>
-      `<span style="font-size:0.65rem;color:#5a7a9a">📌 ${n}</span> `
+      `<span style="font-size:.65rem;color:#5a7a9a">📌 ${n}</span> `
     ).join('');
 
-    const skip  = s.warning
+    const skip = s.warning
       ? `<div class="skip-banner">⛔ SKIP — Dangerous catalyst!</div>` : '';
 
     const strong = ['A+','A'].includes(s.grade) && !s.warning
-      ? `<div style="font-size:0.65rem;color:#00ff88;margin-top:4px">✅ STRONG SETUP — Watch for continuation!</div>` : '';
+      ? `<div style="font-size:.65rem;color:#00ff88;margin-top:4px">✅ STRONG SETUP — Watch for continuation!</div>` : '';
 
     return `
       <div class="setup-card ${cc}" id="card-${s.ticker}">
@@ -380,7 +456,7 @@
           <div class="ticker-info">
             <span class="ticker">${s.ticker}</span>
             <span class="grade-badge ${gc}">${s.grade}</span>
-            <span class="source-tag">${s.source || 'Live'}</span>
+            <span class="source-tag">${s.source||'Live'}</span>
           </div>
           <span class="gap-pct">+${s.gap_pct}%</span>
         </div>
@@ -398,14 +474,14 @@
         </div>
         <div style="margin-top:5px">${notes}</div>
         ${headlines}${skip}${strong}
-        <div style="font-size:0.58rem;color:#2a3a5a;margin-top:5px;text-align:right">${s.time}</div>
+        <div style="font-size:.58rem;color:#2a3a5a;margin-top:5px;text-align:right">${s.time}</div>
       </div>`;
   }
 
   function renderResults(data) {
     const c = document.getElementById('results');
     if (!data || !data.length) {
-      c.innerHTML = `<div class="no-results"><div class="icon">📭</div><p>No qualifying setups found</p><p style="font-size:0.75rem;margin-top:6px;color:#2a3a5a">Scanner running — next scan soon</p></div>`;
+      c.innerHTML = `<div class="no-results"><div class="icon">📭</div><p>No qualifying setups found</p><p style="font-size:.75rem;margin-top:6px;color:#2a3a5a">Scanner running — next scan soon</p></div>`;
       return;
     }
     c.innerHTML = data.map(s => buildCard(s)).join('');
@@ -421,9 +497,8 @@
   function updateStats(msg) {
     const data = msg.data || [];
     document.getElementById('statSetups').textContent = data.length;
-    document.getElementById('statAplus').textContent  = data.filter(s => s.grade==='A+').length;
-    document.getElementById('statAlerts').textContent = (msg.alerts||[]).length;
-    document.getElementById('statTime').textContent   = msg.time || '--:--';
+    document.getElementById('statAplus').textContent  = data.filter(s=>s.grade==='A+').length;
+    document.getElementById('statTime').textContent   = msg.time||'--:--';
     document.getElementById('lastScan').textContent   = `Last: ${msg.time} — ${data.length} setup(s)`;
   }
 
@@ -433,16 +508,15 @@
     const cnt  = document.getElementById('progressCount');
     const fill = document.getElementById('progressFill');
 
-    if (!status || status.phase === 'idle') { hideProgress(); return; }
+    if (!status || status.phase==='idle') { hideProgress(); return; }
 
     bar.classList.add('visible');
     msg.textContent = status.message || 'Scanning...';
 
     if (status.total > 0 && status.progress > 0) {
-      const pct = Math.round((status.progress / status.total) * 100);
       cnt.textContent = `${status.progress}/${status.total}`;
       fill.classList.remove('indeterminate');
-      fill.style.width = pct + '%';
+      fill.style.width = Math.round((status.progress/status.total)*100) + '%';
     } else {
       cnt.textContent = '';
       fill.classList.add('indeterminate');
@@ -460,11 +534,12 @@
     const dot  = document.getElementById('statusDot');
     const text = document.getElementById('statusText');
     const bar  = document.getElementById('scanBar');
+
     if (running) {
       dot.classList.add('active');
-      text.textContent = '● Live';
-      text.style.color = '#00ff88';
-      bar.classList.remove('hidden');
+      text.textContent = isPaused ? '⏸ Paused' : '● Live';
+      text.style.color = isPaused ? '#ff9100' : '#00ff88';
+      bar.classList.toggle('hidden', isPaused);
     } else {
       dot.classList.remove('active');
       text.textContent = 'Stopped';
@@ -474,55 +549,118 @@
     }
   }
 
-  function toggleLog() {
-    logVisible = !logVisible;
-    document.getElementById('mainLayout').classList.toggle('log-hidden', !logVisible);
-    document.getElementById('logBtn').textContent = logVisible ? '📋 Hide Log' : '📋 Show Log';
-  }
+  // ── BUTTONS ──
 
   async function startScanner() {
     try {
-      await fetch(`${API_URL}/api/scanner/start`, { method: 'POST' });
-      isRunning  = true;
-      allResults = [];
-      updateStatus(true);
-      document.getElementById('results').innerHTML = `
-        <div class="no-results">
-          <div class="icon">⚡</div>
-          <p style="color:#ffd700;font-size:0.95rem;font-weight:700">Connecting to Massive.com...</p>
-          <p style="font-size:0.78rem;margin-top:6px;color:#4a6a8a">Fetching real-time pre/after market gainers</p>
-          <p style="font-size:0.78rem;margin-top:4px;color:#4a6a8a">⚡ Stocks appear here as they are found</p>
-          <div class="loading-bar"><div class="loading-fill"></div></div>
-          <p style="font-size:0.65rem;margin-top:8px;color:#2a3a5a">First scan: 15–30 seconds</p>
-        </div>`;
+      const r = await fetch(`${API_URL}/api/scanner/start`, { method: 'POST' });
+      const d = await r.json();
+
+      if (d.status === 'started' || d.status === 'already running') {
+        isRunning      = true;
+        isPaused       = false;
+        scannerStarted = true;
+        allResults     = [];
+
+        updateStatus(true);
+
+        // Show start screen — will be replaced by first ticker
+        document.getElementById('results').innerHTML = `
+          <div class="no-results">
+            <div class="icon">⚡</div>
+            <p style="color:#ffd700;font-size:.95rem;font-weight:700">Connecting to Massive.com...</p>
+            <p style="font-size:.78rem;margin-top:6px;color:#4a6a8a">Fetching real-time gainers</p>
+            <p style="font-size:.78rem;margin-top:4px;color:#4a6a8a">⚡ Stocks appear here as they are found</p>
+            <div class="loading-bar"><div class="loading-fill"></div></div>
+            <p style="font-size:.65rem;margin-top:8px;color:#2a3a5a">First scan: 15–30 seconds</p>
+          </div>`;
+
+        // Show pause button, hide start
+        document.getElementById('startBtn').style.display  = 'none';
+        document.getElementById('pauseBtn').style.display  = 'flex';
+        document.getElementById('pauseBtn').textContent    = '⏸ Pause';
+      }
     } catch(e) { alert('Cannot connect to server.'); }
   }
 
-  async function stopScanner() {
+  async function togglePause() {
+    if (!isPaused) {
+      // PAUSE
+      await fetch(`${API_URL}/api/scanner/stop`, { method: 'POST' });
+      isPaused = true;
+      document.getElementById('pauseBtn').textContent = '▶ Resume';
+      document.getElementById('pausedBanner').classList.add('visible');
+      document.getElementById('scanBar').classList.add('hidden');
+      document.getElementById('statusText').textContent = '⏸ Paused';
+      document.getElementById('statusText').style.color = '#ff9100';
+    } else {
+      // RESUME
+      await fetch(`${API_URL}/api/scanner/start`, { method: 'POST' });
+      isPaused = false;
+      document.getElementById('pauseBtn').textContent = '⏸ Pause';
+      document.getElementById('pausedBanner').classList.remove('visible');
+      document.getElementById('scanBar').classList.remove('hidden');
+      document.getElementById('statusText').textContent = '● Live';
+      document.getElementById('statusText').style.color = '#00ff88';
+    }
+  }
+
+  async function rescan() {
+    // Force immediate rescan — stop then restart
     try {
       await fetch(`${API_URL}/api/scanner/stop`, { method: 'POST' });
-      isRunning = false;
-      updateStatus(false);
+      await new Promise(r => setTimeout(r, 500));
+      allResults = [];
+      document.getElementById('results').innerHTML = `
+        <div class="no-results">
+          <div class="icon">🔄</div>
+          <p style="color:#00d4ff;font-size:.95rem;font-weight:700">Rescanning...</p>
+          <div class="loading-bar"><div class="loading-fill"></div></div>
+        </div>`;
+      document.getElementById('screenerList').innerHTML =
+        '<div class="screener-empty">Rescanning...</div>';
+      await fetch(`${API_URL}/api/scanner/start`, { method: 'POST' });
+      isRunning  = true;
+      isPaused   = false;
+      updateStatus(true);
+      document.getElementById('startBtn').style.display = 'none';
+      document.getElementById('pauseBtn').style.display = 'flex';
+      document.getElementById('pauseBtn').textContent   = '⏸ Pause';
     } catch(e) {}
   }
 
-  async function clearAlerts() {
-    try { await fetch(`${API_URL}/api/clear-alerts`, { method: 'POST' }); } catch(e) {}
+  function clearResults() {
+    allResults = [];
+    document.getElementById('results').innerHTML = `
+      <div class="no-results">
+        <div class="icon">🗑️</div>
+        <p>Results cleared</p>
+        <p style="font-size:.75rem;margin-top:6px;color:#2a3a5a">
+          Press Rescan to find new setups
+        </p>
+      </div>`;
+    document.getElementById('screenerList').innerHTML =
+      '<div class="screener-empty">Cleared. Press Rescan.</div>';
+    document.getElementById('statSetups').textContent = '0';
+    document.getElementById('statAplus').textContent  = '0';
   }
 
   async function loadResults() {
     try {
       const r    = await fetch(`${API_URL}/api/results`);
       const data = await r.json();
-      allResults = data.data || [];
-      renderResults(allResults);
+      if (data.data && data.data.length) {
+        allResults = data.data;
+        renderResults(allResults);
+        updateScreener();
+      }
       renderAlerts(data.alerts);
     } catch(e) {}
   }
 
   function updateClock() {
     document.getElementById('clock').textContent =
-      new Date().toLocaleTimeString('en-US', { hour12: true, timeZone: 'America/New_York' }) + ' EST';
+      new Date().toLocaleTimeString('en-US',{hour12:true,timeZone:'America/New_York'})+' EST';
   }
 
   setInterval(updateClock, 1000);
