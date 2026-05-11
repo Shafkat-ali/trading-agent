@@ -28,7 +28,6 @@ MAX_PRICE       = float(os.getenv('MAX_PRICE', 50.00))
 MIN_GAP_PCT     = float(os.getenv('MIN_GAP_PCT', 20.0))
 MIN_DOLLAR_VOL  = float(os.getenv('MIN_DOLLAR_VOL', 50000))
 SCAN_INTERVAL   = int(os.getenv('SCAN_INTERVAL', 30))
-STOP_LOSS_PCT   = float(os.getenv('STOP_LOSS_PCT', 5.0))
 EMAIL_ADDRESS   = os.getenv('EMAIL_ADDRESS', '')
 EMAIL_PASSWORD  = os.getenv('EMAIL_PASSWORD', '')
 EMAIL_TO        = os.getenv('EMAIL_TO', '')
@@ -39,7 +38,12 @@ alerted_tickers   = set()
 scan_results      = []
 alert_log         = []
 connected_clients = []
-scan_status       = {'phase': 'idle', 'message': 'Scanner stopped', 'progress': 0, 'total': 0}
+current_scan_status = {
+    'phase': 'idle',
+    'message': 'Scanner stopped',
+    'progress': 0,
+    'total': 0
+}
 
 STRONG_KEYWORDS = [
     'fda', 'approval', 'approved', 'breakthrough', 'contract',
@@ -54,10 +58,6 @@ DANGER_KEYWORDS = [
     'lawsuit', 'sec', 'subpoena', 'delay', 'failed', 'withdrawn',
     'suspended', 'reverse split', 'compliance'
 ]
-
-# ============================================================
-# EMAIL
-# ============================================================
 
 def send_email(subject, body):
     def _send():
@@ -78,11 +78,16 @@ def send_email(subject, body):
     threading.Thread(target=_send, daemon=True).start()
 
 def log_alert(message):
-    alert_log.insert(0, {'time': datetime.now().strftime('%H:%M:%S'), 'message': message})
+    alert_log.insert(0, {
+        'time':    datetime.now().strftime('%H:%M:%S'),
+        'message': message
+    })
     if len(alert_log) > 100:
         alert_log.pop()
 
 async def broadcast(data):
+    if not connected_clients:
+        return
     disconnected = []
     for client in connected_clients:
         try:
@@ -93,31 +98,26 @@ async def broadcast(data):
         if c in connected_clients:
             connected_clients.remove(c)
 
-# ============================================================
-# NEWS CATALYST
-# ============================================================
-
 def check_catalyst(ticker):
     try:
-        news   = yf.Ticker(ticker).news
+        news = yf.Ticker(ticker).news
         if not news:
             return 'NONE', '❌ No Catalyst', [], False
-
         cutoff = datetime.now() - timedelta(hours=48)
         recent = [n for n in news[:10]
                   if n.get('providerPublishTime', 0) and
                   datetime.fromtimestamp(n['providerPublishTime']) >= cutoff]
-
         if not recent:
             return 'NONE', '❌ No Recent News', [], False
-
         headlines, strong_hits, danger_hits, warning = [], 0, 0, False
         for item in recent[:5]:
             title = item.get('title', '').lower()
             headlines.append(item.get('title', ''))
-            if any(kw in title for kw in STRONG_KEYWORDS): strong_hits += 1
-            if any(kw in title for kw in DANGER_KEYWORDS): danger_hits += 1; warning = True
-
+            if any(kw in title for kw in STRONG_KEYWORDS):
+                strong_hits += 1
+            if any(kw in title for kw in DANGER_KEYWORDS):
+                danger_hits += 1
+                warning = True
         if warning and danger_hits > strong_hits:
             return 'DANGER', '☠️ DANGER: Dilution/Legal Risk', headlines[:2], True
         elif strong_hits >= 2:
@@ -129,91 +129,58 @@ def check_catalyst(ticker):
     except:
         return 'UNKNOWN', '❓ Could not fetch news', [], False
 
-# ============================================================
-# MASSIVE/POLYGON DATA SOURCE
-# ============================================================
-
 def get_massive_gainers():
-    """
-    Fetch top gainers from Massive.com (formerly Polygon.io)
-    Uses the snapshot gainers endpoint — works pre/after market
-    """
     try:
-        # Gainers endpoint
         url = (f"https://api.polygon.io/v2/snapshot/locale/us/"
                f"markets/stocks/gainers"
                f"?apiKey={POLYGON_API_KEY}&include_otc=false")
-
         r = requests.get(url, timeout=15)
         candidates = []
-
         if r.status_code == 200:
-            data    = r.json()
-            tickers = data.get('tickers', [])
-
-            for t in tickers:
+            for t in r.json().get('tickers', []):
                 sym  = t.get('ticker', '')
                 day  = t.get('day', {})
                 prev = t.get('prevDay', {})
                 last = t.get('lastTrade', {})
-                min_data = t.get('min', {})
-
-                # Best available price
-                price = (last.get('p') or
-                         min_data.get('c') or
-                         day.get('c', 0))
-
+                price      = last.get('p') or day.get('c', 0)
                 prev_close = prev.get('c', 0)
                 volume     = day.get('v', 0)
-
                 if not (price and prev_close and price > 0 and prev_close > 0):
                     continue
-
                 pct        = ((price - prev_close) / prev_close) * 100
                 dollar_vol = price * volume
-
                 if (sym and MIN_PRICE <= price <= MAX_PRICE and
-                        pct >= MIN_GAP_PCT and
-                        dollar_vol >= MIN_DOLLAR_VOL):
+                        pct >= MIN_GAP_PCT and dollar_vol >= MIN_DOLLAR_VOL):
                     candidates.append({
-                        'ticker':     sym,
-                        'price':      float(price),
+                        'ticker': sym, 'price': float(price),
                         'prev_close': float(prev_close),
-                        'gap_pct':    round(float(pct), 1),
-                        'volume':     float(volume),
+                        'gap_pct': round(float(pct), 1),
+                        'volume': float(volume),
                         'dollar_vol': float(dollar_vol),
-                        'source':     'Massive'
+                        'source': 'Massive'
                     })
-
-            log_alert(f"📡 Massive: {len(candidates)} qualifying stocks")
+            log_alert(f"📡 Massive: {len(candidates)} stocks")
             return candidates
-
         else:
             log_alert(f"⚠️ Massive API error: {r.status_code}")
             return []
-
     except Exception as e:
         log_alert(f"⚠️ Massive error: {e}")
         return []
 
 def get_yahoo_gainers():
-    """Fallback — Yahoo Finance"""
     candidates = []
     headers    = {'User-Agent': 'Mozilla/5.0'}
-
     for scrId in ['day_gainers', 'small_cap_gainers']:
         try:
             url = (f"https://query1.finance.yahoo.com/v1/finance/screener/"
-                   f"predefined/saved?formatted=false"
-                   f"&scrIds={scrId}&count=50")
+                   f"predefined/saved?formatted=false&scrIds={scrId}&count=50")
             r = requests.get(url, headers=headers, timeout=10)
             if r.status_code != 200:
                 continue
-
             quotes = (r.json().get('finance', {})
                                .get('result', [{}])[0]
                                .get('quotes', []))
-
             for q in quotes:
                 sym        = q.get('symbol', '')
                 price      = q.get('regularMarketPrice', 0)
@@ -221,38 +188,28 @@ def get_yahoo_gainers():
                 vol        = q.get('regularMarketVolume', 0)
                 prev       = q.get('regularMarketPreviousClose', 0)
                 dollar_vol = price * vol
-
                 if (sym and MIN_PRICE <= price <= MAX_PRICE and
-                        pct >= MIN_GAP_PCT and
-                        dollar_vol >= MIN_DOLLAR_VOL):
+                        pct >= MIN_GAP_PCT and dollar_vol >= MIN_DOLLAR_VOL):
                     candidates.append({
-                        'ticker':     sym,
-                        'price':      float(price),
+                        'ticker': sym, 'price': float(price),
                         'prev_close': float(prev),
-                        'gap_pct':    round(float(pct), 1),
-                        'volume':     float(vol),
+                        'gap_pct': round(float(pct), 1),
+                        'volume': float(vol),
                         'dollar_vol': float(dollar_vol),
-                        'source':     'Yahoo'
+                        'source': 'Yahoo'
                     })
         except:
             pass
-
-    log_alert(f"📡 Yahoo fallback: {len(candidates)} stocks")
+    log_alert(f"📡 Yahoo: {len(candidates)} stocks")
     return candidates
-
-# ============================================================
-# GRADE SETUP
-# ============================================================
 
 def grade_setup(gap_pct, dollar_vol):
     grade, notes = "B", []
-
     if gap_pct >= 50:   grade = "A+"; notes.append(f"Massive gap +{gap_pct:.1f}% 🔥🔥🔥")
     elif gap_pct >= 30: grade = "A+"; notes.append(f"Huge gap +{gap_pct:.1f}% 🔥🔥")
     elif gap_pct >= 20: grade = "A";  notes.append(f"Strong gap +{gap_pct:.1f}% 🔥")
     elif gap_pct >= 15: grade = "A";  notes.append(f"Good gap +{gap_pct:.1f}%")
     elif gap_pct >= 10: grade = "B";  notes.append(f"Moderate gap +{gap_pct:.1f}%")
-
     if dollar_vol >= 5_000_000:
         notes.append(f"Monster $vol ${dollar_vol/1e6:.1f}M 🔥")
         if grade == "A": grade = "A+"
@@ -260,7 +217,6 @@ def grade_setup(gap_pct, dollar_vol):
         notes.append(f"Strong $vol ${dollar_vol/1e6:.1f}M ✅")
     else:
         notes.append(f"$Vol ${dollar_vol:,.0f}")
-
     return grade, notes
 
 def process_ticker(stock_data):
@@ -270,17 +226,17 @@ def process_ticker(stock_data):
         prev_close = stock_data['prev_close']
         gap_pct    = stock_data['gap_pct']
         dollar_vol = stock_data['dollar_vol']
-        source     = stock_data.get('source', 'Unknown')
+        source     = stock_data.get('source', 'Live')
 
         grade, notes = grade_setup(gap_pct, dollar_vol)
         strength, label, headlines, warning = check_catalyst(ticker)
 
         final_grade = grade
-        if warning:                                  final_grade = "D"
-        elif strength == 'STRONG' and grade == 'A': final_grade = "A+"
+        if warning:                                   final_grade = "D"
+        elif strength == 'STRONG' and grade == 'A':  final_grade = "A+"
         elif strength == 'NONE':
-            if grade == 'A+': final_grade = 'A'
-            elif grade == 'A': final_grade = 'B'
+            if grade == 'A+':   final_grade = 'A'
+            elif grade == 'A':  final_grade = 'B'
 
         entry_low  = round(price * 0.99, 2)
         entry_high = round(price * 1.02, 2)
@@ -312,120 +268,146 @@ def process_ticker(stock_data):
     except:
         return None
 
-# ============================================================
-# SCANNER LOOP
-# ============================================================
+async def do_scan():
+    """Run one complete scan and return results"""
+    global current_scan_status
+
+    # Step 1 fetch
+    current_scan_status = {
+        'phase': 'fetching',
+        'message': '📡 Fetching gainers from Massive.com...',
+        'progress': 0, 'total': 0
+    }
+    await broadcast({'type': 'scan_status', 'status': current_scan_status})
+    await asyncio.sleep(0)
+
+    candidates = get_massive_gainers()
+    if not candidates:
+        current_scan_status['message'] = '⚠️ Massive empty, trying Yahoo...'
+        await broadcast({'type': 'scan_status', 'status': current_scan_status})
+        await asyncio.sleep(0)
+        candidates = get_yahoo_gainers()
+
+    total = len(candidates)
+    log_alert(f"📊 {total} candidates")
+
+    # Step 2 analyze
+    current_scan_status = {
+        'phase': 'analyzing',
+        'message': f'Analyzing {total} candidates...',
+        'progress': 0, 'total': total
+    }
+    await broadcast({'type': 'scan_status', 'status': current_scan_status})
+    await asyncio.sleep(0)
+
+    results = []
+    count   = 0
+
+    for stock_data in candidates:
+        if not scanner_running:
+            break
+
+        count  += 1
+        ticker  = stock_data.get('ticker', '')
+
+        current_scan_status = {
+            'phase':    'analyzing',
+            'message':  f'Checking {ticker} ({count}/{total})...',
+            'progress': count,
+            'total':    total
+        }
+        await broadcast({'type': 'scan_status', 'status': current_scan_status})
+        # Yield to event loop so WS messages actually get sent
+        await asyncio.sleep(0.05)
+
+        setup = process_ticker(stock_data)
+        if setup:
+            results.append(setup)
+            # Broadcast immediately
+            await broadcast({'type': 'new_ticker', 'setup': setup})
+            await asyncio.sleep(0)
+
+            if (setup['grade'] in ['A+', 'A'] and
+                    not setup['warning'] and
+                    ticker not in alerted_tickers):
+                alerted_tickers.add(ticker)
+                log_alert(f"🚀 {setup['grade']}: {ticker} +{setup['gap_pct']}%")
+                send_email(
+                    subject=f"🚀 {setup['grade']} — {ticker} +{setup['gap_pct']}%",
+                    body=(
+                        f"Grade: {setup['grade']}\n"
+                        f"Gap: +{setup['gap_pct']}%\n"
+                        f"Price: ${setup['price']}\n"
+                        f"Catalyst: {setup['catalyst']}\n\n"
+                        f"Entry: ${setup['entry_low']}–${setup['entry_high']}\n"
+                        f"Stop: ${setup['stop_loss']}\n"
+                        f"T1: ${setup['target1']}\n"
+                    )
+                )
+
+    # Sort and finalize
+    results.sort(
+        key=lambda x: (
+            0 if x['warning'] else
+            {'A+': 4, 'A': 3, 'B': 2}.get(x['grade'], 1)
+        ),
+        reverse=True
+    )
+
+    current_scan_status = {
+        'phase': 'done',
+        'message': f'✅ {len(results)} setup(s) found',
+        'progress': total, 'total': total
+    }
+
+    return results
 
 async def scanner_loop():
-    global scan_results, scanner_running, scan_status
+    global scan_results, scanner_running, current_scan_status
 
     log_alert("🔍 Scanner started")
     await broadcast({'type': 'status', 'running': True})
 
     while scanner_running:
         try:
-            # Step 1 — Fetch gainers
-            scan_status = {'phase': 'fetching', 'message': '📡 Fetching gainers from Massive.com...', 'progress': 0, 'total': 0}
-            await broadcast({'type': 'scan_status', 'status': scan_status})
-            log_alert(f"🔍 Scanning — {datetime.now().strftime('%H:%M:%S')}")
-
-            candidates = get_massive_gainers()
-
-            if not candidates:
-                scan_status['message'] = '⚠️ Massive empty, trying Yahoo Finance...'
-                await broadcast({'type': 'scan_status', 'status': scan_status})
-                candidates = get_yahoo_gainers()
-
-            total = len(candidates)
-            log_alert(f"📊 {total} candidates found")
-
-            # Step 2 — Analyze each
-            scan_status = {'phase': 'analyzing', 'message': f'Analyzing {total} candidates...', 'progress': 0, 'total': total}
-            await broadcast({'type': 'scan_status', 'status': scan_status})
-
-            # Clear results for new scan
-            current_results = []
-            count = 0
-
-            for stock_data in candidates:
-                if not scanner_running:
-                    break
-
-                count  += 1
-                ticker  = stock_data.get('ticker', '')
-
-                scan_status = {
-                    'phase':    'analyzing',
-                    'message':  f'Checking {ticker} ({count}/{total})...',
-                    'progress': count,
-                    'total':    total
-                }
-                await broadcast({'type': 'scan_status', 'status': scan_status})
-
-                setup = process_ticker(stock_data)
-
-                if setup:
-                    current_results.append(setup)
-
-                    # ✅ Broadcast each ticker IMMEDIATELY as found
-                    await broadcast({'type': 'new_ticker', 'setup': setup})
-
-                    # Email for A/A+
-                    if (setup['grade'] in ['A+', 'A'] and
-                            not setup['warning'] and
-                            ticker not in alerted_tickers):
-                        alerted_tickers.add(ticker)
-                        log_alert(f"🚀 {setup['grade']}: {ticker} +{setup['gap_pct']}%")
-                        send_email(
-                            subject=f"🚀 {setup['grade']} — {ticker} +{setup['gap_pct']}%",
-                            body=(
-                                f"Grade: {setup['grade']}\n"
-                                f"Gap: +{setup['gap_pct']}%\n"
-                                f"Price: ${setup['price']}\n"
-                                f"Catalyst: {setup['catalyst']}\n\n"
-                                f"Entry: ${setup['entry_low']}–${setup['entry_high']}\n"
-                                f"Stop: ${setup['stop_loss']}\n"
-                                f"T1: ${setup['target1']}\n"
-                            )
-                        )
-
-            # Sort final
-            current_results.sort(
-                key=lambda x: (0 if x['warning'] else {'A+': 4, 'A': 3, 'B': 2}.get(x['grade'], 1)),
-                reverse=True
-            )
-
-            scan_results = current_results
-            scan_status  = {'phase': 'done', 'message': f'✅ {len(current_results)} setup(s) found', 'progress': total, 'total': total}
+            results    = await do_scan()
+            scan_results = results
 
             await broadcast({
                 'type':        'scan_results',
-                'data':        current_results,
+                'data':        results,
                 'time':        datetime.now().strftime('%H:%M:%S'),
-                'count':       len(current_results),
+                'count':       len(results),
                 'alerts':      alert_log[:20],
-                'scan_status': scan_status
+                'scan_status': current_scan_status
             })
 
         except Exception as e:
             log_alert(f"⚠️ Scanner error: {e}")
 
-        await asyncio.sleep(SCAN_INTERVAL)
+        if scanner_running:
+            log_alert(f"⏱ Next scan in {SCAN_INTERVAL}s")
+            await asyncio.sleep(SCAN_INTERVAL)
 
     log_alert("⏹️ Scanner stopped")
+    current_scan_status = {'phase': 'idle', 'message': 'Scanner stopped', 'progress': 0, 'total': 0}
     await broadcast({'type': 'status', 'running': False})
-
-# ============================================================
-# API ROUTES
-# ============================================================
 
 @app.get("/api/status")
 async def get_status():
-    return {'running': scanner_running, 'results': len(scan_results), 'time': datetime.now().strftime('%H:%M:%S')}
+    return {
+        'running': scanner_running,
+        'results': len(scan_results),
+        'time':    datetime.now().strftime('%H:%M:%S')
+    }
 
 @app.get("/api/results")
 async def get_results():
-    return {'data': scan_results, 'alerts': alert_log[:20], 'time': datetime.now().strftime('%H:%M:%S')}
+    return {
+        'data':   scan_results,
+        'alerts': alert_log[:20],
+        'time':   datetime.now().strftime('%H:%M:%S')
+    }
 
 @app.post("/api/scanner/start")
 async def start_scanner():
@@ -446,7 +428,7 @@ async def stop_scanner():
     return {'status': 'stopped'}
 
 @app.post("/api/clear-alerts")
-async def clear_alerts():
+async def clear_alerts_route():
     alerted_tickers.clear()
     log_alert("🗑️ Alerts cleared")
     return {'status': 'cleared'}
@@ -456,10 +438,23 @@ async def websocket_endpoint(websocket: WebSocket):
     await websocket.accept()
     connected_clients.append(websocket)
     log_alert("📱 Client connected")
+
+    # Send current state immediately on connect
     await websocket.send_json({
-        'type': 'scan_results', 'data': scan_results,
-        'alerts': alert_log[:20], 'time': datetime.now().strftime('%H:%M:%S'), 'count': len(scan_results)
+        'type':        'scan_results',
+        'data':        scan_results,
+        'alerts':      alert_log[:20],
+        'time':        datetime.now().strftime('%H:%M:%S'),
+        'count':       len(scan_results),
+        'scan_status': current_scan_status
     })
+
+    # Also send running status
+    await websocket.send_json({
+        'type':    'status',
+        'running': scanner_running
+    })
+
     try:
         while True:
             await websocket.receive_text()
