@@ -101,16 +101,31 @@
     .setup-card.grade-d     { border-left: 3px solid #ff1744; opacity: .5; }
 
     .card-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 7px; }
-    .ticker-info { display: flex; align-items: center; gap: 6px; }
+    .ticker-info { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
     .ticker { font-size: 1rem; font-weight: 800; color: #fff; }
     .grade-badge { padding: 2px 7px; border-radius: 10px; font-size: 0.65rem; font-weight: 700; }
     .grade-badge.aplus{background:#ffd700;color:#000}
     .grade-badge.a    {background:#00d4ff;color:#000}
     .grade-badge.b    {background:#00ff88;color:#000}
     .grade-badge.d    {background:#ff1744;color:#fff}
-    .news-pill { font-size: 0.52rem; padding: 1px 6px; border-radius: 10px; background: rgba(0,212,255,0.12); color: #00d4ff; border: 1px solid rgba(0,212,255,0.2); }
-    .news-pill.has-news { background: rgba(0,255,136,0.12); color: #00ff88; border-color: rgba(0,255,136,0.2); }
-    .news-pill.danger { background: rgba(255,23,68,0.12); color: #ff5252; border-color: rgba(255,23,68,0.2); }
+
+    .news-count-pill {
+      font-size: 0.55rem; padding: 2px 7px; border-radius: 10px;
+      font-weight: 600; border: 1px solid;
+    }
+    .news-count-pill.has-news {
+      background: rgba(0,255,136,0.1); color: #00ff88;
+      border-color: rgba(0,255,136,0.3);
+    }
+    .news-count-pill.no-news {
+      background: rgba(100,120,160,0.1); color: #4a6a8a;
+      border-color: rgba(100,120,160,0.2);
+    }
+    .news-count-pill.danger {
+      background: rgba(255,23,68,0.1); color: #ff5252;
+      border-color: rgba(255,23,68,0.3);
+    }
+
     .click-hint { font-size: 0.5rem; color: #2a3f6f; }
     .gap-pct { font-size: 0.95rem; font-weight: 700; color: #00ff88; }
 
@@ -119,7 +134,8 @@
     .metric-val { font-size: 0.82rem; font-weight: 700; }
     .metric-label { font-size: 0.52rem; color: #3a4a6a; text-transform: uppercase; margin-top: 1px; }
 
-    .catalyst { font-size: 0.7rem; padding: 4px 6px; background: #080c18; border-radius: 5px; margin-bottom: 6px; }
+    .catalyst-row { font-size: 0.68rem; padding: 4px 6px; background: #080c18; border-radius: 5px; margin-bottom: 6px; color: #8090b0; }
+
     .trade-plan { display: grid; grid-template-columns: repeat(4,1fr); gap: 4px; }
     .trade-item { background: #080c18; border-radius: 4px; padding: 4px; text-align: center; }
     .trade-val { font-size: 0.72rem; font-weight: 700; }
@@ -158,13 +174,13 @@
     /* POPUP */
     .popup-overlay { position: fixed; inset: 0; background: rgba(0,0,0,.85); z-index: 1000; display: flex; align-items: center; justify-content: center; padding: 16px; backdrop-filter: blur(4px); }
     .popup-overlay.hidden { display: none; }
-    .popup-box { background: #0d1525; border: 1px solid #1e2d4a; border-radius: 16px; width: 100%; max-width: 920px; max-height: 90vh; overflow-y: auto; position: relative; box-shadow: 0 20px 60px rgba(0,0,0,.6); }
+    .popup-box { background: #0d1525; border: 1px solid #1e2d4a; border-radius: 16px; width: 100%; max-width: 920px; max-height: 90vh; overflow-y: auto; box-shadow: 0 20px 60px rgba(0,0,0,.6); }
     .popup-header { padding: 14px 18px; border-bottom: 1px solid #1a2035; display: flex; align-items: center; justify-content: space-between; position: sticky; top: 0; background: #0d1525; z-index: 10; }
-    .popup-ticker-group { display: flex; align-items: center; gap: 10px; }
+    .popup-ticker-group { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
     .popup-ticker { font-size: 1.6rem; font-weight: 900; color: #fff; }
     .popup-price  { font-size: 1.2rem; font-weight: 700; }
     .popup-change { font-size: 0.85rem; font-weight: 600; }
-    .popup-close  { width: 30px; height: 30px; border-radius: 50%; background: #1e2d4a; border: none; color: #a0b0d0; font-size: 1rem; cursor: pointer; display: flex; align-items: center; justify-content: center; transition: all 0.2s; }
+    .popup-close  { width: 30px; height: 30px; border-radius: 50%; background: #1e2d4a; border: none; color: #a0b0d0; font-size: 1rem; cursor: pointer; display: flex; align-items: center; justify-content: center; transition: all 0.2s; flex-shrink: 0; }
     .popup-close:hover { background: #ff1744; color: #fff; }
     .popup-body { padding: 14px 18px; }
 
@@ -179,7 +195,7 @@
 
     .bid-ask-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
     .bid-box { background: rgba(0,255,136,.08); border: 1px solid rgba(0,255,136,.25); border-radius: 8px; padding: 10px; text-align: center; }
-    .ask-box { background: rgba(255,23,68,.08);  border: 1px solid rgba(255,23,68,.25);  border-radius: 8px; padding: 10px; text-align: center; }
+    .ask-box { background: rgba(255,23,68,.08); border: 1px solid rgba(255,23,68,.25); border-radius: 8px; padding: 10px; text-align: center; }
     .ba-label { font-size: 0.6rem; color: #6b7fa3; text-transform: uppercase; margin-bottom: 4px; }
     .bid-val  { font-size: 1.3rem; font-weight: 800; color: #00ff88; }
     .ask-val  { font-size: 1.3rem; font-weight: 800; color: #ff4444; }
@@ -208,7 +224,7 @@
     .news-sentiment.neutral {background:rgba(255,255,255,.06);color:#8090b0}
 
     .loading-spinner { text-align: center; padding: 20px; color: #3a5a7a; font-size: 0.75rem; }
-    .refresh-quote { font-size: 0.6rem; color: #3a5a7a; text-align: right; margin-top: 4px; }
+    .refresh-quote { font-size: 0.58rem; color: #3a5a7a; text-align: right; margin-top: 4px; }
 
     ::-webkit-scrollbar{width:3px}
     ::-webkit-scrollbar-track{background:#080c18}
@@ -264,9 +280,7 @@
       <button class="popup-close" onclick="closePopup()">✕</button>
     </div>
     <div class="popup-body">
-
       <div class="popup-trade-plan" id="popupTradePlan"></div>
-
       <div class="popup-grid">
         <div class="popup-section">
           <div class="popup-section-title">📊 Level 1 — Bid / Ask</div>
@@ -283,25 +297,21 @@
             </div>
           </div>
           <div class="spread-row">Spread: <span class="spread-val" id="popupSpread">--</span></div>
-          <div class="refresh-quote" id="quoteUpdated">Updating...</div>
+          <div class="refresh-quote" id="quoteUpdated">Fetching...</div>
         </div>
-
         <div class="popup-section">
           <div class="popup-section-title">📈 Key Statistics</div>
           <div id="popupStats"><div class="loading-spinner">Loading...</div></div>
         </div>
       </div>
-
       <div class="chart-container">
         <div class="popup-section-title" style="margin-bottom:10px">📉 Live Chart</div>
         <iframe class="chart-frame" id="popupChart" src="" frameborder="0" allowtransparency="true"></iframe>
       </div>
-
       <div class="news-section">
-        <div class="popup-section-title" id="newsTitle">📰 Latest News</div>
+        <div class="popup-section-title" id="newsTitle">📰 Latest News (past 5 days)</div>
         <div id="popupNews"><div class="loading-spinner">Loading news...</div></div>
       </div>
-
     </div>
   </div>
 </div>
@@ -393,7 +403,7 @@
   const WS_URL  = `ws://${location.host}/ws`;
   const API_URL = `${location.protocol}//${location.host}`;
 
-  // ── LOGOS — use direct GitHub raw URLs ──
+  // Logos — direct GitHub raw URLs
   const PAYDA_LOGO  = 'https://raw.githubusercontent.com/Shafkat-ali/trading-agent/main/payda.png';
   const UYGHUR_LOGO = 'https://raw.githubusercontent.com/Shafkat-ali/trading-agent/main/UYGHURKID.png';
 
@@ -409,17 +419,17 @@
   }
   setLogos();
 
-  // ── STATE ──
-  let currentUser  = null;
-  let ws           = null;
-  let isRunning    = false;
-  let isPaused     = false;
-  let allResults   = [];
-  let isLoading    = false;
-  let pollTimer    = null;
-  let quoteTimer   = null;
+  // STATE
+  let currentUser = null;
+  let ws          = null;
+  let isRunning   = false;
+  let isPaused    = false;
+  let allResults  = [];
+  let isLoading   = false;
+  let pollTimer   = null;
+  let quoteTimer  = null;
 
-  // ── USER ──
+  // USER
   function selectUser(id, name, initial) {
     currentUser = { id, name, initial };
     sessionStorage.setItem('tradingUser', JSON.stringify(currentUser));
@@ -439,7 +449,7 @@
   const saved = sessionStorage.getItem('tradingUser');
   if (saved) { const u = JSON.parse(saved); selectUser(u.id, u.name, u.initial); }
 
-  // ── TABS ──
+  // TABS
   function switchTab(name) {
     document.querySelectorAll('.tab-btn').forEach((b,i) =>
       b.classList.toggle('active',(i===0&&name==='screener')||(i===1&&name==='log'))
@@ -448,7 +458,7 @@
     document.getElementById('tab-log').classList.toggle('active', name==='log');
   }
 
-  // ── WEBSOCKET ──
+  // WEBSOCKET
   function connectWS() {
     try {
       ws = new WebSocket(WS_URL);
@@ -489,7 +499,7 @@
     } catch(e) {}
   }
 
-  // ── POLLING FALLBACK ──
+  // POLLING FALLBACK
   function startPolling() {
     stopPolling();
     pollTimer = setInterval(async () => {
@@ -524,7 +534,7 @@
     if (c.querySelector('.no-results')) c.innerHTML = '';
   }
 
-  // ── ADD TICKER ──
+  // ADD TICKER
   function addTickerToDOM(setup) {
     if (!setup || !setup.ticker) return;
     if (document.getElementById('card-' + setup.ticker)) return;
@@ -540,7 +550,7 @@
     document.getElementById('statAplus').textContent  = allResults.filter(s=>s.grade==='A+').length;
   }
 
-  // ── SCREENER ──
+  // SCREENER
   function updateScreener() {
     const c = document.getElementById('screenerList');
     if (!allResults.length) { c.innerHTML = '<div class="screener-empty">No stocks yet.</div>'; return; }
@@ -555,7 +565,7 @@
         <div class="screener-item ${s.warning?'danger':gc}" onclick="openStockPopup('${s.ticker}')">
           <div>
             <div class="screener-ticker">${s.ticker}</div>
-            <div class="screener-meta">$${s.price} · $${(s.dollar_vol/1000).toFixed(0)}K</div>
+            <div class="screener-meta">$${s.price} · ${s.news_count||0} news (5d)</div>
           </div>
           <div style="text-align:right">
             <div class="screener-gap">+${s.gap_pct}%</div>
@@ -565,25 +575,25 @@
     }).join('');
   }
 
-  // ── BUILD CARD ──
+  // BUILD CARD
   function buildCard(s) {
-    const gc = {'A+':'aplus','A':'a','B':'b','D':'d'}[s.grade]||'b';
-    const cc = {'A+':'grade-aplus','A':'grade-a','B':'grade-b','D':'grade-d'}[s.grade]||'grade-b';
+    const gc  = {'A+':'aplus','A':'a','B':'b','D':'d'}[s.grade]||'b';
+    const cc  = {'A+':'grade-aplus','A':'grade-a','B':'grade-b','D':'grade-d'}[s.grade]||'grade-b';
+    const nc  = s.news_count || 0;
 
-    // News pill — replaces "Yahoo" tag and "No Recent News"
-    const nc = s.news_count || 0;
-    let newsPill = '';
-    if (s.warning) {
-      newsPill = `<span class="news-pill danger">⚠️ ${nc} article${nc!==1?'s':''}</span>`;
-    } else if (nc > 0) {
-      newsPill = `<span class="news-pill has-news">📰 ${nc} news today</span>`;
-    } else {
-      newsPill = `<span class="news-pill">📰 0 news</span>`;
-    }
+    // News count pill — no more "No Recent News"
+    let pillClass = 'no-news';
+    if (s.warning) pillClass = 'danger';
+    else if (nc > 0) pillClass = 'has-news';
+
+    const newsPill = `<span class="news-count-pill ${pillClass}">
+      📰 ${nc} article${nc!==1?'s':''} (5 days)
+    </span>`;
 
     const notes  = (s.notes||[]).map(n=>`<span style="font-size:.62rem;color:#5a7a9a">📌 ${n}</span> `).join('');
-    const skip   = s.warning?`<div class="skip-banner">⛔ SKIP — Dangerous catalyst!</div>`:'';
-    const strong = ['A+','A'].includes(s.grade)&&!s.warning?`<div style="font-size:.62rem;color:#00ff88;margin-top:3px">✅ STRONG SETUP</div>`:'';
+    const skip   = s.warning ? `<div class="skip-banner">⛔ SKIP — Dangerous catalyst!</div>` : '';
+    const strong = ['A+','A'].includes(s.grade)&&!s.warning
+      ? `<div style="font-size:.62rem;color:#00ff88;margin-top:3px">✅ STRONG SETUP</div>` : '';
 
     return `
       <div class="setup-card ${cc}" id="card-${s.ticker}" onclick="openStockPopup('${s.ticker}')">
@@ -601,7 +611,7 @@
           <div class="metric"><div class="metric-val">$${s.prev_close}</div><div class="metric-label">Prev Close</div></div>
           <div class="metric"><div class="metric-val">$${(s.dollar_vol/1000).toFixed(0)}K</div><div class="metric-label">$ Volume</div></div>
         </div>
-        <div class="catalyst">${s.catalyst}</div>
+        <div class="catalyst-row">${s.catalyst}</div>
         <div class="trade-plan">
           <div class="trade-item"><div class="trade-val entry-val">$${s.entry_low}–$${s.entry_high}</div><div class="trade-label">Entry</div></div>
           <div class="trade-item"><div class="trade-val stop-val">$${s.stop_loss}</div><div class="trade-label">Stop -5%</div></div>
@@ -614,9 +624,7 @@
       </div>`;
   }
 
-  // ══════════════════════════════
-  // STOCK POPUP
-  // ══════════════════════════════
+  // POPUP
   async function openStockPopup(ticker) {
     const setup = allResults.find(s => s.ticker === ticker);
     if (!setup) return;
@@ -627,7 +635,6 @@
     document.getElementById('popupChange').textContent  = `+${setup.gap_pct}%`;
     document.getElementById('popupChange').style.color  = '#00ff88';
 
-    // Trade plan
     document.getElementById('popupTradePlan').innerHTML = `
       <div class="popup-trade-item">
         <div class="popup-trade-val entry-val">$${setup.entry_low}–$${setup.entry_high}</div>
@@ -652,26 +659,26 @@
     document.getElementById('popupHigh').textContent    = 'H: --';
     document.getElementById('popupLow').textContent     = 'L: --';
     document.getElementById('popupSpread').textContent  = '--';
-    document.getElementById('popupStats').innerHTML     = '<div class="loading-spinner">Loading stats...</div>';
+    document.getElementById('popupStats').innerHTML     = '<div class="loading-spinner">Loading...</div>';
     document.getElementById('popupNews').innerHTML      = '<div class="loading-spinner">Loading news...</div>';
     document.getElementById('quoteUpdated').textContent = 'Fetching...';
+    document.getElementById('newsTitle').textContent    = '📰 Latest News (past 5 days)';
 
-    // TradingView chart
+    // Chart
     document.getElementById('popupChart').src =
       `https://www.tradingview.com/widgetembed/?frameElementId=popupChart` +
       `&symbol=${ticker}&interval=5&hidesidetoolbar=1&symboledit=0` +
-      `&saveimage=0&toolbarbg=f1f3f6&theme=dark&style=1` +
+      `&saveimage=0&theme=dark&style=1` +
       `&timezone=America%2FNew_York&withdateranges=0&showpopupbutton=0` +
       `&studies=Volume%40tv-basicstudies&hideideas=1`;
 
-    // Fetch all data via server-side API (no CORS issues)
-    fetchQuoteViaServer(ticker);
-    fetchStatsViaServer(ticker);
-    fetchNewsViaServer(ticker);
+    // Fetch all data via server (no CORS)
+    fetchQuote(ticker);
+    fetchStats(ticker);
+    fetchNews(ticker);
 
-    // Auto-refresh quote every 5 seconds
     if (quoteTimer) clearInterval(quoteTimer);
-    quoteTimer = setInterval(() => fetchQuoteViaServer(ticker), 5000);
+    quoteTimer = setInterval(() => fetchQuote(ticker), 5000);
   }
 
   function closePopup() {
@@ -684,26 +691,18 @@
     if (e.target === document.getElementById('stockPopup')) closePopup();
   });
 
-  // ── FETCH QUOTE (via server to avoid CORS) ──
-  async function fetchQuoteViaServer(ticker) {
+  async function fetchQuote(ticker) {
     try {
       const r = await fetch(`${API_URL}/api/stock/quote/${ticker}`);
       const d = await r.json();
-
       if (d && d.c && d.c > 0) {
-        const price = d.c.toFixed(2);
-        const chg   = ((d.c - d.pc) / d.pc * 100).toFixed(2);
-
-        document.getElementById('popupPrice').textContent  = `$${price}`;
-        document.getElementById('popupChange').textContent = `${chg > 0 ? '+' : ''}${chg}%`;
+        const chg = ((d.c - d.pc) / d.pc * 100).toFixed(2);
+        document.getElementById('popupPrice').textContent  = `$${d.c.toFixed(2)}`;
+        document.getElementById('popupChange').textContent = `${chg>0?'+':''}${chg}%`;
         document.getElementById('popupChange').style.color = chg >= 0 ? '#00ff88' : '#ff4444';
-
-        // Bid = price - small spread, Ask = price + small spread
-        // Finnhub free quote gives us c (current), h (high), l (low), o (open), pc (prev close)
-        const spread  = Math.max(0.01, (d.c * 0.001)).toFixed(2);
-        const bid     = (d.c - parseFloat(spread)/2).toFixed(2);
-        const ask     = (d.c + parseFloat(spread)/2).toFixed(2);
-
+        const spread = Math.max(0.01, (d.c * 0.001)).toFixed(2);
+        const bid    = (d.c - parseFloat(spread)/2).toFixed(2);
+        const ask    = (d.c + parseFloat(spread)/2).toFixed(2);
         document.getElementById('popupBid').textContent    = `$${bid}`;
         document.getElementById('popupAsk').textContent    = `$${ask}`;
         document.getElementById('popupSpread').textContent = `$${spread}`;
@@ -712,35 +711,23 @@
         document.getElementById('quoteUpdated').textContent =
           `Updated: ${new Date().toLocaleTimeString('en-US',{hour12:true,timeZone:'America/New_York'})} EST`;
       }
-    } catch(e) {
-      document.getElementById('quoteUpdated').textContent = 'Quote unavailable';
-    }
+    } catch(e) {}
   }
 
-  // ── FETCH STATS (via server) ──
-  async function fetchStatsViaServer(ticker) {
+  async function fetchStats(ticker) {
     try {
-      const [profRes, metRes] = await Promise.all([
+      const [pr, mr] = await Promise.all([
         fetch(`${API_URL}/api/stock/profile/${ticker}`),
         fetch(`${API_URL}/api/stock/metrics/${ticker}`)
       ]);
-      const profile = await profRes.json();
-      const metrics = await metRes.json();
+      const profile = await pr.json();
+      const metrics = await mr.json();
       const m = metrics.metric || {};
-
       const fmt = (v, pre='', suf='') =>
-        (v != null && v !== '' && v !== 0)
-          ? `${pre}${typeof v==='number'?v.toLocaleString():v}${suf}`
-          : '--';
-
+        (v != null && v !== '' && v !== 0) ? `${pre}${typeof v==='number'?v.toLocaleString():v}${suf}` : '--';
       const mktCap = profile.marketCapitalization
-        ? `$${(profile.marketCapitalization/1000).toFixed(2)}B`
-        : '--';
-
-      const float = m.float
-        ? `${m.float.toFixed(1)}M`
-        : '--';
-
+        ? `$${(profile.marketCapitalization/1000).toFixed(2)}B` : '--';
+      const float = m.float ? `${m.float.toFixed(1)}M` : '--';
       document.getElementById('popupStats').innerHTML = `
         <div class="stats-grid">
           <div>
@@ -759,35 +746,32 @@
           </div>
         </div>`;
     } catch(e) {
-      document.getElementById('popupStats').innerHTML =
-        '<div class="loading-spinner">Stats unavailable</div>';
+      document.getElementById('popupStats').innerHTML = '<div class="loading-spinner">Stats unavailable</div>';
     }
   }
 
-  // ── FETCH NEWS (via server) ──
-  async function fetchNewsViaServer(ticker) {
+  async function fetchNews(ticker) {
     try {
       const r    = await fetch(`${API_URL}/api/stock/news/${ticker}`);
       const data = await r.json();
       const news = data.news || [];
 
       document.getElementById('newsTitle').textContent =
-        `📰 Latest News (${news.length} article${news.length!==1?'s':''})`;
+        `📰 Latest News — ${news.length} article${news.length!==1?'s':''} (past 5 days)`;
 
       if (!news.length) {
         document.getElementById('popupNews').innerHTML =
-          '<div class="loading-spinner">No recent news found for this ticker</div>';
+          '<div class="loading-spinner">No news found in the past 5 days</div>';
         return;
       }
 
       document.getElementById('popupNews').innerHTML = news.slice(0, 10).map(n => {
         const date = new Date((n.datetime||0) * 1000).toLocaleDateString('en-US', {
-          month: 'short', day: 'numeric',
-          hour: '2-digit', minute: '2-digit'
+          month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit'
         });
         const sent   = n.sentiment || 'neutral';
-        const sClass = sent === 'positive' ? 'positive' : sent === 'negative' ? 'negative' : 'neutral';
-        const sLabel = sent === 'positive' ? '▲ Bullish' : sent === 'negative' ? '▼ Bearish' : '◆ Neutral';
+        const sClass = sent==='positive'?'positive':sent==='negative'?'negative':'neutral';
+        const sLabel = sent==='positive'?'▲ Bullish':sent==='negative'?'▼ Bearish':'◆ Neutral';
         return `
           <div class="news-item">
             <div class="news-headline">
@@ -806,7 +790,6 @@
     }
   }
 
-  // ── RENDER HELPERS ──
   function renderAlerts(alerts) {
     if (!alerts||!alerts.length) return;
     document.getElementById('alertLog').innerHTML = alerts.map(a =>
@@ -866,7 +849,6 @@
     }
   }
 
-  // ── BUTTONS ──
   async function startScanner() {
     try {
       await fetch(`${API_URL}/api/scanner/start`, { method: 'POST' });
@@ -943,7 +925,6 @@
       new Date().toLocaleTimeString('en-US',{hour12:true,timeZone:'America/New_York'})+' EST';
   }
 
-  // ── INIT ──
   setInterval(updateClock, 1000);
   updateClock();
   connectWS();

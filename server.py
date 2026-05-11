@@ -34,16 +34,14 @@ EMAIL_TO        = os.getenv('EMAIL_TO', '')
 POLYGON_API_KEY = os.getenv('POLYGON_API_KEY', '')
 FINNHUB_KEY     = os.getenv('FINNHUB_API_KEY', '')
 
-scanner_running   = False
-alerted_tickers   = set()
-scan_results      = []
-alert_log         = []
-connected_clients = []
+scanner_running     = False
+alerted_tickers     = set()
+scan_results        = []
+alert_log           = []
+connected_clients   = []
 current_scan_status = {
-    'phase': 'idle',
-    'message': 'Scanner stopped',
-    'progress': 0,
-    'total': 0
+    'phase': 'idle', 'message': 'Scanner stopped',
+    'progress': 0, 'total': 0
 }
 
 STRONG_KEYWORDS = [
@@ -61,7 +59,7 @@ DANGER_KEYWORDS = [
 ]
 
 # ============================================================
-# EMAIL
+# HELPERS
 # ============================================================
 
 def send_email(subject, body):
@@ -104,15 +102,14 @@ async def broadcast(data):
             connected_clients.remove(c)
 
 # ============================================================
-# FINNHUB API ENDPOINTS (server-side to avoid CORS)
+# FINNHUB ENDPOINTS (server-side — avoids CORS)
 # ============================================================
 
 @app.get("/api/stock/quote/{ticker}")
 async def get_stock_quote(ticker: str):
-    """Get real-time quote from Finnhub"""
     try:
         r = requests.get(
-            f"https://finnhub.io/api/v1/quote",
+            "https://finnhub.io/api/v1/quote",
             params={'symbol': ticker, 'token': FINNHUB_KEY},
             timeout=8
         )
@@ -124,10 +121,9 @@ async def get_stock_quote(ticker: str):
 
 @app.get("/api/stock/profile/{ticker}")
 async def get_stock_profile(ticker: str):
-    """Get company profile from Finnhub"""
     try:
         r = requests.get(
-            f"https://finnhub.io/api/v1/stock/profile2",
+            "https://finnhub.io/api/v1/stock/profile2",
             params={'symbol': ticker, 'token': FINNHUB_KEY},
             timeout=8
         )
@@ -139,10 +135,9 @@ async def get_stock_profile(ticker: str):
 
 @app.get("/api/stock/metrics/{ticker}")
 async def get_stock_metrics(ticker: str):
-    """Get key metrics from Finnhub"""
     try:
         r = requests.get(
-            f"https://finnhub.io/api/v1/stock/metric",
+            "https://finnhub.io/api/v1/stock/metric",
             params={'symbol': ticker, 'metric': 'all', 'token': FINNHUB_KEY},
             timeout=8
         )
@@ -154,13 +149,12 @@ async def get_stock_metrics(ticker: str):
 
 @app.get("/api/stock/news/{ticker}")
 async def get_stock_news(ticker: str):
-    """Get company news from Finnhub"""
     try:
-        today = datetime.now()
-        from_date = (today - timedelta(days=7)).strftime('%Y-%m-%d')
+        today     = datetime.now()
+        from_date = (today - timedelta(days=5)).strftime('%Y-%m-%d')
         to_date   = today.strftime('%Y-%m-%d')
         r = requests.get(
-            f"https://finnhub.io/api/v1/company-news",
+            "https://finnhub.io/api/v1/company-news",
             params={
                 'symbol': ticker,
                 'from':   from_date,
@@ -176,14 +170,13 @@ async def get_stock_news(ticker: str):
         return {'news': [], 'error': str(e)}
 
 # ============================================================
-# CATALYST CHECK (for scanner)
+# CATALYST CHECK (used during scanning)
 # ============================================================
 
 def check_catalyst(ticker):
     try:
-        # Try Finnhub news first
         today     = datetime.now()
-        from_date = (today - timedelta(days=2)).strftime('%Y-%m-%d')
+        from_date = (today - timedelta(days=5)).strftime('%Y-%m-%d')
         to_date   = today.strftime('%Y-%m-%d')
 
         r = requests.get(
@@ -199,20 +192,21 @@ def check_catalyst(ticker):
 
         news_items = []
         if r.status_code == 200:
-            news_items = r.json()[:10]
+            news_items = r.json()[:15]
 
-        # Fallback to yfinance if no results
+        # Fallback to yfinance if Finnhub returned nothing
         if not news_items:
             yf_news = yf.Ticker(ticker).news or []
-            cutoff  = datetime.now() - timedelta(hours=48)
+            cutoff  = datetime.now() - timedelta(days=5)
             for n in yf_news[:10]:
                 pub = n.get('providerPublishTime', 0)
                 if pub and datetime.fromtimestamp(pub) >= cutoff:
-                    news_items.append({'headline': n.get('title',''), 'source': 'yf'})
+                    news_items.append({
+                        'headline': n.get('title', ''),
+                        'source':   'yf'
+                    })
 
-        if not news_items:
-            return 'NONE', '❌ No Recent News', [], False, 0
-
+        news_count  = len(news_items)
         headlines   = []
         strong_hits = 0
         danger_hits = 0
@@ -221,24 +215,26 @@ def check_catalyst(ticker):
         for item in news_items[:5]:
             title = (item.get('headline') or item.get('title') or '').lower()
             headlines.append(item.get('headline') or item.get('title') or '')
-            if any(kw in title for kw in STRONG_KEYWORDS): strong_hits += 1
-            if any(kw in title for kw in DANGER_KEYWORDS): danger_hits += 1; warning = True
+            if any(kw in title for kw in STRONG_KEYWORDS):
+                strong_hits += 1
+            if any(kw in title for kw in DANGER_KEYWORDS):
+                danger_hits += 1
+                warning = True
 
-        news_count = len(news_items)
+        if not news_items:
+            return 'NONE', news_count, headlines[:2], False
 
         if warning and danger_hits > strong_hits:
-            return 'DANGER', f'☠️ DANGER: Dilution/Legal Risk ({news_count} articles)', headlines[:2], True, news_count
+            return 'DANGER', news_count, headlines[:2], True
         elif strong_hits >= 2:
-            return 'STRONG', f'🔥 STRONG Catalyst ({news_count} articles today)', headlines[:2], False, news_count
+            return 'STRONG', news_count, headlines[:2], False
         elif strong_hits == 1:
-            return 'MODERATE', f'✅ Moderate Catalyst ({news_count} articles)', headlines[:2], False, news_count
-        elif news_count > 0:
-            return 'WEAK', f'📰 {news_count} article(s) — weak catalyst', headlines[:2], False, news_count
+            return 'MODERATE', news_count, headlines[:2], False
         else:
-            return 'NONE', '❌ No Recent News', [], False, 0
+            return 'WEAK', news_count, headlines[:2], False
 
     except Exception as e:
-        return 'UNKNOWN', '❓ Could not fetch news', [], False, 0
+        return 'NONE', 0, [], False
 
 # ============================================================
 # DATA SOURCES
@@ -246,17 +242,19 @@ def check_catalyst(ticker):
 
 def get_massive_gainers():
     try:
-        url = (f"https://api.polygon.io/v2/snapshot/locale/us/"
-               f"markets/stocks/gainers"
-               f"?apiKey={POLYGON_API_KEY}&include_otc=false")
+        url = (
+            f"https://api.polygon.io/v2/snapshot/locale/us/"
+            f"markets/stocks/gainers"
+            f"?apiKey={POLYGON_API_KEY}&include_otc=false"
+        )
         r = requests.get(url, timeout=15)
         candidates = []
         if r.status_code == 200:
             for t in r.json().get('tickers', []):
-                sym  = t.get('ticker', '')
-                day  = t.get('day', {})
-                prev = t.get('prevDay', {})
-                last = t.get('lastTrade', {})
+                sym        = t.get('ticker', '')
+                day        = t.get('day', {})
+                prev       = t.get('prevDay', {})
+                last       = t.get('lastTrade', {})
                 price      = last.get('p') or day.get('c', 0)
                 prev_close = prev.get('c', 0)
                 volume     = day.get('v', 0)
@@ -265,19 +263,21 @@ def get_massive_gainers():
                 pct        = ((price - prev_close) / prev_close) * 100
                 dollar_vol = price * volume
                 if (sym and MIN_PRICE <= price <= MAX_PRICE and
-                        pct >= MIN_GAP_PCT and dollar_vol >= MIN_DOLLAR_VOL):
+                        pct >= MIN_GAP_PCT and
+                        dollar_vol >= MIN_DOLLAR_VOL):
                     candidates.append({
-                        'ticker': sym, 'price': float(price),
+                        'ticker':     sym,
+                        'price':      float(price),
                         'prev_close': float(prev_close),
-                        'gap_pct': round(float(pct), 1),
-                        'volume': float(volume),
+                        'gap_pct':    round(float(pct), 1),
+                        'volume':     float(volume),
                         'dollar_vol': float(dollar_vol),
-                        'source': 'Massive'
+                        'source':     'Live'
                     })
             log_alert(f"📡 Massive: {len(candidates)} stocks")
             return candidates
         else:
-            log_alert(f"⚠️ Massive API error: {r.status_code}")
+            log_alert(f"⚠️ Massive error: {r.status_code}")
             return []
     except Exception as e:
         log_alert(f"⚠️ Massive error: {e}")
@@ -288,8 +288,10 @@ def get_yahoo_gainers():
     headers    = {'User-Agent': 'Mozilla/5.0'}
     for scrId in ['day_gainers', 'small_cap_gainers']:
         try:
-            url = (f"https://query1.finance.yahoo.com/v1/finance/screener/"
-                   f"predefined/saved?formatted=false&scrIds={scrId}&count=50")
+            url = (
+                f"https://query1.finance.yahoo.com/v1/finance/screener/"
+                f"predefined/saved?formatted=false&scrIds={scrId}&count=50"
+            )
             r = requests.get(url, headers=headers, timeout=10)
             if r.status_code != 200:
                 continue
@@ -304,14 +306,16 @@ def get_yahoo_gainers():
                 prev       = q.get('regularMarketPreviousClose', 0)
                 dollar_vol = price * vol
                 if (sym and MIN_PRICE <= price <= MAX_PRICE and
-                        pct >= MIN_GAP_PCT and dollar_vol >= MIN_DOLLAR_VOL):
+                        pct >= MIN_GAP_PCT and
+                        dollar_vol >= MIN_DOLLAR_VOL):
                     candidates.append({
-                        'ticker': sym, 'price': float(price),
+                        'ticker':     sym,
+                        'price':      float(price),
                         'prev_close': float(prev),
-                        'gap_pct': round(float(pct), 1),
-                        'volume': float(vol),
+                        'gap_pct':    round(float(pct), 1),
+                        'volume':     float(vol),
                         'dollar_vol': float(dollar_vol),
-                        'source': 'Live'
+                        'source':     'Live'
                     })
         except:
             pass
@@ -324,11 +328,16 @@ def get_yahoo_gainers():
 
 def grade_setup(gap_pct, dollar_vol):
     grade, notes = "B", []
-    if gap_pct >= 50:   grade = "A+"; notes.append(f"Massive gap +{gap_pct:.1f}% 🔥🔥🔥")
-    elif gap_pct >= 30: grade = "A+"; notes.append(f"Huge gap +{gap_pct:.1f}% 🔥🔥")
-    elif gap_pct >= 20: grade = "A";  notes.append(f"Strong gap +{gap_pct:.1f}% 🔥")
-    elif gap_pct >= 15: grade = "A";  notes.append(f"Good gap +{gap_pct:.1f}%")
-    elif gap_pct >= 10: grade = "B";  notes.append(f"Moderate gap +{gap_pct:.1f}%")
+    if gap_pct >= 50:
+        grade = "A+"; notes.append(f"Massive gap +{gap_pct:.1f}% 🔥🔥🔥")
+    elif gap_pct >= 30:
+        grade = "A+"; notes.append(f"Huge gap +{gap_pct:.1f}% 🔥🔥")
+    elif gap_pct >= 20:
+        grade = "A";  notes.append(f"Strong gap +{gap_pct:.1f}% 🔥")
+    elif gap_pct >= 15:
+        grade = "A";  notes.append(f"Good gap +{gap_pct:.1f}%")
+    elif gap_pct >= 10:
+        grade = "B";  notes.append(f"Moderate gap +{gap_pct:.1f}%")
     if dollar_vol >= 5_000_000:
         notes.append(f"Monster $vol ${dollar_vol/1e6:.1f}M 🔥")
         if grade == "A": grade = "A+"
@@ -348,14 +357,28 @@ def process_ticker(stock_data):
         source     = stock_data.get('source', 'Live')
 
         grade, notes = grade_setup(gap_pct, dollar_vol)
-        strength, label, headlines, warning, news_count = check_catalyst(ticker)
+        strength, news_count, headlines, warning = check_catalyst(ticker)
 
         final_grade = grade
-        if warning:                                   final_grade = "D"
-        elif strength == 'STRONG' and grade == 'A':  final_grade = "A+"
+        if warning:
+            final_grade = "D"
+        elif strength == 'STRONG' and grade == 'A':
+            final_grade = "A+"
         elif strength == 'NONE':
             if grade == 'A+':  final_grade = 'A'
             elif grade == 'A': final_grade = 'B'
+
+        # Build catalyst label
+        if warning:
+            catalyst_label = f"☠️ Danger — {news_count} article(s) in 5 days"
+        elif strength == 'STRONG':
+            catalyst_label = f"🔥 Strong Catalyst — {news_count} article(s) in 5 days"
+        elif strength == 'MODERATE':
+            catalyst_label = f"✅ Moderate Catalyst — {news_count} article(s) in 5 days"
+        elif news_count > 0:
+            catalyst_label = f"📰 {news_count} article(s) in past 5 days"
+        else:
+            catalyst_label = "📰 0 articles in past 5 days"
 
         entry_low  = round(price * 0.99, 2)
         entry_high = round(price * 1.02, 2)
@@ -372,7 +395,7 @@ def process_ticker(stock_data):
             'dollar_vol': round(dollar_vol, 0),
             'grade':      final_grade,
             'notes':      notes,
-            'catalyst':   label,
+            'catalyst':   catalyst_label,
             'news_count': news_count,
             'headlines':  headlines[:2],
             'warning':    warning,
@@ -457,7 +480,7 @@ async def do_scan():
                         f"Grade: {setup['grade']}\n"
                         f"Gap: +{setup['gap_pct']}%\n"
                         f"Price: ${setup['price']}\n"
-                        f"Catalyst: {setup['catalyst']}\n\n"
+                        f"News: {setup['news_count']} articles in 5 days\n\n"
                         f"Entry: ${setup['entry_low']}–${setup['entry_high']}\n"
                         f"Stop: ${setup['stop_loss']}\n"
                         f"T1: ${setup['target1']}\n"
