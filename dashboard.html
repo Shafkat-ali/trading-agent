@@ -8,6 +8,84 @@
     * { margin: 0; padding: 0; box-sizing: border-box; }
     body { background: #0a0e1a; color: #e0e6f0; font-family: 'Segoe UI', sans-serif; min-height: 100vh; }
 
+    /* ── LOGIN SCREEN ── */
+    .login-screen {
+      position: fixed; inset: 0;
+      background: radial-gradient(ellipse at center, #0d1525 0%, #060a12 100%);
+      display: flex; align-items: center; justify-content: center;
+      z-index: 9999;
+    }
+    .login-screen.hidden { display: none; }
+
+    .login-box {
+      background: #0f1729;
+      border: 1px solid #1e2d4a;
+      border-radius: 20px;
+      padding: 40px;
+      width: 420px;
+      text-align: center;
+      box-shadow: 0 20px 60px rgba(0,0,0,0.5);
+    }
+
+    .login-logos {
+      display: flex; align-items: center; justify-content: center; gap: 12px;
+      margin-bottom: 20px;
+    }
+
+    .login-logo {
+      width: 64px; height: 64px; border-radius: 50%;
+      object-fit: cover; border: 2px solid #2a3f6f;
+    }
+
+    .login-x { color: #ffd700; font-size: 1.4rem; font-weight: 800; }
+
+    .login-title {
+      font-size: 1.1rem; font-weight: 800;
+      background: linear-gradient(90deg,#ffd700,#00d4ff,#00ff88);
+      -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+      margin-bottom: 6px;
+    }
+
+    .login-sub { font-size: 0.72rem; color: #3a5a7a; text-transform: uppercase; letter-spacing: 2px; margin-bottom: 30px; }
+
+    .login-label { font-size: 0.8rem; color: #6b7fa3; margin-bottom: 16px; }
+
+    .user-cards { display: flex; flex-direction: column; gap: 12px; }
+
+    .user-card {
+      background: #080c18;
+      border: 2px solid #1e2d4a;
+      border-radius: 12px;
+      padding: 16px 20px;
+      cursor: pointer;
+      transition: all 0.2s;
+      display: flex; align-items: center; gap: 14px;
+      text-align: left;
+    }
+
+    .user-card:hover {
+      border-color: #ffd700;
+      background: #111825;
+      transform: translateY(-2px);
+      box-shadow: 0 8px 24px rgba(255,215,0,0.15);
+    }
+
+    .user-avatar {
+      width: 48px; height: 48px; border-radius: 50%;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 1.4rem; font-weight: 800;
+      flex-shrink: 0;
+    }
+
+    .user-avatar.shafkat { background: linear-gradient(135deg,#00d4ff,#7b61ff); color: #fff; }
+    .user-avatar.irfan   { background: linear-gradient(135deg,#ffd700,#ff6d00); color: #000; }
+
+    .user-name { font-size: 0.95rem; font-weight: 700; color: #fff; }
+    .user-role { font-size: 0.68rem; color: #4a6a8a; margin-top: 2px; }
+
+    .user-arrow { margin-left: auto; color: #2a3f6f; font-size: 1.2rem; }
+
+    /* ── HEADER ── */
     .header {
       background: linear-gradient(135deg,#080c18,#0f1525);
       border-bottom: 1px solid #1a2a4a;
@@ -17,49 +95,73 @@
     }
     .header-brand { display: flex; align-items: center; gap: 14px; }
     .logos { display: flex; align-items: center; gap: 8px; }
-    .logo-img { width: 44px; height: 44px; border-radius: 50%; object-fit: cover; border: 2px solid #2a3f6f; background: #0f1729; }
-    .logo-x { color: #ffd700; font-size: 1rem; font-weight: 800; }
-    .brand-text h1 { font-size: 1rem; font-weight: 800; background: linear-gradient(90deg,#ffd700,#00d4ff,#00ff88); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
-    .brand-text p { font-size: 0.6rem; color: #3a5a7a; text-transform: uppercase; letter-spacing: 2px; margin-top: 1px; }
-    .header-right { display: flex; align-items: center; gap: 12px; }
-    .status-pill { display: flex; align-items: center; gap: 6px; padding: 5px 12px; border-radius: 20px; background: #0f1729; border: 1px solid #1e2d4a; }
+    .logo-img { width: 40px; height: 40px; border-radius: 50%; object-fit: cover; border: 2px solid #2a3f6f; }
+    .logo-x { color: #ffd700; font-size: 0.9rem; font-weight: 800; }
+    .brand-text h1 { font-size: 0.95rem; font-weight: 800; background: linear-gradient(90deg,#ffd700,#00d4ff,#00ff88); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+    .brand-text p { font-size: 0.58rem; color: #3a5a7a; text-transform: uppercase; letter-spacing: 1.5px; margin-top: 1px; }
+
+    .header-right { display: flex; align-items: center; gap: 10px; }
+
+    .active-user-badge {
+      display: flex; align-items: center; gap: 8px;
+      padding: 5px 12px; border-radius: 20px;
+      background: #0f1729; border: 1px solid #1e2d4a;
+      cursor: pointer; transition: all 0.2s;
+    }
+    .active-user-badge:hover { border-color: #ffd700; }
+
+    .user-mini-avatar {
+      width: 24px; height: 24px; border-radius: 50%;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 0.7rem; font-weight: 800;
+    }
+    .user-mini-avatar.shafkat { background: linear-gradient(135deg,#00d4ff,#7b61ff); color: #fff; }
+    .user-mini-avatar.irfan   { background: linear-gradient(135deg,#ffd700,#ff6d00); color: #000; }
+
+    .active-user-name { font-size: 0.72rem; font-weight: 600; color: #a0b0d0; }
+    .switch-btn { font-size: 0.6rem; color: #4a6a8a; }
+
+    .status-pill { display: flex; align-items: center; gap: 6px; padding: 5px 10px; border-radius: 20px; background: #0f1729; border: 1px solid #1e2d4a; }
     .status-dot { width: 7px; height: 7px; border-radius: 50%; background: #ff4444; }
     .status-dot.active { background: #00ff88; animation: pulse 1.5s infinite; }
     @keyframes pulse { 0%,100%{opacity:1;transform:scale(1)}50%{opacity:.4;transform:scale(1.5)} }
-    .status-text { font-size: 0.75rem; font-weight: 600; }
-    .clock { font-size: 0.72rem; color: #4a6a8a; font-family: monospace; }
+    .status-text { font-size: 0.72rem; font-weight: 600; }
+    .clock { font-size: 0.7rem; color: #4a6a8a; font-family: monospace; }
 
     .scanning-bar { height: 2px; background: linear-gradient(90deg,#ffd700,#00d4ff,#00ff88,#ffd700); background-size: 300%; animation: scan 1.5s linear infinite; }
     .scanning-bar.hidden { display: none; }
     @keyframes scan { 0%{background-position:0%}100%{background-position:300%} }
 
+    /* ── CONTROLS ── */
     .controls { padding: 10px 20px; display: flex; gap: 8px; flex-wrap: wrap; background: #0d1220; border-bottom: 1px solid #1a2035; align-items: center; }
-    .btn { padding: 7px 16px; border: none; border-radius: 7px; font-size: 0.8rem; font-weight: 600; cursor: pointer; transition: all 0.2s; display: flex; align-items: center; gap: 5px; }
+    .btn { padding: 7px 14px; border: none; border-radius: 7px; font-size: 0.78rem; font-weight: 600; cursor: pointer; transition: all 0.2s; display: flex; align-items: center; gap: 5px; }
     .btn:hover { transform: translateY(-1px); filter: brightness(1.1); }
     .btn-start  { background: linear-gradient(135deg,#00c853,#00e676); color: #000; }
     .btn-pause  { background: linear-gradient(135deg,#ff6d00,#ff9100); color: #000; }
     .btn-rescan { background: linear-gradient(135deg,#2979ff,#448aff); color: #fff; }
     .btn-clear  { background: linear-gradient(135deg,#6200ea,#9c27b0); color: #fff; }
 
-    .stats-bar { margin-left: auto; display: flex; gap: 16px; align-items: center; }
+    .stats-bar { margin-left: auto; display: flex; gap: 14px; align-items: center; }
     .stat { text-align: center; }
-    .stat-val { font-size: 1rem; font-weight: 700; color: #00d4ff; }
-    .stat-label { font-size: 0.58rem; color: #4a6a8a; text-transform: uppercase; }
+    .stat-val { font-size: 0.95rem; font-weight: 700; color: #00d4ff; }
+    .stat-label { font-size: 0.55rem; color: #4a6a8a; text-transform: uppercase; }
 
+    /* ── PROGRESS ── */
     .scan-progress-bar { padding: 5px 20px; background: #080c18; border-bottom: 1px solid #1a2035; display: none; }
     .scan-progress-bar.visible { display: block; }
-    .progress-label { font-size: 0.68rem; color: #4a6a8a; margin-bottom: 3px; display: flex; justify-content: space-between; }
+    .progress-label { font-size: 0.65rem; color: #4a6a8a; margin-bottom: 3px; display: flex; justify-content: space-between; }
     .progress-track { height: 3px; background: #1a2035; border-radius: 2px; overflow: hidden; }
     .progress-fill { height: 100%; background: linear-gradient(90deg,#ffd700,#00d4ff); border-radius: 2px; transition: width 0.3s; }
     .progress-fill.indeterminate { width: 30%!important; animation: ind 1.5s ease-in-out infinite; }
     @keyframes ind { 0%{transform:translateX(-200%)}100%{transform:translateX(450%)} }
 
-    .main { display: grid; grid-template-columns: 1fr 280px; height: calc(100vh - 130px); }
-    .results-panel { overflow-y: auto; padding: 14px; }
-    .results-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; }
-    .results-title { font-size: 0.85rem; font-weight: 600; color: #8090b0; }
-    .data-badge { font-size: 0.58rem; padding: 2px 6px; border-radius: 4px; background: rgba(0,212,255,0.1); color: #00d4ff; margin-left: 6px; }
-    .last-scan { font-size: 0.65rem; color: #3a4a6a; }
+    /* ── MAIN LAYOUT ── */
+    .main { display: grid; grid-template-columns: 1fr 260px; height: calc(100vh - 125px); }
+    .results-panel { overflow-y: auto; padding: 12px; }
+    .results-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; }
+    .results-title { font-size: 0.82rem; font-weight: 600; color: #8090b0; }
+    .data-badge { font-size: 0.55rem; padding: 2px 5px; border-radius: 3px; background: rgba(0,212,255,0.1); color: #00d4ff; margin-left: 5px; }
+    .last-scan { font-size: 0.62rem; color: #3a4a6a; }
 
     .no-results { text-align: center; padding: 50px 20px; color: #2a3a5a; }
     .no-results .icon { font-size: 2.5rem; margin-bottom: 12px; }
@@ -67,66 +169,155 @@
     .loading-fill { height: 100%; width: 30%; background: linear-gradient(90deg,#ffd700,#00d4ff); animation: lf 1.5s ease-in-out infinite; }
     @keyframes lf { 0%{transform:translateX(-100%)}100%{transform:translateX(450%)} }
 
-    .setup-card { background: #0d1525; border: 1px solid #1a2035; border-radius: 10px; padding: 12px; margin-bottom: 8px; transition: all 0.2s; animation: fadeIn 0.3s ease; }
+    /* ── SETUP CARD ── */
+    .setup-card { background: #0d1525; border: 1px solid #1a2035; border-radius: 10px; padding: 11px; margin-bottom: 7px; transition: all 0.2s; animation: fadeIn 0.3s ease; cursor: pointer; }
     @keyframes fadeIn { from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)} }
-    .setup-card:hover { border-color: #2a4a8a; transform: translateY(-1px); }
+    .setup-card:hover { border-color: #ffd700; transform: translateY(-1px); box-shadow: 0 4px 20px rgba(255,215,0,0.1); }
     .setup-card.grade-aplus { border-left: 3px solid #ffd700; background: linear-gradient(135deg,#0d1525,#1a1200); }
     .setup-card.grade-a     { border-left: 3px solid #00d4ff; background: linear-gradient(135deg,#0d1525,#081520); }
     .setup-card.grade-b     { border-left: 3px solid #00ff88; background: linear-gradient(135deg,#0d1525,#081a10); }
     .setup-card.grade-d     { border-left: 3px solid #ff1744; opacity: .5; }
 
-    .card-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; }
-    .ticker-info { display: flex; align-items: center; gap: 7px; }
-    .ticker { font-size: 1.1rem; font-weight: 800; color: #fff; }
-    .grade-badge { padding: 2px 8px; border-radius: 12px; font-size: 0.68rem; font-weight: 700; }
+    .card-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 7px; }
+    .ticker-info { display: flex; align-items: center; gap: 6px; }
+    .ticker { font-size: 1rem; font-weight: 800; color: #fff; }
+    .grade-badge { padding: 2px 7px; border-radius: 10px; font-size: 0.65rem; font-weight: 700; }
     .grade-badge.aplus{background:#ffd700;color:#000}
     .grade-badge.a    {background:#00d4ff;color:#000}
     .grade-badge.b    {background:#00ff88;color:#000}
     .grade-badge.d    {background:#ff1744;color:#fff}
-    .source-tag { font-size: 0.55rem; padding: 1px 5px; border-radius: 3px; background: rgba(255,215,0,.15); color: #ffd700; }
-    .gap-pct { font-size: 1rem; font-weight: 700; color: #00ff88; }
+    .source-tag { font-size: 0.52rem; padding: 1px 4px; border-radius: 3px; background: rgba(255,215,0,.12); color: #ffd700; }
+    .click-hint { font-size: 0.52rem; color: #2a3f6f; margin-left: 4px; }
+    .gap-pct { font-size: 0.95rem; font-weight: 700; color: #00ff88; }
 
-    .card-metrics { display: grid; grid-template-columns: repeat(3,1fr); gap: 5px; margin-bottom: 8px; }
+    .card-metrics { display: grid; grid-template-columns: repeat(3,1fr); gap: 4px; margin-bottom: 7px; }
     .metric { background: #080c18; border-radius: 5px; padding: 5px; text-align: center; }
-    .metric-val { font-size: 0.85rem; font-weight: 700; }
-    .metric-label { font-size: 0.55rem; color: #3a4a6a; text-transform: uppercase; margin-top: 1px; }
+    .metric-val { font-size: 0.82rem; font-weight: 700; }
+    .metric-label { font-size: 0.52rem; color: #3a4a6a; text-transform: uppercase; margin-top: 1px; }
 
-    .catalyst { font-size: 0.72rem; padding: 4px 7px; background: #080c18; border-radius: 5px; margin-bottom: 7px; }
+    .catalyst { font-size: 0.7rem; padding: 4px 6px; background: #080c18; border-radius: 5px; margin-bottom: 6px; }
     .trade-plan { display: grid; grid-template-columns: repeat(4,1fr); gap: 4px; }
-    .trade-item { background: #080c18; border-radius: 5px; padding: 4px; text-align: center; }
-    .trade-val { font-size: 0.75rem; font-weight: 700; }
-    .trade-label { font-size: 0.5rem; color: #3a4a6a; text-transform: uppercase; margin-top: 1px; }
+    .trade-item { background: #080c18; border-radius: 4px; padding: 4px; text-align: center; }
+    .trade-val { font-size: 0.72rem; font-weight: 700; }
+    .trade-label { font-size: 0.48rem; color: #3a4a6a; text-transform: uppercase; margin-top: 1px; }
     .entry-val{color:#00d4ff}.stop-val{color:#ff4444}.t-val{color:#00ff88}
-    .skip-banner { background: rgba(255,23,68,.12); border: 1px solid #ff1744; border-radius: 5px; padding: 4px 7px; font-size:.68rem; color:#ff5252; margin-top: 5px; text-align: center; }
-    .headline { font-size:.65rem; color:#3a5a7a; padding: 2px 0; border-top: 1px solid #1a2035; margin-top: 3px; }
+    .skip-banner { background: rgba(255,23,68,.12); border: 1px solid #ff1744; border-radius: 4px; padding: 4px 6px; font-size:.65rem; color:#ff5252; margin-top: 5px; text-align: center; }
+    .headline { font-size:.62rem; color:#3a5a7a; padding: 2px 0; border-top: 1px solid #1a2035; margin-top: 3px; }
 
+    /* ── RIGHT PANEL ── */
     .right-panel { background: #0d1220; border-left: 1px solid #1a2035; display: flex; flex-direction: column; overflow: hidden; }
     .tab-header { display: flex; border-bottom: 1px solid #1a2035; }
-    .tab-btn { flex: 1; padding: 10px 8px; background: transparent; border: none; color: #4a6a8a; font-size: 0.72rem; font-weight: 600; cursor: pointer; transition: all 0.2s; text-transform: uppercase; }
+    .tab-btn { flex: 1; padding: 9px 6px; background: transparent; border: none; color: #4a6a8a; font-size: 0.68rem; font-weight: 600; cursor: pointer; transition: all 0.2s; text-transform: uppercase; }
     .tab-btn.active { color: #00d4ff; border-bottom: 2px solid #00d4ff; background: rgba(0,212,255,0.05); }
-    .tab-content { flex: 1; overflow-y: auto; padding: 12px; display: none; }
+    .tab-content { flex: 1; overflow-y: auto; padding: 10px; display: none; }
     .tab-content.active { display: block; }
 
-    .screener-item { padding: 8px 10px; background: #0f1729; border-radius: 6px; margin-bottom: 6px; border-left: 3px solid #1e2d4a; cursor: pointer; transition: all 0.2s; display: flex; align-items: center; justify-content: space-between; }
-    .screener-item:hover { background: #142040; border-left-color: #00d4ff; }
+    .screener-item { padding: 7px 9px; background: #0f1729; border-radius: 5px; margin-bottom: 5px; border-left: 3px solid #1e2d4a; cursor: pointer; transition: all 0.2s; display: flex; align-items: center; justify-content: space-between; }
+    .screener-item:hover { background: #142040; border-left-color: #ffd700; }
     .screener-item.aplus{border-left-color:#ffd700}
     .screener-item.a    {border-left-color:#00d4ff}
     .screener-item.b    {border-left-color:#00ff88}
     .screener-item.danger{border-left-color:#ff1744;opacity:.6}
-    .screener-ticker { font-size: 0.85rem; font-weight: 700; color: #fff; }
-    .screener-meta { font-size: 0.62rem; color: #4a6a8a; margin-top: 1px; }
-    .screener-right { text-align: right; }
-    .screener-gap { font-size: 0.85rem; font-weight: 700; color: #00ff88; }
-    .screener-grade { font-size: 0.6rem; padding: 1px 5px; border-radius: 3px; font-weight: 700; margin-top: 2px; display: inline-block; }
+    .screener-ticker { font-size: 0.82rem; font-weight: 700; color: #fff; }
+    .screener-meta { font-size: 0.58rem; color: #4a6a8a; margin-top: 1px; }
+    .screener-gap { font-size: 0.82rem; font-weight: 700; color: #00ff88; }
+    .screener-grade { font-size: 0.58rem; padding: 1px 4px; border-radius: 3px; font-weight: 700; margin-top: 2px; display: inline-block; }
     .screener-grade.aplus{background:#ffd700;color:#000}
     .screener-grade.a    {background:#00d4ff;color:#000}
     .screener-grade.b    {background:#00ff88;color:#000}
     .screener-grade.d    {background:#ff1744;color:#fff}
-    .screener-empty { text-align: center; padding: 40px 10px; color: #2a3a5a; font-size: 0.78rem; }
+    .screener-empty { text-align: center; padding: 30px 10px; color: #2a3a5a; font-size: 0.72rem; }
 
-    .alert-item { padding: 6px 8px; background: #0f1729; border-radius: 5px; margin-bottom: 4px; border-left: 2px solid #1e2d4a; }
-    .alert-time { font-size: 0.58rem; color: #3a4a6a; font-family: monospace; }
-    .alert-msg  { font-size: 0.68rem; color: #8090b0; margin-top: 1px; }
+    .alert-item { padding: 5px 7px; background: #0f1729; border-radius: 4px; margin-bottom: 4px; border-left: 2px solid #1e2d4a; }
+    .alert-time { font-size: 0.55rem; color: #3a4a6a; font-family: monospace; }
+    .alert-msg  { font-size: 0.65rem; color: #8090b0; margin-top: 1px; }
+
+    /* ── STOCK DETAIL POPUP ── */
+    .popup-overlay {
+      position: fixed; inset: 0;
+      background: rgba(0,0,0,0.8);
+      z-index: 1000;
+      display: flex; align-items: center; justify-content: center;
+      padding: 20px;
+      backdrop-filter: blur(4px);
+    }
+    .popup-overlay.hidden { display: none; }
+
+    .popup-box {
+      background: #0d1525;
+      border: 1px solid #1e2d4a;
+      border-radius: 16px;
+      width: 100%;
+      max-width: 900px;
+      max-height: 85vh;
+      overflow-y: auto;
+      position: relative;
+      box-shadow: 0 20px 60px rgba(0,0,0,0.6);
+    }
+
+    .popup-header {
+      padding: 16px 20px;
+      border-bottom: 1px solid #1a2035;
+      display: flex; align-items: center; justify-content: space-between;
+      position: sticky; top: 0; background: #0d1525; z-index: 10;
+    }
+
+    .popup-ticker-info { display: flex; align-items: center; gap: 10px; }
+    .popup-ticker { font-size: 1.6rem; font-weight: 900; color: #fff; }
+    .popup-price  { font-size: 1.2rem; font-weight: 700; color: #00ff88; }
+    .popup-change { font-size: 0.85rem; font-weight: 600; margin-left: 4px; }
+    .popup-close  { width: 32px; height: 32px; border-radius: 50%; background: #1e2d4a; border: none; color: #a0b0d0; font-size: 1.1rem; cursor: pointer; display: flex; align-items: center; justify-content: center; transition: all 0.2s; }
+    .popup-close:hover { background: #ff1744; color: #fff; }
+
+    .popup-body { padding: 16px 20px; }
+
+    .popup-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 16px; }
+
+    .popup-section { background: #080c18; border-radius: 10px; padding: 14px; }
+    .popup-section-title { font-size: 0.72rem; font-weight: 700; color: #4a6a8a; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 10px; display: flex; align-items: center; gap: 6px; }
+
+    /* BID/ASK */
+    .bid-ask-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+    .bid-box { background: rgba(0,255,136,0.1); border: 1px solid rgba(0,255,136,0.3); border-radius: 8px; padding: 10px; text-align: center; }
+    .ask-box { background: rgba(255,23,68,0.1);  border: 1px solid rgba(255,23,68,0.3);  border-radius: 8px; padding: 10px; text-align: center; }
+    .ba-label { font-size: 0.62rem; color: #6b7fa3; text-transform: uppercase; margin-bottom: 4px; }
+    .bid-val  { font-size: 1.3rem; font-weight: 800; color: #00ff88; }
+    .ask-val  { font-size: 1.3rem; font-weight: 800; color: #ff4444; }
+    .ba-size  { font-size: 0.68rem; color: #4a6a8a; margin-top: 2px; }
+    .spread-row { text-align: center; margin-top: 8px; font-size: 0.7rem; color: #6b7fa3; }
+    .spread-val { color: #ffd700; font-weight: 700; }
+
+    /* KEY STATS */
+    .stats-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+    .stat-row { display: flex; justify-content: space-between; align-items: center; padding: 5px 0; border-bottom: 1px solid #1a2035; }
+    .stat-row:last-child { border-bottom: none; }
+    .stat-key { font-size: 0.65rem; color: #4a6a8a; }
+    .stat-value { font-size: 0.7rem; font-weight: 600; color: #e0e6f0; }
+
+    /* CHART */
+    .chart-container { background: #080c18; border-radius: 10px; padding: 14px; margin-bottom: 16px; }
+    .chart-frame { width: 100%; height: 300px; border: none; border-radius: 8px; background: #080c18; }
+
+    /* NEWS */
+    .news-section { background: #080c18; border-radius: 10px; padding: 14px; }
+    .news-item { padding: 8px 0; border-bottom: 1px solid #1a2035; }
+    .news-item:last-child { border-bottom: none; }
+    .news-headline { font-size: 0.72rem; color: #c0d0e0; margin-bottom: 3px; line-height: 1.4; }
+    .news-headline a { color: #00d4ff; text-decoration: none; }
+    .news-headline a:hover { text-decoration: underline; }
+    .news-meta { font-size: 0.6rem; color: #3a5a7a; display: flex; gap: 8px; align-items: center; }
+    .news-sentiment { padding: 1px 5px; border-radius: 3px; font-size: 0.58rem; font-weight: 600; }
+    .news-sentiment.positive { background: rgba(0,255,136,0.15); color: #00ff88; }
+    .news-sentiment.negative { background: rgba(255,23,68,0.15);  color: #ff4444; }
+    .news-sentiment.neutral  { background: rgba(255,255,255,0.08); color: #8090b0; }
+
+    /* TRADE PLAN IN POPUP */
+    .popup-trade-plan { display: grid; grid-template-columns: repeat(4,1fr); gap: 8px; background: #080c18; border-radius: 10px; padding: 14px; margin-bottom: 16px; }
+    .popup-trade-item { text-align: center; padding: 8px; background: #0d1525; border-radius: 8px; }
+    .popup-trade-val { font-size: 0.95rem; font-weight: 700; }
+    .popup-trade-label { font-size: 0.6rem; color: #4a6a8a; text-transform: uppercase; margin-top: 3px; }
+
+    .loading-spinner { text-align: center; padding: 20px; color: #4a6a8a; font-size: 0.78rem; }
 
     ::-webkit-scrollbar{width:3px}
     ::-webkit-scrollbar-track{background:#080c18}
@@ -137,11 +328,116 @@
       .right-panel{display:none}
       .stats-bar{display:none}
       .trade-plan{grid-template-columns:repeat(2,1fr)}
+      .popup-grid{grid-template-columns:1fr}
+      .popup-trade-plan{grid-template-columns:repeat(2,1fr)}
+      .login-box{width:90%;padding:24px}
     }
   </style>
 </head>
 <body>
 
+<!-- ══════════════════════════════════════
+     LOGIN SCREEN
+══════════════════════════════════════ -->
+<div class="login-screen" id="loginScreen">
+  <div class="login-box">
+    <div class="login-logos">
+      <img class="login-logo" id="loginPaydaLogo"  src="" alt="Payda">
+      <span class="login-x">×</span>
+      <img class="login-logo" id="loginUyghurLogo" src="" alt="UyghurKid">
+    </div>
+    <div class="login-title">Payda × UyghurKid</div>
+    <div class="login-sub">Capital Trading Agent</div>
+    <div class="login-label">Select your profile to continue</div>
+    <div class="user-cards">
+      <div class="user-card" onclick="selectUser('shafkat','Shafkat Uyghurkid','S')">
+        <div class="user-avatar shafkat">S</div>
+        <div>
+          <div class="user-name">Shafkat Uyghurkid</div>
+          <div class="user-role">UyghurKid Capital</div>
+        </div>
+        <div class="user-arrow">→</div>
+      </div>
+      <div class="user-card" onclick="selectUser('irfan','Irfan Payda','I')">
+        <div class="user-avatar irfan">I</div>
+        <div>
+          <div class="user-name">Irfan Payda</div>
+          <div class="user-role">Payda Capital</div>
+        </div>
+        <div class="user-arrow">→</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════
+     STOCK DETAIL POPUP
+══════════════════════════════════════ -->
+<div class="popup-overlay hidden" id="stockPopup">
+  <div class="popup-box">
+    <div class="popup-header">
+      <div class="popup-ticker-info">
+        <span class="popup-ticker" id="popupTicker">--</span>
+        <span class="popup-price"  id="popupPrice">$--</span>
+        <span class="popup-change" id="popupChange"></span>
+      </div>
+      <button class="popup-close" onclick="closePopup()">✕</button>
+    </div>
+    <div class="popup-body">
+
+      <!-- TRADE PLAN -->
+      <div class="popup-trade-plan" id="popupTradePlan"></div>
+
+      <!-- BID/ASK + STATS -->
+      <div class="popup-grid">
+        <div class="popup-section">
+          <div class="popup-section-title">📊 Level 1 — Bid / Ask</div>
+          <div class="bid-ask-grid">
+            <div class="bid-box">
+              <div class="ba-label">BID</div>
+              <div class="bid-val" id="popupBid">--</div>
+              <div class="ba-size" id="popupBidSize">-- shares</div>
+            </div>
+            <div class="ask-box">
+              <div class="ba-label">ASK</div>
+              <div class="ask-val" id="popupAsk">--</div>
+              <div class="ba-size" id="popupAskSize">-- shares</div>
+            </div>
+          </div>
+          <div class="spread-row">
+            Spread: <span class="spread-val" id="popupSpread">--</span>
+          </div>
+        </div>
+
+        <div class="popup-section">
+          <div class="popup-section-title">📈 Key Statistics</div>
+          <div id="popupStats">
+            <div class="loading-spinner">Loading...</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- CHART -->
+      <div class="chart-container">
+        <div class="popup-section-title" style="margin-bottom:10px">📉 Live Chart</div>
+        <iframe class="chart-frame" id="popupChart" src="" frameborder="0"></iframe>
+      </div>
+
+      <!-- NEWS -->
+      <div class="news-section">
+        <div class="popup-section-title">📰 Latest News</div>
+        <div id="popupNews">
+          <div class="loading-spinner">Loading news...</div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════
+     MAIN APP
+══════════════════════════════════════ -->
 <div class="scanning-bar hidden" id="scanBar"></div>
 
 <div class="header">
@@ -157,6 +453,11 @@
     </div>
   </div>
   <div class="header-right">
+    <div class="active-user-badge" onclick="switchUser()">
+      <div class="user-mini-avatar" id="headerAvatar"></div>
+      <span class="active-user-name" id="headerUserName"></span>
+      <span class="switch-btn">⇄ Switch</span>
+    </div>
     <div class="status-pill">
       <div class="status-dot" id="statusDot"></div>
       <span class="status-text" id="statusText">Offline</span>
@@ -200,7 +501,7 @@
       <div class="no-results">
         <div class="icon">🔍</div>
         <p>Press Start to begin scanning</p>
-        <p style="font-size:.75rem;margin-top:6px;color:#2a3a5a">Real-time • Pre-market • After-hours</p>
+        <p style="font-size:.72rem;margin-top:6px;color:#2a3a5a">Click any stock card to see Level 1, news & chart</p>
       </div>
     </div>
   </div>
@@ -211,7 +512,7 @@
       <button class="tab-btn"        onclick="switchTab('log')">📝 Log</button>
     </div>
     <div class="tab-content active" id="tab-screener">
-      <div style="font-size:.65rem;color:#3a5a7a;margin-bottom:8px;text-align:center">Live watchlist — click to jump to card</div>
+      <div style="font-size:.62rem;color:#3a5a7a;margin-bottom:8px;text-align:center">Click ticker to view details</div>
       <div id="screenerList"><div class="screener-empty">No stocks yet.<br>Press Start.</div></div>
     </div>
     <div class="tab-content" id="tab-log">
@@ -223,24 +524,69 @@
 </div>
 
 <script>
-  const WS_URL  = `ws://${location.host}/ws`;
-  const API_URL = `${location.protocol}//${location.host}`;
-  const GITHUB  = 'https://raw.githubusercontent.com/Shafkat-ali/trading-agent/main/';
+  // ── CONFIG ──
+  const WS_URL      = `ws://${location.host}/ws`;
+  const API_URL     = `${location.protocol}//${location.host}`;
+  const GITHUB      = 'https://raw.githubusercontent.com/Shafkat-ali/trading-agent/main/';
+  const FINNHUB_KEY = 'live_9199b4da0d8f36b3ad22107dd6fd73a37d38cda210723bbe79742879324';
 
-  document.getElementById('paydaLogo').src  = GITHUB + 'payda.png';
-  document.getElementById('uyghurLogo').src = GITHUB + 'UYGHURKID.png';
+  // Set logos everywhere
+  const PAYDA_LOGO  = GITHUB + 'payda.png';
+  const UYGHUR_LOGO = GITHUB + 'UYGHURKID.png';
 
-  let ws         = null;
-  let isRunning  = false;
-  let isPaused   = false;
-  let allResults = [];
-  let isLoading  = false;
-  let pollTimer  = null;
+  ['paydaLogo','loginPaydaLogo'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.src = PAYDA_LOGO;
+  });
+  ['uyghurLogo','loginUyghurLogo'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.src = UYGHUR_LOGO;
+  });
+
+  // ── USER STATE ──
+  let currentUser = null;
+  let ws          = null;
+  let isRunning   = false;
+  let isPaused    = false;
+  let allResults  = [];
+  let isLoading   = false;
+  let pollTimer   = null;
+  let currentSetup = null;
+  let quoteTimer   = null;
+
+  // ── USER SELECTION ──
+  function selectUser(id, name, initial) {
+    currentUser = { id, name, initial };
+    sessionStorage.setItem('tradingUser', JSON.stringify(currentUser));
+    document.getElementById('loginScreen').classList.add('hidden');
+
+    // Update header
+    const avatar = document.getElementById('headerAvatar');
+    avatar.textContent   = initial;
+    avatar.className     = `user-mini-avatar ${id}`;
+    document.getElementById('headerUserName').textContent = name;
+
+    // Load existing results
+    loadExistingResults();
+  }
+
+  function switchUser() {
+    sessionStorage.removeItem('tradingUser');
+    currentUser = null;
+    document.getElementById('loginScreen').classList.remove('hidden');
+  }
+
+  // Check if already logged in
+  const savedUser = sessionStorage.getItem('tradingUser');
+  if (savedUser) {
+    const u = JSON.parse(savedUser);
+    selectUser(u.id, u.name, u.initial);
+  }
 
   // ── TABS ──
   function switchTab(name) {
     document.querySelectorAll('.tab-btn').forEach((b,i) =>
-      b.classList.toggle('active', (i===0&&name==='screener')||(i===1&&name==='log'))
+      b.classList.toggle('active',(i===0&&name==='screener')||(i===1&&name==='log'))
     );
     document.getElementById('tab-screener').classList.toggle('active', name==='screener');
     document.getElementById('tab-log').classList.toggle('active', name==='log');
@@ -252,60 +598,42 @@
       ws = new WebSocket(WS_URL);
       ws.onopen    = () => console.log('WS connected');
       ws.onmessage = handleMessage;
-      ws.onclose   = () => { setTimeout(connectWS, 3000); };
+      ws.onclose   = () => setTimeout(connectWS, 3000);
       ws.onerror   = () => ws.close();
-    } catch(e) {
-      setTimeout(connectWS, 3000);
-    }
+    } catch(e) { setTimeout(connectWS, 3000); }
   }
 
   function handleMessage(event) {
     try {
       const msg = JSON.parse(event.data);
-
       if (msg.type === 'status') {
         isRunning = msg.running;
         updateStatusUI(isRunning);
         if (!isRunning) hideProgress();
       }
-
-      if (msg.type === 'scan_status') {
-        updateProgress(msg.status);
-      }
-
-      // ✅ LIVE TICKER — appears immediately
+      if (msg.type === 'scan_status') updateProgress(msg.status);
       if (msg.type === 'new_ticker' && msg.setup) {
-        if (isLoading) {
-          clearLoadingScreen();
-        }
+        if (isLoading) clearLoadingScreen();
         addTickerToDOM(msg.setup);
+        updateScreener();
       }
-
-      // Final results after scan completes
       if (msg.type === 'scan_results') {
         const data = msg.data || [];
-        if (data.length > 0) {
-          // Merge any new tickers we might have missed
-          data.forEach(s => {
-            if (!allResults.find(r => r.ticker === s.ticker)) {
-              allResults.push(s);
-              addTickerToDOM(s);
-            }
-          });
-          updateScreener();
-        }
+        data.forEach(s => {
+          if (!allResults.find(r => r.ticker === s.ticker)) {
+            allResults.push(s);
+            addTickerToDOM(s);
+          }
+        });
+        if (data.length) updateScreener();
         renderAlerts(msg.alerts);
-        updateStats(data, msg.time);
+        updateStats(allResults, msg.time);
         if (msg.scan_status) updateProgress(msg.scan_status);
       }
-    } catch(e) {
-      console.error('WS message error:', e);
-    }
+    } catch(e) { console.error('WS error:', e); }
   }
 
   // ── POLLING FALLBACK ──
-  // Every 5 seconds while running, check API for results
-  // This ensures stocks show even if WS messages are missed
   function startPolling() {
     stopPolling();
     pollTimer = setInterval(async () => {
@@ -323,10 +651,7 @@
               added = true;
             }
           });
-          if (added) {
-            updateScreener();
-            updateStats(allResults, data.time);
-          }
+          if (added) { updateScreener(); updateStats(allResults, data.time); }
           renderAlerts(data.alerts);
         }
       } catch(e) {}
@@ -337,26 +662,17 @@
     if (pollTimer) { clearInterval(pollTimer); pollTimer = null; }
   }
 
-  // ── CLEAR LOADING ──
   function clearLoadingScreen() {
     isLoading = false;
     const c = document.getElementById('results');
-    if (c.querySelector('.no-results')) {
-      c.innerHTML = '';
-    }
+    if (c.querySelector('.no-results')) c.innerHTML = '';
   }
 
-  // ── ADD TICKER TO DOM ──
+  // ── ADD TICKER ──
   function addTickerToDOM(setup) {
     if (!setup || !setup.ticker) return;
-
-    // Skip duplicates
     if (document.getElementById('card-' + setup.ticker)) return;
-
-    // Track in allResults
-    if (!allResults.find(r => r.ticker === setup.ticker)) {
-      allResults.push(setup);
-    }
+    if (!allResults.find(r => r.ticker === setup.ticker)) allResults.push(setup);
 
     const div = document.createElement('div');
     div.innerHTML = buildCard(setup);
@@ -364,42 +680,35 @@
     if (!card) return;
 
     const container = document.getElementById('results');
-
-    // A+ to top
     if (setup.grade === 'A+' && !setup.warning) {
       container.insertBefore(card, container.firstChild);
     } else {
       container.appendChild(card);
     }
 
-    // Update counters
     document.getElementById('statSetups').textContent = allResults.length;
-    document.getElementById('statAplus').textContent  =
-      allResults.filter(s => s.grade === 'A+').length;
+    document.getElementById('statAplus').textContent  = allResults.filter(s=>s.grade==='A+').length;
   }
 
   // ── SCREENER ──
   function updateScreener() {
     const c = document.getElementById('screenerList');
-    if (!allResults.length) {
-      c.innerHTML = '<div class="screener-empty">No stocks yet.</div>';
-      return;
-    }
+    if (!allResults.length) { c.innerHTML = '<div class="screener-empty">No stocks yet.</div>'; return; }
     const sorted = [...allResults].sort((a,b) => {
-      if (a.warning && !b.warning) return 1;
-      if (!a.warning && b.warning) return -1;
-      return ({'A+':4,'A':3,'B':2,'D':0}[b.grade]||0) - ({'A+':4,'A':3,'B':2,'D':0}[a.grade]||0);
+      if (a.warning&&!b.warning) return 1;
+      if (!a.warning&&b.warning) return -1;
+      return ({'A+':4,'A':3,'B':2,'D':0}[b.grade]||0)-({'A+':4,'A':3,'B':2,'D':0}[a.grade]||0);
     });
     c.innerHTML = sorted.map(s => {
       const gc = {'A+':'aplus','A':'a','B':'b','D':'d'}[s.grade]||'b';
-      const lc = s.warning ? 'danger' : gc;
+      const lc = s.warning?'danger':gc;
       return `
-        <div class="screener-item ${lc}" onclick="scrollToCard('${s.ticker}')">
+        <div class="screener-item ${lc}" onclick="openStockPopup('${s.ticker}')">
           <div>
             <div class="screener-ticker">${s.ticker}</div>
             <div class="screener-meta">$${s.price} · $${(s.dollar_vol/1000).toFixed(0)}K</div>
           </div>
-          <div class="screener-right">
+          <div style="text-align:right">
             <div class="screener-gap">+${s.gap_pct}%</div>
             <span class="screener-grade ${gc}">${s.grade}</span>
           </div>
@@ -407,30 +716,22 @@
     }).join('');
   }
 
-  function scrollToCard(ticker) {
-    const card = document.getElementById('card-' + ticker);
-    if (card) {
-      card.scrollIntoView({ behavior: 'smooth', block: 'center' });
-      card.style.outline = '2px solid #ffd700';
-      setTimeout(() => card.style.outline = '', 2000);
-    }
-  }
-
   // ── BUILD CARD ──
   function buildCard(s) {
     const gc = {'A+':'aplus','A':'a','B':'b','D':'d'}[s.grade]||'b';
     const cc = {'A+':'grade-aplus','A':'grade-a','B':'grade-b','D':'grade-d'}[s.grade]||'grade-b';
-    const headlines = (s.headlines||[]).map(h => `<div class="headline">📰 ${h.substring(0,80)}...</div>`).join('');
-    const notes     = (s.notes||[]).map(n => `<span style="font-size:.65rem;color:#5a7a9a">📌 ${n}</span> `).join('');
-    const skip   = s.warning ? `<div class="skip-banner">⛔ SKIP — Dangerous catalyst!</div>` : '';
-    const strong = ['A+','A'].includes(s.grade)&&!s.warning ? `<div style="font-size:.65rem;color:#00ff88;margin-top:4px">✅ STRONG SETUP — Watch for continuation!</div>` : '';
+    const headlines = (s.headlines||[]).map(h=>`<div class="headline">📰 ${h.substring(0,75)}...</div>`).join('');
+    const notes     = (s.notes||[]).map(n=>`<span style="font-size:.62rem;color:#5a7a9a">📌 ${n}</span> `).join('');
+    const skip      = s.warning?`<div class="skip-banner">⛔ SKIP — Dangerous catalyst!</div>`:'';
+    const strong    = ['A+','A'].includes(s.grade)&&!s.warning?`<div style="font-size:.62rem;color:#00ff88;margin-top:3px">✅ STRONG SETUP</div>`:'';
     return `
-      <div class="setup-card ${cc}" id="card-${s.ticker}">
+      <div class="setup-card ${cc}" id="card-${s.ticker}" onclick="openStockPopup('${s.ticker}')">
         <div class="card-header">
           <div class="ticker-info">
             <span class="ticker">${s.ticker}</span>
             <span class="grade-badge ${gc}">${s.grade}</span>
             <span class="source-tag">${s.source||'Live'}</span>
+            <span class="click-hint">🔍 click for details</span>
           </div>
           <span class="gap-pct">+${s.gap_pct}%</span>
         </div>
@@ -446,12 +747,205 @@
           <div class="trade-item"><div class="trade-val t-val">$${s.target1}</div><div class="trade-label">T1 +10%</div></div>
           <div class="trade-item"><div class="trade-val t-val">$${s.target2}</div><div class="trade-label">T2 +20%</div></div>
         </div>
-        <div style="margin-top:5px">${notes}</div>
+        <div style="margin-top:4px">${notes}</div>
         ${headlines}${skip}${strong}
-        <div style="font-size:.58rem;color:#2a3a5a;margin-top:5px;text-align:right">${s.time}</div>
+        <div style="font-size:.55rem;color:#2a3a5a;margin-top:4px;text-align:right">${s.time}</div>
       </div>`;
   }
 
+  // ══════════════════════════════════════
+  // STOCK DETAIL POPUP
+  // ══════════════════════════════════════
+  async function openStockPopup(ticker) {
+    const setup = allResults.find(s => s.ticker === ticker);
+    if (!setup) return;
+
+    currentSetup = setup;
+    const popup = document.getElementById('stockPopup');
+    popup.classList.remove('hidden');
+
+    // Header
+    document.getElementById('popupTicker').textContent = ticker;
+    document.getElementById('popupPrice').textContent  = `$${setup.price}`;
+    document.getElementById('popupChange').textContent = `+${setup.gap_pct}%`;
+    document.getElementById('popupChange').style.color = '#00ff88';
+
+    // Trade Plan
+    document.getElementById('popupTradePlan').innerHTML = `
+      <div class="popup-trade-item">
+        <div class="popup-trade-val entry-val">$${setup.entry_low}–$${setup.entry_high}</div>
+        <div class="popup-trade-label">Entry Zone</div>
+      </div>
+      <div class="popup-trade-item">
+        <div class="popup-trade-val stop-val">$${setup.stop_loss}</div>
+        <div class="popup-trade-label">Stop Loss -5%</div>
+      </div>
+      <div class="popup-trade-item">
+        <div class="popup-trade-val t-val">$${setup.target1}</div>
+        <div class="popup-trade-label">Target 1 +10%</div>
+      </div>
+      <div class="popup-trade-item">
+        <div class="popup-trade-val t-val">$${setup.target2}</div>
+        <div class="popup-trade-label">Target 2 +20%</div>
+      </div>`;
+
+    // Reset panels
+    document.getElementById('popupBid').textContent     = '--';
+    document.getElementById('popupAsk').textContent     = '--';
+    document.getElementById('popupBidSize').textContent = '-- shares';
+    document.getElementById('popupAskSize').textContent = '-- shares';
+    document.getElementById('popupSpread').textContent  = '--';
+    document.getElementById('popupStats').innerHTML     = '<div class="loading-spinner">Loading stats...</div>';
+    document.getElementById('popupNews').innerHTML      = '<div class="loading-spinner">Loading news...</div>';
+
+    // TradingView Chart
+    document.getElementById('popupChart').src =
+      `https://www.tradingview.com/widgetembed/?frameElementId=popupChart&symbol=${ticker}&interval=5&hidesidetoolbar=1&symboledit=0&saveimage=0&toolbarbg=080c18&theme=dark&style=1&timezone=America%2FNew_York&withdateranges=0&showpopupbutton=0&studies=Volume%40tv-basicstudies&hideideas=1&hidelegend=0&hidetooltip=0`;
+
+    // Fetch Finnhub data in parallel
+    fetchQuote(ticker);
+    fetchProfile(ticker);
+    fetchNews(ticker);
+
+    // Auto-refresh quote every 5 seconds
+    if (quoteTimer) clearInterval(quoteTimer);
+    quoteTimer = setInterval(() => fetchQuote(ticker), 5000);
+  }
+
+  function closePopup() {
+    document.getElementById('stockPopup').classList.add('hidden');
+    if (quoteTimer) { clearInterval(quoteTimer); quoteTimer = null; }
+    document.getElementById('popupChart').src = '';
+  }
+
+  // Close on backdrop click
+  document.getElementById('stockPopup').addEventListener('click', function(e) {
+    if (e.target === this) closePopup();
+  });
+
+  // ── FINNHUB QUOTE (Level 1) ──
+  async function fetchQuote(ticker) {
+    try {
+      const r = await fetch(
+        `https://finnhub.io/api/v1/quote?symbol=${ticker}&token=${FINNHUB_KEY}`
+      );
+      const d = await r.json();
+      if (d && d.c) {
+        document.getElementById('popupPrice').textContent  = `$${d.c.toFixed(2)}`;
+        const chg = ((d.c - d.pc) / d.pc * 100).toFixed(2);
+        document.getElementById('popupChange').textContent = `${chg > 0 ? '+' : ''}${chg}%`;
+        document.getElementById('popupChange').style.color = chg >= 0 ? '#00ff88' : '#ff4444';
+
+        // Bid/Ask — Finnhub free provides these
+        if (d.bid || d.ask) {
+          const bid  = (d.bid || d.c - 0.01).toFixed(2);
+          const ask  = (d.ask || d.c + 0.01).toFixed(2);
+          const spread = ((d.ask || d.c + 0.01) - (d.bid || d.c - 0.01)).toFixed(2);
+          document.getElementById('popupBid').textContent     = `$${bid}`;
+          document.getElementById('popupAsk').textContent     = `$${ask}`;
+          document.getElementById('popupSpread').textContent  = `$${spread}`;
+        } else {
+          // Estimate from current price if not provided
+          const est_bid = (d.c - 0.01).toFixed(2);
+          const est_ask = (d.c + 0.01).toFixed(2);
+          document.getElementById('popupBid').textContent    = `$${est_bid}`;
+          document.getElementById('popupAsk').textContent    = `$${est_ask}`;
+          document.getElementById('popupSpread').textContent = `$0.02 (est)`;
+        }
+
+        document.getElementById('popupBidSize').textContent = `H: $${d.h?.toFixed(2)||'--'}`;
+        document.getElementById('popupAskSize').textContent = `L: $${d.l?.toFixed(2)||'--'}`;
+      }
+    } catch(e) {}
+  }
+
+  // ── FINNHUB PROFILE & STATS ──
+  async function fetchProfile(ticker) {
+    try {
+      const [profileRes, metricsRes] = await Promise.all([
+        fetch(`https://finnhub.io/api/v1/stock/profile2?symbol=${ticker}&token=${FINNHUB_KEY}`),
+        fetch(`https://finnhub.io/api/v1/stock/metric?symbol=${ticker}&metric=all&token=${FINNHUB_KEY}`)
+      ]);
+
+      const profile = await profileRes.json();
+      const metrics = await metricsRes.json();
+      const m = metrics.metric || {};
+
+      const fmt = (v, prefix='', suffix='') =>
+        v != null && v !== '' ? `${prefix}${typeof v === 'number' ? v.toLocaleString() : v}${suffix}` : '--';
+
+      const mktCap = profile.marketCapitalization
+        ? `$${(profile.marketCapitalization/1000).toFixed(1)}B`
+        : '--';
+
+      document.getElementById('popupStats').innerHTML = `
+        <div class="stats-grid">
+          <div>
+            <div class="stat-row"><span class="stat-key">Market Cap</span><span class="stat-value">${mktCap}</span></div>
+            <div class="stat-row"><span class="stat-key">Float</span><span class="stat-value">${fmt(m.float, '', ' M')}</span></div>
+            <div class="stat-row"><span class="stat-key">Shares Out</span><span class="stat-value">${fmt(m.sharesOutstanding, '', ' M')}</span></div>
+            <div class="stat-row"><span class="stat-key">52W High</span><span class="stat-value">${fmt(m['52WeekHigh'], '$')}</span></div>
+            <div class="stat-row"><span class="stat-key">52W Low</span><span class="stat-value">${fmt(m['52WeekLow'], '$')}</span></div>
+          </div>
+          <div>
+            <div class="stat-row"><span class="stat-key">Avg Vol 10D</span><span class="stat-value">${fmt(m['10DayAverageTradingVolume'], '', ' M')}</span></div>
+            <div class="stat-row"><span class="stat-key">Short Int %</span><span class="stat-value">${fmt(m.shortInterestRatio, '', '%')}</span></div>
+            <div class="stat-row"><span class="stat-key">Beta</span><span class="stat-value">${fmt(m.beta)}</span></div>
+            <div class="stat-row"><span class="stat-key">Industry</span><span class="stat-value" style="font-size:.6rem">${profile.finnhubIndustry||'--'}</span></div>
+            <div class="stat-row"><span class="stat-key">Exchange</span><span class="stat-value">${profile.exchange||'--'}</span></div>
+          </div>
+        </div>`;
+    } catch(e) {
+      document.getElementById('popupStats').innerHTML = '<div class="loading-spinner">Stats unavailable</div>';
+    }
+  }
+
+  // ── FINNHUB NEWS ──
+  async function fetchNews(ticker) {
+    try {
+      const today = new Date();
+      const from  = new Date(today - 7*24*60*60*1000).toISOString().split('T')[0];
+      const to    = today.toISOString().split('T')[0];
+
+      const r = await fetch(
+        `https://finnhub.io/api/v1/company-news?symbol=${ticker}&from=${from}&to=${to}&token=${FINNHUB_KEY}`
+      );
+      const news = await r.json();
+
+      if (!news || !news.length) {
+        document.getElementById('popupNews').innerHTML =
+          '<div class="loading-spinner">No recent news found</div>';
+        return;
+      }
+
+      document.getElementById('popupNews').innerHTML = news.slice(0,8).map(n => {
+        const date = new Date(n.datetime * 1000).toLocaleDateString('en-US', {
+          month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit'
+        });
+        const sentiment = n.sentiment || 'neutral';
+        const sClass = sentiment === 'positive' ? 'positive' :
+                       sentiment === 'negative' ? 'negative' : 'neutral';
+        const sLabel = sentiment === 'positive' ? '▲ Bullish' :
+                       sentiment === 'negative' ? '▼ Bearish' : '◆ Neutral';
+        return `
+          <div class="news-item">
+            <div class="news-headline">
+              <a href="${n.url}" target="_blank" rel="noopener">${n.headline}</a>
+            </div>
+            <div class="news-meta">
+              <span>${date}</span>
+              <span>${n.source}</span>
+              <span class="news-sentiment ${sClass}">${sLabel}</span>
+            </div>
+          </div>`;
+      }).join('');
+    } catch(e) {
+      document.getElementById('popupNews').innerHTML =
+        '<div class="loading-spinner">News unavailable</div>';
+    }
+  }
+
+  // ── RENDER HELPERS ──
   function renderAlerts(alerts) {
     if (!alerts||!alerts.length) return;
     document.getElementById('alertLog').innerHTML = alerts.map(a =>
@@ -464,8 +958,8 @@
     document.getElementById('statSetups').textContent = arr.length;
     document.getElementById('statAplus').textContent  = arr.filter(s=>s.grade==='A+').length;
     if (time) {
-      document.getElementById('statTime').textContent  = time;
-      document.getElementById('lastScan').textContent  = `Last: ${time} — ${arr.length} setup(s)`;
+      document.getElementById('statTime').textContent = time;
+      document.getElementById('lastScan').textContent = `Last: ${time} — ${arr.length} setup(s)`;
     }
   }
 
@@ -502,44 +996,34 @@
       text.textContent = '● Live';
       text.style.color = '#00ff88';
       bar.classList.remove('hidden');
-    } else if (running && isPaused) {
-      dot.classList.remove('active');
-      text.textContent = '⏸ Paused';
-      text.style.color = '#ff9100';
-      bar.classList.add('hidden');
     } else {
       dot.classList.remove('active');
-      text.textContent = 'Stopped';
-      text.style.color = '#ff4444';
+      text.textContent = isPaused ? '⏸ Paused' : 'Stopped';
+      text.style.color = isPaused ? '#ff9100' : '#ff4444';
       bar.classList.add('hidden');
+      hideProgress();
     }
   }
 
   // ── BUTTONS ──
   async function startScanner() {
     try {
-      const r = await fetch(`${API_URL}/api/scanner/start`, { method: 'POST' });
-      const d = await r.json();
-      isRunning = true;
-      isPaused  = false;
-      allResults = [];
-      isLoading  = true;
+      await fetch(`${API_URL}/api/scanner/start`, { method: 'POST' });
+      isRunning = true; isPaused = false;
+      allResults = []; isLoading = true;
       updateStatusUI(true);
-
       document.getElementById('startBtn').style.display = 'none';
       document.getElementById('pauseBtn').style.display = 'flex';
       document.getElementById('pauseBtn').textContent   = '⏸ Pause';
-
       document.getElementById('results').innerHTML = `
         <div class="no-results">
           <div class="icon">⚡</div>
-          <p style="color:#ffd700;font-size:.95rem;font-weight:700">Scanning Massive.com...</p>
-          <p style="font-size:.78rem;margin-top:6px;color:#4a6a8a">Fetching real-time pre/after market gainers</p>
-          <p style="font-size:.78rem;margin-top:4px;color:#00d4ff">⚡ Stocks appear here as they are found</p>
+          <p style="color:#ffd700;font-size:.9rem;font-weight:700">Scanning Massive.com...</p>
+          <p style="font-size:.75rem;margin-top:6px;color:#4a6a8a">Fetching real-time gainers</p>
+          <p style="font-size:.75rem;margin-top:4px;color:#00d4ff">⚡ Stocks appear as they are found</p>
           <div class="loading-bar"><div class="loading-fill"></div></div>
-          <p style="font-size:.65rem;margin-top:8px;color:#2a3a5a">First scan: 15–45 seconds</p>
+          <p style="font-size:.62rem;margin-top:8px;color:#2a3a5a">First scan: 15–45 seconds</p>
         </div>`;
-
       startPolling();
     } catch(e) { alert('Cannot connect to server.'); }
   }
@@ -547,15 +1031,13 @@
   async function togglePause() {
     if (!isPaused) {
       await fetch(`${API_URL}/api/scanner/stop`, { method: 'POST' });
-      isPaused = true;
-      isRunning = false;
+      isPaused = true; isRunning = false;
       stopPolling();
       document.getElementById('pauseBtn').textContent = '▶ Resume';
       updateStatusUI(false);
     } else {
       await fetch(`${API_URL}/api/scanner/start`, { method: 'POST' });
-      isPaused  = false;
-      isRunning = true;
+      isPaused = false; isRunning = true;
       document.getElementById('pauseBtn').textContent = '⏸ Pause';
       updateStatusUI(true);
       startPolling();
@@ -564,30 +1046,20 @@
 
   async function rescan() {
     try {
-      // Stop first
       await fetch(`${API_URL}/api/scanner/stop`, { method: 'POST' });
       await new Promise(r => setTimeout(r, 300));
-
-      // Reset
-      allResults = [];
-      isLoading  = true;
-      stopPolling();
-
+      allResults = []; isLoading = true; stopPolling();
       document.getElementById('results').innerHTML = `
         <div class="no-results">
           <div class="icon">🔄</div>
-          <p style="color:#00d4ff;font-size:.95rem;font-weight:700">Rescanning...</p>
+          <p style="color:#00d4ff;font-size:.9rem;font-weight:700">Rescanning...</p>
           <div class="loading-bar"><div class="loading-fill"></div></div>
         </div>`;
-      document.getElementById('screenerList').innerHTML =
-        '<div class="screener-empty">Rescanning...</div>';
+      document.getElementById('screenerList').innerHTML = '<div class="screener-empty">Rescanning...</div>';
       document.getElementById('statSetups').textContent = '0';
       document.getElementById('statAplus').textContent  = '0';
-
-      // Restart
       await fetch(`${API_URL}/api/scanner/start`, { method: 'POST' });
-      isRunning = true;
-      isPaused  = false;
+      isRunning = true; isPaused = false;
       updateStatusUI(true);
       document.getElementById('startBtn').style.display = 'none';
       document.getElementById('pauseBtn').style.display = 'flex';
@@ -597,17 +1069,14 @@
   }
 
   function clearResults() {
-    allResults = [];
-    isLoading  = false;
-    stopPolling();
+    allResults = []; isLoading = false; stopPolling();
     document.getElementById('results').innerHTML = `
       <div class="no-results">
         <div class="icon">🗑️</div>
         <p>Results cleared</p>
-        <p style="font-size:.75rem;margin-top:6px;color:#2a3a5a">Press Rescan to find new setups</p>
+        <p style="font-size:.72rem;margin-top:6px;color:#2a3a5a">Press Rescan to find new setups</p>
       </div>`;
-    document.getElementById('screenerList').innerHTML =
-      '<div class="screener-empty">Cleared. Press Rescan.</div>';
+    document.getElementById('screenerList').innerHTML = '<div class="screener-empty">Cleared. Press Rescan.</div>';
     document.getElementById('statSetups').textContent = '0';
     document.getElementById('statAplus').textContent  = '0';
   }
@@ -622,8 +1091,7 @@
   updateClock();
   connectWS();
 
-  // Load existing results on page open
-  (async () => {
+  async function loadExistingResults() {
     try {
       const r    = await fetch(`${API_URL}/api/results`);
       const data = await r.json();
@@ -634,8 +1102,8 @@
         updateStats(allResults, data.time);
       }
       renderAlerts(data.alerts);
-      const status = await fetch(`${API_URL}/api/status`);
-      const sd     = await status.json();
+      const sr = await fetch(`${API_URL}/api/status`);
+      const sd = await sr.json();
       isRunning = sd.running;
       updateStatusUI(isRunning);
       if (isRunning) {
@@ -644,7 +1112,7 @@
         startPolling();
       }
     } catch(e) {}
-  })();
+  }
 </script>
 </body>
 </html>
