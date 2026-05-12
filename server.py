@@ -184,23 +184,7 @@ async def get_stock_quote(ticker: str):
             params={'symbol':ticker,'token':FINNHUB_KEY},timeout=8)
         data = r.json() if r.status_code==200 else {}
 
-        # Halt detection: price frozen + zero volume = likely halted
-        halted = False
-        halt_reason = ''
-        if data:
-            c = data.get('c', 0)
-            v = data.get('v', 0)  # some endpoints return volume
-            o = data.get('o', 0)
-            h = data.get('h', 0)
-            l = data.get('l', 0)
-            # If high == low == current and open == current, likely halted
-            if c > 0 and h == l == c and o == c:
-                halted = True
-                halt_reason = '⛔ Possible trading halt — price frozen'
-            data['halted'] = halted
-            data['halt_reason'] = halt_reason
-
-        return data if data else {'error':f'Status {r.status_code}'}
+              return data if data else {'error':f'Status {r.status_code}'}
     except Exception as e: return {'error':str(e)}
 
 @app.get("/api/stock/profile/{ticker}")
@@ -274,11 +258,7 @@ async def search_ticker(ticker: str):
         closes=hist['Close'].values.tolist() if not hist.empty else []
         dollar_vol=price*volume
 
-        # Halt detection
-        halted=False; halt_reason=''
-        if high==low==price==open_price and price>0:
-            halted=True; halt_reason='⛔ Possible trading halt — price frozen'
-
+    
         pattern,pattern_desc,pattern_criteria=detect_sykes_pattern(
             ticker,price,prev_close,pct_change,closes,vol_ratio,dollar_vol)
         grade,notes=grade_setup(pct_change,dollar_vol)
@@ -307,7 +287,6 @@ async def search_ticker(ticker: str):
             'open':round(open_price,2),'dollar_vol':round(dollar_vol,0),
             'vol_ratio':round(vol_ratio,1),'grade':final_grade,'notes':notes,
             'catalyst':catalyst_label,'news_count':news_count,'headlines':headlines[:2],
-            'warning':warning,'halted':halted,'halt_reason':halt_reason,
             'pattern':pattern,'pattern_desc':pattern_desc,'pattern_criteria':pattern_criteria,
             'entry_low':entry_low,'entry_high':entry_high,'stop_loss':stop_loss,
             'target1':target1,'target2':target2,'target3':target3,
@@ -634,15 +613,7 @@ def process_ticker(stock_data,mode='standard'):
                         f"✅ Moderate — {news_count}" if strength=='MODERATE' else
                         f"📰 {news_count} article(s)" if news_count>0 else "📰 0 articles")
 
-        # Halt detection
-        halted=False; halt_reason=''
-        try:
-            hist_1m=yf.Ticker(ticker).history(period="1d",interval="1m")
-            if not hist_1m.empty:
-                last_vol=hist_1m['Volume'].iloc[-1]
-                if last_vol==0 and len(hist_1m)>5:
-                    halted=True; halt_reason='⛔ Possible halt — zero volume detected'
-        except: pass
+      
 
         try:
             stock=yf.Ticker(ticker)
@@ -666,7 +637,6 @@ def process_ticker(stock_data,mode='standard'):
             'gap_pct':round(gap_pct,1),'dollar_vol':round(dollar_vol,0),
             'grade':final_grade,'notes':notes,'catalyst':catalyst_label,
             'news_count':news_count,'headlines':headlines[:2],'warning':warning,
-            'halted':halted,'halt_reason':halt_reason,
             'pattern':pattern,'pattern_desc':pattern_desc,'pattern_criteria':pattern_criteria,
             'entry_low':entry_low,'entry_high':entry_high,'stop_loss':stop_loss,
             'target1':target1,'target2':target2,'target3':target3,
