@@ -27,14 +27,14 @@ EMAIL_TO        = os.getenv('EMAIL_TO', '')
 
 # ── PER-USER STATE ──
 user_state = {
-    'shafkat': {'scan_results':[], 'alerted':set(), 'mode':'standard', 'running':False,
-                'filters':{'min_price':0.20,'max_price':20.00,'min_gap_pct':10.0,
-                           'min_dollar_vol':100000,'min_volume':100000,'min_rvol':1.5,
-                           'max_float_m':50.0,'max_market_cap_m':1000.0,'require_news':False}},
-    'irfan':   {'scan_results':[], 'alerted':set(), 'mode':'standard', 'running':False,
-                'filters':{'min_price':0.20,'max_price':20.00,'min_gap_pct':10.0,
-                           'min_dollar_vol':100000,'min_volume':100000,'min_rvol':1.5,
-                           'max_float_m':50.0,'max_market_cap_m':1000.0,'require_news':False}},
+    'shafkat': {'scan_results':[], 'alerted':set(), 'mode':'morning_gap', 'running':False,
+                'filters':{'min_price':0.10,'max_price':50.00,'min_gap_pct':5.0,
+                           'min_dollar_vol':250000,'min_volume':50000,'min_rvol':0,
+                           'max_float_m':20.0,'max_market_cap_m':0,'require_news':False}},
+    'irfan':   {'scan_results':[], 'alerted':set(), 'mode':'morning_gap', 'running':False,
+                'filters':{'min_price':0.10,'max_price':50.00,'min_gap_pct':5.0,
+                           'min_dollar_vol':250000,'min_volume':50000,'min_rvol':0,
+                           'max_float_m':20.0,'max_market_cap_m':0,'require_news':False}},
 }
 user_clients = {'shafkat':[], 'irfan':[]}
 alert_log    = []
@@ -45,55 +45,65 @@ halt_cache_ts  = None
 
 # ── SCAN MODES — updated with new recommended criteria ──
 SCAN_MODES = {
+    'morning_gap': {
+        'label':'🌅 MorningGap',   'desc':'Price $0.10–$50, Gap 5%+, $Vol $250K+, Float ≤20M',
+        'min_price':0.10,'max_price':50.00,'min_gap':5.0,'min_dvol':250_000,
+        'min_volume':50_000,'min_rvol':0,'max_float_m':20.0,'max_mktcap_m':0,'require_news':False,
+    },
+    'scanopp': {
+        'label':'💡 ScanOpp',      'desc':'Price $0.50–$15, Gap 9%+, $Vol $3M+, Trades 3K+',
+        'min_price':0.50,'max_price':15.00,'min_gap':9.0,'min_dvol':3_000_000,
+        'min_volume':300_000,'min_rvol':0,'max_float_m':0,'max_mktcap_m':0,'require_news':False,
+    },
     'standard': {
-        'label':'🔍 Standard','desc':'Gap 10%+, $0.20–$20, $100K vol, RVOL 1.5x+',
+        'label':'🔍 Standard',     'desc':'Gap 10%+, $0.20–$20, $100K vol, RVOL 1.5x+',
         'min_price':0.20,'max_price':20.00,'min_gap':10.0,'min_dvol':100_000,
         'min_volume':100_000,'min_rvol':1.5,'max_float_m':50.0,'max_mktcap_m':1000.0,'require_news':False,
     },
-    'premarket': {
-        'label':'🌅 Pre-Market','desc':'Gap 10%+, vol 100K+, pre-market high break',
-        'min_price':0.20,'max_price':20.00,'min_gap':10.0,'min_dvol':100_000,
-        'min_volume':100_000,'min_rvol':2.0,'max_float_m':30.0,'max_mktcap_m':500.0,'require_news':False,
-    },
     'supernova': {
-        'label':'🚀 Supernovas','desc':'Gap 50%+, massive movers',
-        'min_price':0.20,'max_price':20.00,'min_gap':50.0,'min_dvol':500_000,
-        'min_volume':300_000,'min_rvol':5.0,'max_float_m':30.0,'max_mktcap_m':500.0,'require_news':False,
+        'label':'🚀 Supernovas',   'desc':'Gap 50%+ only — massive movers',
+        'min_price':0.10,'max_price':50.00,'min_gap':50.0,'min_dvol':250_000,
+        'min_volume':50_000,'min_rvol':0,'max_float_m':0,'max_mktcap_m':0,'require_news':False,
     },
     'biotech': {
-        'label':'🧬 Biotech','desc':'Biotech/FDA, gap 15%+, catalyst required',
+        'label':'🧬 Biotech',      'desc':'Biotech/FDA, gap 15%+, catalyst required',
         'min_price':0.50,'max_price':20.00,'min_gap':15.0,'min_dvol':500_000,
-        'min_volume':300_000,'min_rvol':3.0,'max_float_m':50.0,'max_mktcap_m':500.0,'require_news':True,
+        'min_volume':100_000,'min_rvol':0,'max_float_m':50.0,'max_mktcap_m':500.0,'require_news':True,
     },
     'low_float': {
-        'label':'⚡ Low Float','desc':'Float under 10M, RVOL 5x+',
-        'min_price':0.20,'max_price':20.00,'min_gap':15.0,'min_dvol':500_000,
-        'min_volume':300_000,'min_rvol':5.0,'max_float_m':10.0,'max_mktcap_m':300.0,'require_news':False,
+        'label':'⚡ Low Float',    'desc':'Float under 10M, gap 15%+',
+        'min_price':0.10,'max_price':20.00,'min_gap':15.0,'min_dvol':250_000,
+        'min_volume':50_000,'min_rvol':0,'max_float_m':10.0,'max_mktcap_m':0,'require_news':False,
+    },
+    'premarket': {
+        'label':'🌄 Pre-Market',   'desc':'Gap 10%+, vol 100K+, pre-market gaps',
+        'min_price':0.10,'max_price':50.00,'min_gap':10.0,'min_dvol':100_000,
+        'min_volume':100_000,'min_rvol':0,'max_float_m':0,'max_mktcap_m':0,'require_news':False,
     },
     'squeeze': {
-        'label':'💎 Squeeze','desc':'High short interest, gapping up, $1M+ vol',
-        'min_price':1.00,'max_price':20.00,'min_gap':10.0,'min_dvol':1_000_000,
-        'min_volume':500_000,'min_rvol':3.0,'max_float_m':30.0,'max_mktcap_m':500.0,'require_news':False,
+        'label':'💎 Squeeze',      'desc':'High dollar vol $3M+, gap 9%+',
+        'min_price':0.50,'max_price':15.00,'min_gap':9.0,'min_dvol':3_000_000,
+        'min_volume':300_000,'min_rvol':0,'max_float_m':0,'max_mktcap_m':0,'require_news':False,
     },
     'small_cap': {
-        'label':'📊 Small Cap','desc':'$1–$20, market cap under $500M',
-        'min_price':1.00,'max_price':20.00,'min_gap':15.0,'min_dvol':500_000,
-        'min_volume':300_000,'min_rvol':3.0,'max_float_m':30.0,'max_mktcap_m':500.0,'require_news':False,
+        'label':'📊 Small Cap',    'desc':'$1–$20, gap 15%+, $250K vol',
+        'min_price':1.00,'max_price':20.00,'min_gap':15.0,'min_dvol':250_000,
+        'min_volume':50_000,'min_rvol':0,'max_float_m':0,'max_mktcap_m':500.0,'require_news':False,
     },
     'afternoon': {
-        'label':'🌆 Afternoon','desc':'HOD breakouts, gap 5%+, afternoon session',
-        'min_price':0.20,'max_price':20.00,'min_gap':5.0,'min_dvol':500_000,
-        'min_volume':300_000,'min_rvol':2.0,'max_float_m':30.0,'max_mktcap_m':500.0,'require_news':False,
+        'label':'🌆 Afternoon',    'desc':'HOD breakouts, gap 5%+',
+        'min_price':0.10,'max_price':50.00,'min_gap':5.0,'min_dvol':250_000,
+        'min_volume':50_000,'min_rvol':0,'max_float_m':0,'max_mktcap_m':0,'require_news':False,
     },
     'penny': {
-        'label':'🪙 Penny','desc':'Under $1, gap 20%+',
+        'label':'🪙 Penny',        'desc':'Under $1, gap 20%+',
         'min_price':0.01,'max_price':1.00,'min_gap':20.0,'min_dvol':100_000,
-        'min_volume':300_000,'min_rvol':3.0,'max_float_m':30.0,'max_mktcap_m':100.0,'require_news':False,
+        'min_volume':50_000,'min_rvol':0,'max_float_m':0,'max_mktcap_m':0,'require_news':False,
     },
     'custom': {
-        'label':'⚙️ Custom','desc':'Your custom filter settings',
-        'min_price':0.20,'max_price':20.00,'min_gap':10.0,'min_dvol':500_000,
-        'min_volume':300_000,'min_rvol':3.0,'max_float_m':30.0,'max_mktcap_m':500.0,'require_news':False,
+        'label':'⚙️ Custom',       'desc':'Your custom filter settings',
+        'min_price':0.10,'max_price':50.00,'min_gap':5.0,'min_dvol':250_000,
+        'min_volume':50_000,'min_rvol':0,'max_float_m':0,'max_mktcap_m':0,'require_news':False,
     },
 }
 

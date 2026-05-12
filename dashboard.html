@@ -508,16 +508,18 @@
       <div class="filter-tab-section">
         <div class="filter-tab-title">📡 Scan Mode</div>
         <div class="mode-grid">
-          <button class="mode-btn active" id="mode-standard"  onclick="setScanMode('standard')">🔍 Standard</button>
-          <button class="mode-btn"        id="mode-supernova" onclick="setScanMode('supernova')">🚀 Supernovas</button>
-          <button class="mode-btn"        id="mode-biotech"   onclick="setScanMode('biotech')">🧬 Biotech</button>
-          <button class="mode-btn"        id="mode-low_float" onclick="setScanMode('low_float')">⚡ Low Float</button>
-          <button class="mode-btn"        id="mode-premarket" onclick="setScanMode('premarket')">🌅 Pre-Market</button>
-          <button class="mode-btn"        id="mode-squeeze"   onclick="setScanMode('squeeze')">💎 Squeeze</button>
-          <button class="mode-btn"        id="mode-small_cap" onclick="setScanMode('small_cap')">📊 Small Cap</button>
-          <button class="mode-btn"        id="mode-afternoon" onclick="setScanMode('afternoon')">🌆 Afternoon</button>
-          <button class="mode-btn"        id="mode-penny"     onclick="setScanMode('penny')">🪙 Penny</button>
-          <button class="mode-btn"        id="mode-custom"    onclick="setScanMode('custom')">⚙️ Custom</button>
+          <button class="mode-btn active" id="mode-morning_gap" onclick="setScanMode('morning_gap')">🌅 MorningGap</button>
+          <button class="mode-btn"        id="mode-scanopp"     onclick="setScanMode('scanopp')">💡 ScanOpp</button>
+          <button class="mode-btn"        id="mode-standard"    onclick="setScanMode('standard')">🔍 Standard</button>
+          <button class="mode-btn"        id="mode-supernova"   onclick="setScanMode('supernova')">🚀 Supernovas</button>
+          <button class="mode-btn"        id="mode-biotech"     onclick="setScanMode('biotech')">🧬 Biotech</button>
+          <button class="mode-btn"        id="mode-low_float"   onclick="setScanMode('low_float')">⚡ Low Float</button>
+          <button class="mode-btn"        id="mode-premarket"   onclick="setScanMode('premarket')">🌄 Pre-Market</button>
+          <button class="mode-btn"        id="mode-squeeze"     onclick="setScanMode('squeeze')">💎 Squeeze</button>
+          <button class="mode-btn"        id="mode-small_cap"   onclick="setScanMode('small_cap')">📊 Small Cap</button>
+          <button class="mode-btn"        id="mode-afternoon"   onclick="setScanMode('afternoon')">🌆 Afternoon</button>
+          <button class="mode-btn"        id="mode-penny"       onclick="setScanMode('penny')">🪙 Penny</button>
+          <button class="mode-btn"        id="mode-custom"      onclick="setScanMode('custom')">⚙️ Custom</button>
         </div>
         <div class="mode-desc-text" id="modeDescText">Gap 10%+, $0.20–$20, RVOL 3x+, $500K vol</div>
       </div>
@@ -613,16 +615,18 @@
   setLogos();
 
   const MODES={
-    standard:  {label:'🔍 Standard',   desc:'Gap 20%+, $0.10–$50, $50K vol'},
-    supernova: {label:'🚀 Supernovas', desc:'Gap 50%+ only — massive movers'},
-    biotech:   {label:'🧬 Biotech',    desc:'Biotech/FDA plays, gap 15%+'},
-    low_float: {label:'⚡ Low Float',  desc:'Under $20, low float runners'},
-    premarket: {label:'🌅 Pre-Market', desc:'Pre-market gaps 15%+'},
-    squeeze:   {label:'💎 Squeeze',    desc:'Short squeeze — high dollar vol'},
-    small_cap: {label:'📊 Small Cap',  desc:'Small cap $1–$15, gap 15%+'},
-    afternoon: {label:'🌆 Afternoon',  desc:'Afternoon HOD breakouts'},
-    penny:     {label:'🪙 Penny',      desc:'Pure penny stocks under $1'},
-    custom:    {label:'⚙️ Custom',     desc:'Your custom filter settings'},
+    morning_gap: {label:'🌅 MorningGap', desc:'Price $0.10–$50, Gap 5%+, $Vol $250K+, Float ≤20M'},
+    scanopp:     {label:'💡 ScanOpp',    desc:'Price $0.50–$15, Gap 9%+, $Vol $3M+, Trades 3K+'},
+    standard:    {label:'🔍 Standard',   desc:'Gap 10%+, $0.20–$20, $100K vol, RVOL 1.5x+'},
+    supernova:   {label:'🚀 Supernovas', desc:'Gap 50%+ only — massive movers'},
+    biotech:     {label:'🧬 Biotech',    desc:'Biotech/FDA, gap 15%+, catalyst required'},
+    low_float:   {label:'⚡ Low Float',  desc:'Float under 10M, gap 15%+'},
+    premarket:   {label:'🌄 Pre-Market', desc:'Gap 10%+, vol 100K+, pre-market gaps'},
+    squeeze:     {label:'💎 Squeeze',    desc:'High dollar vol $3M+, gap 9%+'},
+    small_cap:   {label:'📊 Small Cap',  desc:'$1–$20, gap 15%+, $250K vol'},
+    afternoon:   {label:'🌆 Afternoon',  desc:'HOD breakouts, gap 5%+'},
+    penny:       {label:'🪙 Penny',      desc:'Pure penny stocks under $1'},
+    custom:      {label:'⚙️ Custom',     desc:'Your custom filter settings'},
   };
 
   const DVOL_VALUES=[10000,25000,50000,75000,100000,150000,200000,300000,500000,750000,
