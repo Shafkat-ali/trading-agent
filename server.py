@@ -12,8 +12,7 @@ from datetime import datetime, timedelta
 from dotenv import load_dotenv
 import os
 
-from dotenv import load_dotenv
-load_dotenv(override=False)  # Railway env vars take priority
+load_dotenv(override=False)
 
 app = FastAPI(title="Payda x UyghurKid Trading Agent")
 
@@ -32,8 +31,8 @@ SCAN_INTERVAL   = int(os.getenv('SCAN_INTERVAL', 30))
 EMAIL_ADDRESS   = os.getenv('EMAIL_ADDRESS', '')
 EMAIL_PASSWORD  = os.getenv('EMAIL_PASSWORD', '')
 EMAIL_TO        = os.getenv('EMAIL_TO', '')
-POLYGON_API_KEY = os.getenv('POLYGON_API_KEY', '')
-FINNHUB_KEY     = os.getenv('FINNHUB_API_KEY', '')
+POLYGON_API_KEY = os.getenv('POLYGON_API_KEY', 'W7T9tMZzRCsHUhJfPvL7SZOReXow4q8L')
+FINNHUB_KEY     = os.getenv('FINNHUB_API_KEY', 'd812vi9r01qler4gpnmgd812vi9r01qler4gpnn0')
 
 scanner_running     = False
 alerted_tickers     = set()
@@ -66,7 +65,7 @@ DANGER_KEYWORDS = [
 def send_email(subject, body):
     def _send():
         try:
-            msg = MIMEMultipart()
+            msg            = MIMEMultipart()
             msg['From']    = EMAIL_ADDRESS
             msg['To']      = EMAIL_TO
             msg['Subject'] = subject
@@ -103,11 +102,11 @@ async def broadcast(data):
             connected_clients.remove(c)
 
 # ============================================================
-# FINNHUB ENDPOINTS (server-side — avoids CORS)
+# DEBUG ENDPOINT
 # ============================================================
+
 @app.get("/api/debug")
 async def debug():
-    """Check environment variables are loaded"""
     return {
         'finnhub_key_set':     bool(FINNHUB_KEY),
         'finnhub_key_length':  len(FINNHUB_KEY),
@@ -115,6 +114,9 @@ async def debug():
         'polygon_key_set':     bool(POLYGON_API_KEY),
     }
 
+# ============================================================
+# FINNHUB ENDPOINTS
+# ============================================================
 
 @app.get("/api/stock/quote/{ticker}")
 async def get_stock_quote(ticker: str):
@@ -181,7 +183,270 @@ async def get_stock_news(ticker: str):
         return {'news': [], 'error': str(e)}
 
 # ============================================================
-# CATALYST CHECK (used during scanning)
+# SEARCH TICKER ENDPOINT
+# ============================================================
+
+@app.get("/api/stock/search/{ticker}")
+async def search_ticker(ticker: str):
+    """
+    Search for any ticker and return full analysis
+    including Sykes pattern detection
+    """
+    try:
+        ticker = ticker.upper().strip()
+
+        # Get quote from Finnhub
+        quote_r = requests.get(
+            "https://finnhub.io/api/v1/quote",
+            params={'symbol': ticker, 'token': FINNHUB_KEY},
+            timeout=8
+        )
+        quote = quote_r.json() if quote_r.status_code == 200 else {}
+
+        price      = quote.get('c', 0)
+        prev_close = quote.get('pc', 0)
+        high       = quote.get('h', 0)
+        low        = quote.get('l', 0)
+        open_price = quote.get('o', 0)
+
+        if not price or price == 0:
+            # Fallback to yfinance
+            stock      = yf.Ticker(ticker)
+            info       = stock.fast_info
+            price      = info.get('last_price', 0)
+            prev_close = info.get('previous_close', 0)
+
+        if not price or price == 0:
+            return {'error': f'Could not find ticker {ticker}'}
+
+        pct_change = ((price - prev_close) / prev_close * 100) if prev_close > 0 else 0
+
+        # Get historical data for pattern detection
+        stock     = yf.Ticker(ticker)
+        hist      = stock.history(period="10d", interval="1d")
+        hist_vol  = stock.history(period="1d",  interval="1m")
+
+        volume      = float(hist_vol['Volume'].sum()) if not hist_vol.empty else 0
+        dollar_vol  = price * volume
+        avg_vol     = float(hist['Volume'].mean()) if not hist.empty else 0
+        vol_ratio   = volume / avg_vol if avg_vol > 0 else 0
+        closes      = hist['Close'].values.tolist() if not hist.empty else []
+
+        # Detect Sykes pattern
+        pattern, pattern_desc, pattern_criteria = detect_sykes_pattern(
+            ticker, price, prev_close, pct_change,
+            closes, vol_ratio, dollar_vol
+        )
+
+        # Grade
+        grade, notes = grade_setup(pct_change, dollar_vol)
+
+        # Catalyst
+        strength, news_count, headlines, warning = check_catalyst(ticker)
+
+        final_grade = grade
+        if warning:
+            final_grade = "D"
+        elif strength == 'STRONG' and grade == 'A':
+            final_grade = "A+"
+        elif strength == 'NONE':
+            if grade == 'A+':  final_grade = 'A'
+            elif grade == 'A': final_grade = 'B'
+
+        if warning:
+            catalyst_label = f"☠️ Danger — {news_count} article(s) in 5 days"
+        elif strength == 'STRONG':
+            catalyst_label = f"🔥 Strong Catalyst — {news_count} article(s) in 5 days"
+        elif strength == 'MODERATE':
+            catalyst_label = f"✅ Moderate Catalyst — {news_count} article(s) in 5 days"
+        elif news_count > 0:
+            catalyst_label = f"📰 {news_count} article(s) in past 5 days"
+        else:
+            catalyst_label = "📰 0 articles in past 5 days"
+
+        entry_low  = round(price * 0.99, 2)
+        entry_high = round(price * 1.02, 2)
+        stop_loss  = round(entry_low * 0.95, 2)
+        target1    = round(entry_high * 1.10, 2)
+        target2    = round(entry_high * 1.20, 2)
+        target3    = round(entry_high * 1.30, 2)
+
+        return {
+            'ticker':          ticker,
+            'price':           round(price, 2),
+            'prev_close':      round(prev_close, 2),
+            'gap_pct':         round(pct_change, 1),
+            'high':            round(high, 2),
+            'low':             round(low, 2),
+            'open':            round(open_price, 2),
+            'dollar_vol':      round(dollar_vol, 0),
+            'vol_ratio':       round(vol_ratio, 1),
+            'grade':           final_grade,
+            'notes':           notes,
+            'catalyst':        catalyst_label,
+            'news_count':      news_count,
+            'headlines':       headlines[:2],
+            'warning':         warning,
+            'pattern':         pattern,
+            'pattern_desc':    pattern_desc,
+            'pattern_criteria': pattern_criteria,
+            'entry_low':       entry_low,
+            'entry_high':      entry_high,
+            'stop_loss':       stop_loss,
+            'target1':         target1,
+            'target2':         target2,
+            'target3':         target3,
+            'source':          'Search',
+            'time':            datetime.now().strftime('%H:%M:%S')
+        }
+
+    except Exception as e:
+        return {'error': str(e)}
+
+# ============================================================
+# SYKES PATTERN DETECTION
+# Based on Tim Sykes published strategy criteria
+# ============================================================
+
+def detect_sykes_pattern(ticker, price, prev_close, pct_change,
+                          closes, vol_ratio, dollar_vol):
+    """
+    Detect which Sykes pattern this stock matches.
+    Returns: (pattern_name, description, criteria_list)
+    """
+
+    pattern      = "No Clear Pattern"
+    description  = "Does not match a defined Sykes setup"
+    criteria     = []
+
+    # ── SUPERNOVA ──
+    # Criteria: Up 50%+ in one session, parabolic move, massive volume
+    if pct_change >= 50:
+        pattern     = "🚀 Supernova"
+        description = ("Stock exploded 50%+ in one session — classic Sykes supernova. "
+                       "These stocks experience massive volatility and liquidity. "
+                       "Can be traded long on the way up or short on the first red day.")
+        criteria = [
+            f"✅ Up {pct_change:.1f}% today (need 50%+)",
+            f"✅ Volume ratio {vol_ratio:.1f}x average" if vol_ratio >= 3 else f"⚠️ Volume ratio {vol_ratio:.1f}x (want 3x+)",
+            "📌 Sykes Rule: Buy the momentum OR wait for first red day to short",
+            "📌 Exit: Sell into strength, never hold a supernova too long",
+            "⚠️ Risk: Supernovas can last longer than expected — use stop loss"
+        ]
+        return pattern, description, criteria
+
+    # ── FIRST GREEN DAY ──
+    # Criteria: Stock was red for 2+ days, now first green day with volume + catalyst
+    if len(closes) >= 4:
+        prev_days_red = all(closes[i] < closes[i-1] for i in range(-3, -1))
+        if prev_days_red and pct_change > 5:
+            pattern     = "🟢 First Green Day"
+            description = ("After multiple red days, this is the first green candle with "
+                           "volume. Sykes' favorite OTC pattern. Look for stocks closing "
+                           "near highs — potential overnight hold for gap up next morning.")
+            criteria = [
+                f"✅ {pct_change:.1f}% green today after 2+ red days",
+                f"✅ Volume ratio {vol_ratio:.1f}x" if vol_ratio >= 2 else f"⚠️ Volume {vol_ratio:.1f}x (want 2x+)",
+                "📌 Sykes Rule: Buy dips on the run-up, not the spike",
+                "📌 Entry: Wait for morning dip then buy bounce",
+                "📌 If closes near HOD → consider overnight hold for gap up",
+                "📌 Exit: Sell into next morning gap up"
+            ]
+            return pattern, description, criteria
+
+    # ── GAP AND GO ──
+    # Criteria: Gapped up 15%+ premarket on catalyst, continues higher
+    if pct_change >= 15 and price > prev_close * 1.10:
+        pattern     = "⚡ Gap and Go"
+        description = ("Stock gapped up significantly on a catalyst and is continuing "
+                       "higher. Sykes trades these when there is confirmed news and "
+                       "volume is supporting the move.")
+        criteria = [
+            f"✅ Gapped up {pct_change:.1f}% from previous close",
+            f"✅ Volume ratio {vol_ratio:.1f}x" if vol_ratio >= 3 else f"⚠️ Volume {vol_ratio:.1f}x (want 3x+)",
+            "📌 Sykes Rule: Only trade with a strong catalyst — no catalyst = skip",
+            "📌 Entry: Buy the first pullback after open, not the gap open price",
+            "📌 Exit: Scale out in thirds — T1, T2, T3",
+            "⚠️ Risk: Gap fills happen — always have stop loss ready"
+        ]
+        return pattern, description, criteria
+
+    # ── BREAKOUT ──
+    # Criteria: Breaking multi-day resistance with volume
+    if len(closes) >= 5:
+        recent_high = max(closes[-5:])
+        if price >= recent_high * 0.98 and vol_ratio >= 2 and pct_change > 5:
+            pattern     = "💥 Breakout"
+            description = ("Stock is breaking above recent resistance with volume support. "
+                           "Sykes likes multi-day breakouts with low float stocks where "
+                           "volume can make a big difference.")
+            criteria = [
+                f"✅ Price near {len(closes)}-day high (${recent_high:.2f})",
+                f"✅ Up {pct_change:.1f}% today",
+                f"✅ Volume {vol_ratio:.1f}x average" if vol_ratio >= 2 else f"⚠️ Volume {vol_ratio:.1f}x (want 2x+)",
+                "📌 Sykes Rule: Buy breakouts only with volume confirmation",
+                "📌 Entry: Buy the breakout above resistance, set stop below it",
+                "📌 Exit: Sell into the spike — take singles, don't get greedy"
+            ]
+            return pattern, description, criteria
+
+    # ── DIP BUY / MORNING PANIC ──
+    # Criteria: Former runner pulling back 20-50%, bouncing on support
+    if len(closes) >= 5:
+        recent_high = max(closes[-5:])
+        dip_pct     = ((price - recent_high) / recent_high * 100) if recent_high > 0 else 0
+        if -50 <= dip_pct <= -15 and pct_change >= 3:
+            pattern     = "📈 Dip Buy / Morning Panic"
+            description = ("Former runner pulled back hard and is showing a bounce. "
+                           "Sykes loves buying morning panics on stocks that held support. "
+                           "Psychology of the market creates oversold bounces.")
+            criteria = [
+                f"✅ Down {abs(dip_pct):.0f}% from recent high — oversold",
+                f"✅ Bouncing {pct_change:.1f}% today",
+                "📌 Sykes Rule: Look for maximum pain levels, dip buy at support",
+                "📌 Entry: Buy when selling slows, not before — patience is key",
+                "📌 Exit: Quick scalp — sell into the bounce, don't overstay",
+                "⚠️ Risk: Dead cat bounces happen — tight stop loss required"
+            ]
+            return pattern, description, criteria
+
+    # ── SUPERNOVA FADE ──
+    # Criteria: Was supernova, now first red day — short opportunity
+    if len(closes) >= 3 and pct_change < -10:
+        prev_was_up = closes[-2] > closes[-3] * 1.3 if len(closes) >= 3 else False
+        if prev_was_up:
+            pattern     = "🔴 Supernova Fade (Short)"
+            description = ("This was a supernova that is now fading. The first red day "
+                           "after a big run is a short selling opportunity per Sykes. "
+                           "Shorts squeeze out longs who are trapped bag holding.")
+            criteria = [
+                f"✅ Down {abs(pct_change):.1f}% today after big run",
+                "✅ Previous session was up 30%+",
+                "📌 Sykes Rule: Short the first red day of a former supernova",
+                "📌 Entry: Short into bounces — sell the rips",
+                "📌 Exit: Cover into panics — buy the dips to cover",
+                "⚠️ Risk: Short squeezes can be brutal — keep position small"
+            ]
+            return pattern, description, criteria
+
+    # ── WEAK PATTERN ──
+    if pct_change >= 10:
+        pattern     = "📊 Momentum Play"
+        description = ("Stock is showing momentum but doesn't fit a classic Sykes pattern "
+                       "perfectly. Trade with caution and look for additional confirmation.")
+        criteria = [
+            f"⚠️ Up {pct_change:.1f}% — decent move but no clear pattern",
+            f"⚠️ Volume {vol_ratio:.1f}x average",
+            "📌 Wait for a cleaner setup before entering",
+            "📌 Look for catalyst to confirm the move",
+            "📌 If pattern develops, reassess for entry"
+        ]
+        return pattern, description, criteria
+
+    return pattern, description, criteria
+
+# ============================================================
+# CATALYST CHECK
 # ============================================================
 
 def check_catalyst(ticker):
@@ -205,7 +470,6 @@ def check_catalyst(ticker):
         if r.status_code == 200:
             news_items = r.json()[:15]
 
-        # Fallback to yfinance if Finnhub returned nothing
         if not news_items:
             yf_news = yf.Ticker(ticker).news or []
             cutoff  = datetime.now() - timedelta(days=5)
@@ -233,7 +497,7 @@ def check_catalyst(ticker):
                 warning = True
 
         if not news_items:
-            return 'NONE', news_count, headlines[:2], False
+            return 'NONE', 0, [], False
 
         if warning and danger_hits > strong_hits:
             return 'DANGER', news_count, headlines[:2], True
@@ -244,7 +508,7 @@ def check_catalyst(ticker):
         else:
             return 'WEAK', news_count, headlines[:2], False
 
-    except Exception as e:
+    except:
         return 'NONE', 0, [], False
 
 # ============================================================
@@ -340,7 +604,7 @@ def get_yahoo_gainers():
 def grade_setup(gap_pct, dollar_vol):
     grade, notes = "B", []
     if gap_pct >= 50:
-        grade = "A+"; notes.append(f"Massive gap +{gap_pct:.1f}% 🔥🔥🔥")
+        grade = "A+"; notes.append(f"Supernova +{gap_pct:.1f}% 🔥🔥🔥")
     elif gap_pct >= 30:
         grade = "A+"; notes.append(f"Huge gap +{gap_pct:.1f}% 🔥🔥")
     elif gap_pct >= 20:
@@ -349,6 +613,11 @@ def grade_setup(gap_pct, dollar_vol):
         grade = "A";  notes.append(f"Good gap +{gap_pct:.1f}%")
     elif gap_pct >= 10:
         grade = "B";  notes.append(f"Moderate gap +{gap_pct:.1f}%")
+    elif gap_pct > 0:
+        grade = "C";  notes.append(f"Weak gap +{gap_pct:.1f}%")
+    else:
+        grade = "D";  notes.append(f"Down {gap_pct:.1f}%")
+
     if dollar_vol >= 5_000_000:
         notes.append(f"Monster $vol ${dollar_vol/1e6:.1f}M 🔥")
         if grade == "A": grade = "A+"
@@ -379,7 +648,6 @@ def process_ticker(stock_data):
             if grade == 'A+':  final_grade = 'A'
             elif grade == 'A': final_grade = 'B'
 
-        # Build catalyst label
         if warning:
             catalyst_label = f"☠️ Danger — {news_count} article(s) in 5 days"
         elif strength == 'STRONG':
@@ -391,6 +659,25 @@ def process_ticker(stock_data):
         else:
             catalyst_label = "📰 0 articles in past 5 days"
 
+        # Get historical data for pattern detection
+        try:
+            stock     = yf.Ticker(ticker)
+            hist      = stock.history(period="10d", interval="1d")
+            hist_1m   = stock.history(period="1d",  interval="1m")
+            volume    = float(hist_1m['Volume'].sum()) if not hist_1m.empty else dollar_vol / price if price > 0 else 0
+            avg_vol   = float(hist['Volume'].mean()) if not hist.empty else 0
+            vol_ratio = volume / avg_vol if avg_vol > 0 else 0
+            closes    = hist['Close'].values.tolist() if not hist.empty else []
+        except:
+            volume    = 0
+            vol_ratio = 0
+            closes    = []
+
+        pattern, pattern_desc, pattern_criteria = detect_sykes_pattern(
+            ticker, price, prev_close, gap_pct,
+            closes, vol_ratio, dollar_vol
+        )
+
         entry_low  = round(price * 0.99, 2)
         entry_high = round(price * 1.02, 2)
         stop_loss  = round(entry_low * 0.95, 2)
@@ -399,25 +686,28 @@ def process_ticker(stock_data):
         target3    = round(entry_high * 1.30, 2)
 
         return {
-            'ticker':     ticker,
-            'price':      round(price, 2),
-            'prev_close': round(prev_close, 2),
-            'gap_pct':    round(gap_pct, 1),
-            'dollar_vol': round(dollar_vol, 0),
-            'grade':      final_grade,
-            'notes':      notes,
-            'catalyst':   catalyst_label,
-            'news_count': news_count,
-            'headlines':  headlines[:2],
-            'warning':    warning,
-            'entry_low':  entry_low,
-            'entry_high': entry_high,
-            'stop_loss':  stop_loss,
-            'target1':    target1,
-            'target2':    target2,
-            'target3':    target3,
-            'source':     source,
-            'time':       datetime.now().strftime('%H:%M:%S')
+            'ticker':           ticker,
+            'price':            round(price, 2),
+            'prev_close':       round(prev_close, 2),
+            'gap_pct':          round(gap_pct, 1),
+            'dollar_vol':       round(dollar_vol, 0),
+            'grade':            final_grade,
+            'notes':            notes,
+            'catalyst':         catalyst_label,
+            'news_count':       news_count,
+            'headlines':        headlines[:2],
+            'warning':          warning,
+            'pattern':          pattern,
+            'pattern_desc':     pattern_desc,
+            'pattern_criteria': pattern_criteria,
+            'entry_low':        entry_low,
+            'entry_high':       entry_high,
+            'stop_loss':        stop_loss,
+            'target1':          target1,
+            'target2':          target2,
+            'target3':          target3,
+            'source':           source,
+            'time':             datetime.now().strftime('%H:%M:%S')
         }
     except:
         return None
@@ -489,9 +779,10 @@ async def do_scan():
                     subject=f"🚀 {setup['grade']} — {ticker} +{setup['gap_pct']}%",
                     body=(
                         f"Grade: {setup['grade']}\n"
+                        f"Pattern: {setup['pattern']}\n"
                         f"Gap: +{setup['gap_pct']}%\n"
                         f"Price: ${setup['price']}\n"
-                        f"News: {setup['news_count']} articles in 5 days\n\n"
+                        f"News: {setup['news_count']} articles\n\n"
                         f"Entry: ${setup['entry_low']}–${setup['entry_high']}\n"
                         f"Stop: ${setup['stop_loss']}\n"
                         f"T1: ${setup['target1']}\n"
@@ -511,7 +802,6 @@ async def do_scan():
         'message': f'✅ {len(results)} setup(s) found',
         'progress': total, 'total': total
     }
-
     return results
 
 async def scanner_loop():
@@ -524,7 +814,6 @@ async def scanner_loop():
         try:
             results      = await do_scan()
             scan_results = results
-
             await broadcast({
                 'type':        'scan_results',
                 'data':        results,
@@ -533,7 +822,6 @@ async def scanner_loop():
                 'alerts':      alert_log[:20],
                 'scan_status': current_scan_status
             })
-
         except Exception as e:
             log_alert(f"⚠️ Scanner error: {e}")
 
