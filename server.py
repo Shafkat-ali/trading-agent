@@ -25,31 +25,76 @@ EMAIL_ADDRESS   = os.getenv('EMAIL_ADDRESS', '')
 EMAIL_PASSWORD  = os.getenv('EMAIL_PASSWORD', '')
 EMAIL_TO        = os.getenv('EMAIL_TO', '')
 
-# Per-user state
+# ── PER-USER STATE ──
 user_state = {
     'shafkat': {'scan_results':[], 'alerted':set(), 'mode':'standard', 'running':False,
-                'filters':{'min_price':0.10,'max_price':50.00,'min_gap_pct':20.0,'min_dollar_vol':50000}},
+                'filters':{'min_price':0.20,'max_price':20.00,'min_gap_pct':10.0,
+                           'min_dollar_vol':500000,'min_volume':300000,'min_rvol':3.0,
+                           'max_float_m':30.0,'max_market_cap_m':500.0,'require_news':True}},
     'irfan':   {'scan_results':[], 'alerted':set(), 'mode':'standard', 'running':False,
-                'filters':{'min_price':0.10,'max_price':50.00,'min_gap_pct':20.0,'min_dollar_vol':50000}},
+                'filters':{'min_price':0.20,'max_price':20.00,'min_gap_pct':10.0,
+                           'min_dollar_vol':500000,'min_volume':300000,'min_rvol':3.0,
+                           'max_float_m':30.0,'max_market_cap_m':500.0,'require_news':True}},
 }
 user_clients = {'shafkat':[], 'irfan':[]}
 alert_log    = []
 
 # NYSE halt cache
-halted_tickers = {}   # ticker -> {'reason': str, 'halt_time': str}
+halted_tickers = {}
 halt_cache_ts  = None
 
+# ── SCAN MODES — updated with new recommended criteria ──
 SCAN_MODES = {
-    'standard':  {'label':'🔍 Standard',   'min_price':0.10,'max_price':50.00,'min_gap':20.0,'min_dvol':50_000,   'desc':'Gap 20%+, $0.10–$50, $50K vol'},
-    'supernova': {'label':'🚀 Supernovas', 'min_price':0.10,'max_price':50.00,'min_gap':50.0,'min_dvol':100_000,  'desc':'Gap 50%+ only — massive movers'},
-    'biotech':   {'label':'🧬 Biotech',    'min_price':0.50,'max_price':50.00,'min_gap':15.0,'min_dvol':100_000,  'desc':'Biotech/FDA plays, gap 15%+'},
-    'low_float': {'label':'⚡ Low Float',  'min_price':0.10,'max_price':20.00,'min_gap':15.0,'min_dvol':50_000,   'desc':'Under $20, low float runners'},
-    'premarket': {'label':'🌅 Pre-Market', 'min_price':0.10,'max_price':50.00,'min_gap':15.0,'min_dvol':25_000,   'desc':'Pre-market gaps 15%+'},
-    'squeeze':   {'label':'💎 Squeeze',    'min_price':1.00,'max_price':50.00,'min_gap':10.0,'min_dvol':500_000,  'desc':'Short squeeze — high dollar vol'},
-    'small_cap': {'label':'📊 Small Cap',  'min_price':1.00,'max_price':15.00,'min_gap':15.0,'min_dvol':100_000,  'desc':'Small cap $1–$15, gap 15%+'},
-    'afternoon': {'label':'🌆 Afternoon',  'min_price':0.10,'max_price':50.00,'min_gap':5.0, 'min_dvol':50_000,   'desc':'Afternoon HOD breakouts'},
-    'penny':     {'label':'🪙 Penny',      'min_price':0.01,'max_price':1.00, 'min_gap':20.0,'min_dvol':10_000,   'desc':'Pure penny stocks under $1'},
-    'custom':    {'label':'⚙️ Custom',     'min_price':0.10,'max_price':50.00,'min_gap':20.0,'min_dvol':50_000,   'desc':'Your custom filter settings'},
+    'standard': {
+        'label':'🔍 Standard','desc':'Gap 10%+, $0.20–$20, $500K vol, RVOL 3x+',
+        'min_price':0.20,'max_price':20.00,'min_gap':10.0,'min_dvol':500_000,
+        'min_volume':300_000,'min_rvol':3.0,'max_float_m':30.0,'max_mktcap_m':500.0,'require_news':True,
+    },
+    'premarket': {
+        'label':'🌅 Pre-Market','desc':'Gap 10%+, vol 100K+, pre-market high break',
+        'min_price':0.20,'max_price':20.00,'min_gap':10.0,'min_dvol':100_000,
+        'min_volume':100_000,'min_rvol':2.0,'max_float_m':30.0,'max_mktcap_m':500.0,'require_news':False,
+    },
+    'supernova': {
+        'label':'🚀 Supernovas','desc':'Gap 50%+, massive movers',
+        'min_price':0.20,'max_price':20.00,'min_gap':50.0,'min_dvol':500_000,
+        'min_volume':300_000,'min_rvol':5.0,'max_float_m':30.0,'max_mktcap_m':500.0,'require_news':False,
+    },
+    'biotech': {
+        'label':'🧬 Biotech','desc':'Biotech/FDA, gap 15%+, catalyst required',
+        'min_price':0.50,'max_price':20.00,'min_gap':15.0,'min_dvol':500_000,
+        'min_volume':300_000,'min_rvol':3.0,'max_float_m':50.0,'max_mktcap_m':500.0,'require_news':True,
+    },
+    'low_float': {
+        'label':'⚡ Low Float','desc':'Float under 10M, RVOL 5x+',
+        'min_price':0.20,'max_price':20.00,'min_gap':15.0,'min_dvol':500_000,
+        'min_volume':300_000,'min_rvol':5.0,'max_float_m':10.0,'max_mktcap_m':300.0,'require_news':False,
+    },
+    'squeeze': {
+        'label':'💎 Squeeze','desc':'High short interest, gapping up, $1M+ vol',
+        'min_price':1.00,'max_price':20.00,'min_gap':10.0,'min_dvol':1_000_000,
+        'min_volume':500_000,'min_rvol':3.0,'max_float_m':30.0,'max_mktcap_m':500.0,'require_news':False,
+    },
+    'small_cap': {
+        'label':'📊 Small Cap','desc':'$1–$20, market cap under $500M',
+        'min_price':1.00,'max_price':20.00,'min_gap':15.0,'min_dvol':500_000,
+        'min_volume':300_000,'min_rvol':3.0,'max_float_m':30.0,'max_mktcap_m':500.0,'require_news':False,
+    },
+    'afternoon': {
+        'label':'🌆 Afternoon','desc':'HOD breakouts, gap 5%+, afternoon session',
+        'min_price':0.20,'max_price':20.00,'min_gap':5.0,'min_dvol':500_000,
+        'min_volume':300_000,'min_rvol':2.0,'max_float_m':30.0,'max_mktcap_m':500.0,'require_news':False,
+    },
+    'penny': {
+        'label':'🪙 Penny','desc':'Under $1, gap 20%+',
+        'min_price':0.01,'max_price':1.00,'min_gap':20.0,'min_dvol':100_000,
+        'min_volume':300_000,'min_rvol':3.0,'max_float_m':30.0,'max_mktcap_m':100.0,'require_news':False,
+    },
+    'custom': {
+        'label':'⚙️ Custom','desc':'Your custom filter settings',
+        'min_price':0.20,'max_price':20.00,'min_gap':10.0,'min_dvol':500_000,
+        'min_volume':300_000,'min_rvol':3.0,'max_float_m':30.0,'max_mktcap_m':500.0,'require_news':False,
+    },
 }
 
 STRONG_KEYWORDS = ['fda','approval','approved','breakthrough','contract','partnership','merger',
@@ -62,6 +107,7 @@ BIOTECH_KEYWORDS = ['fda','trial','phase','clinical','drug','therapy','biotech',
     'pharmaceutical','approval','nda','bla','cancer','oncology']
 SEC_DANGER_KEYWORDS = ['s-1','s-3','424b','offering','dilut','warrant','reverse split',
     'sec filing','8-k','going concern','non-compliance']
+VALID_EXCHANGES = {'NASDAQ','NYSE','AMEX','NYSE ARCA','NYSE MKT','BATS','CBOE'}
 
 # ============================================================
 # HELPERS
@@ -94,7 +140,8 @@ async def broadcast_to_user(user_id, data):
         except:
             disconnected.append(client)
     for c in disconnected:
-        if c in user_clients.get(user_id, []): user_clients[user_id].remove(c)
+        if c in user_clients.get(user_id, []):
+            user_clients[user_id].remove(c)
 
 # ============================================================
 # NYSE HALT DETECTION
@@ -105,43 +152,71 @@ def refresh_halt_cache():
     try:
         r = requests.get(
             'https://www.nyse.com/api/trade-halts/current/download',
-            timeout=10,
-            headers={'User-Agent': 'Mozilla/5.0'}
+            timeout=10, headers={'User-Agent': 'Mozilla/5.0'}
         )
         if r.status_code == 200 and r.text:
             halted_tickers = {}
             reader = csv.DictReader(io.StringIO(r.text))
             for row in reader:
-                sym = (row.get('Symbol') or row.get('symbol') or '').strip().upper()
-                reason = row.get('Reason Halted') or row.get('reasonHalted') or row.get('Reason') or 'Unknown'
-                halt_time = row.get('Halt Time') or row.get('haltTime') or row.get('Time') or ''
+                sym       = (row.get('Symbol') or row.get('symbol') or '').strip().upper()
+                reason    = (row.get('Reason Halted') or row.get('reasonHalted') or row.get('Reason') or 'Unknown').strip()
+                halt_time = (row.get('Halt Time') or row.get('haltTime') or row.get('Time') or '').strip()
                 if sym:
-                    halted_tickers[sym] = {'reason': reason.strip(), 'halt_time': halt_time.strip()}
+                    halted_tickers[sym] = {'reason': reason, 'halt_time': halt_time}
             halt_cache_ts = datetime.now()
-            log_alert(f"🛑 NYSE halt cache: {len(halted_tickers)} halted stocks")
+            log_alert(f"🛑 NYSE halts: {len(halted_tickers)} stocks")
     except Exception as e:
         log_alert(f"⚠️ NYSE halt fetch failed: {e}")
 
 def get_halt_info(ticker):
     global halt_cache_ts
-    # Refresh every 2 minutes
     if halt_cache_ts is None or (datetime.now() - halt_cache_ts).seconds > 120:
         refresh_halt_cache()
     return halted_tickers.get(ticker.upper(), None)
 
 # ============================================================
-# DEBUG
+# COMPANY INFO CACHE
+# ============================================================
+
+_company_cache = {}
+
+def get_company_info(ticker):
+    if ticker in _company_cache:
+        return _company_cache[ticker]
+    try:
+        r = requests.get(
+            "https://finnhub.io/api/v1/stock/profile2",
+            params={'symbol': ticker, 'token': FINNHUB_KEY},
+            timeout=6
+        )
+        if r.status_code == 200:
+            d = r.json()
+            info = {
+                'company_name': d.get('name', ''),
+                'exchange':     d.get('exchange', ''),
+                'industry':     d.get('finnhubIndustry', ''),
+                'market_cap_m': d.get('marketCapitalization', 0),  # already in millions
+                'float_m':      0,
+            }
+            _company_cache[ticker] = info
+            return info
+    except:
+        pass
+    return {'company_name':'','exchange':'','industry':'','market_cap_m':0,'float_m':0}
+
+# ============================================================
+# DEBUG & SCAN MODE ENDPOINTS
 # ============================================================
 
 @app.get("/api/debug")
 async def debug():
     return {
-        'finnhub_key_set': bool(FINNHUB_KEY),
+        'finnhub_key_set':     bool(FINNHUB_KEY),
         'finnhub_key_preview': FINNHUB_KEY[:8]+'...' if FINNHUB_KEY else 'NOT SET',
-        'polygon_key_set': bool(POLYGON_API_KEY),
-        'halted_count': len(halted_tickers),
+        'polygon_key_set':     bool(POLYGON_API_KEY),
+        'halted_count':        len(halted_tickers),
         'users': {uid: {'mode':s['mode'],'running':s['running'],'results':len(s['scan_results'])}
-                  for uid,s in user_state.items()}
+                  for uid, s in user_state.items()}
     }
 
 @app.get("/api/scan_modes")
@@ -151,7 +226,8 @@ async def get_scan_modes():
 @app.get("/api/halts")
 async def get_halts():
     refresh_halt_cache()
-    return {'halted': halted_tickers, 'count': len(halted_tickers), 'as_of': datetime.now().strftime('%H:%M:%S')}
+    return {'halted': halted_tickers, 'count': len(halted_tickers),
+            'as_of': datetime.now().strftime('%H:%M:%S')}
 
 # ============================================================
 # PER-USER ENDPOINTS
@@ -164,8 +240,15 @@ async def set_scan_mode(user_id: str, mode: str):
     m = SCAN_MODES[mode]
     user_state[user_id]['mode'] = mode
     user_state[user_id]['filters'] = {
-        'min_price': m['min_price'], 'max_price': m['max_price'],
-        'min_gap_pct': m['min_gap'], 'min_dollar_vol': m['min_dvol'],
+        'min_price':      m['min_price'],
+        'max_price':      m['max_price'],
+        'min_gap_pct':    m['min_gap'],
+        'min_dollar_vol': m['min_dvol'],
+        'min_volume':     m['min_volume'],
+        'min_rvol':       m['min_rvol'],
+        'max_float_m':    m['max_float_m'],
+        'max_market_cap_m': m['max_mktcap_m'],
+        'require_news':   m['require_news'],
     }
     log_alert(f"🔄 [{user_id}] Mode: {m['label']}")
     return {'status':'ok','mode':mode,'filters':user_state[user_id]['filters']}
@@ -175,10 +258,12 @@ async def set_filters(user_id: str, filters: dict):
     if user_id not in user_state: return {'error': 'Unknown user'}
     user_state[user_id]['mode'] = 'custom'
     f = user_state[user_id]['filters']
-    if 'min_price'      in filters: f['min_price']      = float(filters['min_price'])
-    if 'max_price'      in filters: f['max_price']      = float(filters['max_price'])
-    if 'min_gap_pct'    in filters: f['min_gap_pct']    = float(filters['min_gap_pct'])
-    if 'min_dollar_vol' in filters: f['min_dollar_vol'] = float(filters['min_dollar_vol'])
+    for key in ['min_price','max_price','min_gap_pct','min_dollar_vol',
+                'min_volume','min_rvol','max_float_m','max_market_cap_m']:
+        if key in filters:
+            f[key] = float(filters[key])
+    if 'require_news' in filters:
+        f['require_news'] = bool(filters['require_news'])
     log_alert(f"⚙️ [{user_id}] Custom filters applied")
     return {'status':'ok','filters':f,'mode':'custom'}
 
@@ -201,9 +286,10 @@ async def start_scanner(user_id: str):
     if user_id not in user_state: return {'error':'Unknown user'}
     s = user_state[user_id]
     if not s['running']:
-        s['running'] = True; s['scan_results'] = []
+        s['running'] = True
+        s['scan_results'] = []
         asyncio.create_task(scanner_loop(user_id))
-        log_alert(f"✅ [{user_id}] Scanner started")
+        log_alert(f"✅ [{user_id}] Scanner started [{SCAN_MODES.get(s['mode'],{}).get('label',s['mode'])}]")
         return {'status':'started','mode':s['mode']}
     return {'status':'already running','mode':s['mode']}
 
@@ -262,8 +348,7 @@ async def get_stock_metrics(ticker: str):
         )
         finnhub_data = r.json() if r.status_code == 200 else {}
         m = finnhub_data.get('metric', {})
-
-        # Supplement float & short ratio from yfinance if missing
+        # Supplement float & short from yfinance if missing
         if not m.get('float') or not m.get('shortInterestRatio'):
             try:
                 info = yf.Ticker(ticker).info
@@ -279,7 +364,6 @@ async def get_stock_metrics(ticker: str):
                 finnhub_data['metric'] = m
             except:
                 pass
-
         return finnhub_data
     except Exception as e:
         return {'error': str(e)}
@@ -301,7 +385,6 @@ async def get_stock_news(ticker: str):
 
 @app.get("/api/stock/sec/{ticker}")
 async def get_sec_filings(ticker: str):
-    """Get SEC filings from Finnhub — free endpoint"""
     try:
         r = requests.get(
             "https://finnhub.io/api/v1/stock/filings",
@@ -309,7 +392,6 @@ async def get_sec_filings(ticker: str):
             timeout=8
         )
         filings = r.json() if r.status_code == 200 else []
-        # Flag danger filings
         danger = []
         for f in filings[:20]:
             form = (f.get('form') or '').upper()
@@ -323,37 +405,30 @@ async def get_sec_filings(ticker: str):
 
 @app.get("/api/news/market")
 async def get_market_news():
-    """General market news from Finnhub — for world news tab"""
     try:
         r = requests.get(
             "https://finnhub.io/api/v1/news",
             params={'category': 'general', 'token': FINNHUB_KEY},
             timeout=8
         )
-        news = r.json() if r.status_code == 200 else []
-        return {'news': news[:30]}
+        return {'news': r.json()[:30] if r.status_code == 200 else []}
     except Exception as e:
         return {'news': [], 'error': str(e)}
 
 @app.get("/api/news/sec")
 async def get_sec_news():
-    """SEC/regulatory news — merger, offering, dilution alerts"""
     try:
-        # Finnhub merger/regulatory news
         r = requests.get(
             "https://finnhub.io/api/v1/news",
             params={'category': 'merger', 'token': FINNHUB_KEY},
             timeout=8
         )
         news = r.json() if r.status_code == 200 else []
-
-        # Tag danger items
         tagged = []
         for n in news[:30]:
             headline = (n.get('headline') or '').lower()
             n['danger'] = any(kw in headline for kw in SEC_DANGER_KEYWORDS)
             tagged.append(n)
-
         return {'news': tagged}
     except Exception as e:
         return {'news': [], 'error': str(e)}
@@ -362,8 +437,6 @@ async def get_sec_news():
 async def search_ticker(ticker: str):
     try:
         ticker = ticker.upper().strip()
-
-        # Quote
         quote_r = requests.get(
             "https://finnhub.io/api/v1/quote",
             params={'symbol': ticker, 'token': FINNHUB_KEY},
@@ -387,18 +460,17 @@ async def search_ticker(ticker: str):
 
         pct_change = ((price - prev_close) / prev_close * 100) if prev_close > 0 else 0
 
-        # Profile for company name
-        profile_r = requests.get(
+        profile_r  = requests.get(
             "https://finnhub.io/api/v1/stock/profile2",
             params={'symbol': ticker, 'token': FINNHUB_KEY},
             timeout=8
         )
-        profile = profile_r.json() if profile_r.status_code == 200 else {}
+        profile      = profile_r.json() if profile_r.status_code == 200 else {}
         company_name = profile.get('name', '')
         exchange     = profile.get('exchange', '')
         industry     = profile.get('finnhubIndustry', '')
+        market_cap_m = profile.get('marketCapitalization', 0)
 
-        # Historical
         stock    = yf.Ticker(ticker)
         hist     = stock.history(period="10d", interval="1d")
         hist_1m  = stock.history(period="1d",  interval="1m")
@@ -408,12 +480,17 @@ async def search_ticker(ticker: str):
         closes   = hist['Close'].values.tolist()  if not hist.empty else []
         dollar_vol = price * volume
 
-        # Halt check
+        # Spread estimate
+        spread_pct = 0.0
+        if high > 0 and low > 0:
+            mid = (high + low) / 2
+            spread_pct = round(((high - low) / mid) * 100, 2) if mid > 0 else 0.0
+
         halt_info = get_halt_info(ticker)
 
         pattern, pattern_desc, pattern_criteria = detect_sykes_pattern(
             ticker, price, prev_close, pct_change, closes, vol_ratio, dollar_vol)
-        grade, notes = grade_setup(pct_change, dollar_vol)
+        grade, notes = grade_setup(pct_change, dollar_vol, vol_ratio)
         strength, news_count, headlines, warning = check_catalyst(ticker)
 
         final_grade = grade
@@ -443,6 +520,7 @@ async def search_ticker(ticker: str):
             'company_name':     company_name,
             'exchange':         exchange,
             'industry':         industry,
+            'market_cap_m':     round(market_cap_m, 2),
             'price':            round(price, 2),
             'prev_close':       round(prev_close, 2),
             'gap_pct':          round(pct_change, 1),
@@ -450,7 +528,9 @@ async def search_ticker(ticker: str):
             'low':              round(low, 2),
             'open':             round(open_price, 2),
             'dollar_vol':       round(dollar_vol, 0),
+            'volume':           round(volume, 0),
             'vol_ratio':        round(vol_ratio, 1),
+            'spread_pct':       spread_pct,
             'grade':            final_grade,
             'notes':            notes,
             'catalyst':         catalyst_label,
@@ -468,13 +548,13 @@ async def search_ticker(ticker: str):
             'target2':          target2,
             'target3':          target3,
             'source':           'Search',
-            'time':             datetime.now().strftime('%H:%M:%S')
+            'time':             datetime.now().strftime('%H:%M:%S'),
         }
     except Exception as e:
         return {'error': str(e)}
 
 # ============================================================
-# SYKES PATTERN DETECTION — 14 PATTERNS
+# PATTERN DETECTION
 # ============================================================
 
 def detect_sykes_pattern(ticker, price, prev_close, pct_change, closes, vol_ratio, dollar_vol):
@@ -482,70 +562,60 @@ def detect_sykes_pattern(ticker, price, prev_close, pct_change, closes, vol_rati
 
     if pct_change >= 50:
         return ("🚀 Supernova",
-            "Stock exploded 50%+ in one session. Massive volatility and liquidity. "
-            "Sykes: 'Supernovas can last longer and are greater than anybody thinks possible.'",
-            [f"✅ Up {pct_change:.1f}% today (need 50%+)",
-             f"✅ Volume {vol_ratio:.1f}x average" if vol_ratio>=3 else f"⚠️ Volume {vol_ratio:.1f}x (want 3x+)",
-             "📌 Sykes Rule: Buy momentum OR wait for first red day to short",
-             "📌 Entry: Buy early momentum or dip buy the first panic",
-             "📌 Exit: Sell into strength — supernovas crash hard and fast",
-             "⚠️ Risk: Supernovas can crash 90% in one day — use stop loss"])
+            "Stock exploded 50%+ in one session — classic Sykes supernova.",
+            [f"✅ Up {pct_change:.1f}% today",
+             f"✅ RVOL {vol_ratio:.1f}x" if vol_ratio>=3 else f"⚠️ RVOL {vol_ratio:.1f}x (want 3x+)",
+             "📌 Buy momentum OR wait for first red day to short",
+             "📌 Exit: Sell into strength — supernovas crash fast",
+             "⚠️ Can crash 90% in one day — always use stop loss"])
 
     if n >= 5:
-        recent_high = max(closes[-5:])
-        recent_run  = ((recent_high - closes[-5]) / closes[-5] * 100) if closes[-5] > 0 else 0
+        recent_high   = max(closes[-5:])
+        recent_run    = ((recent_high - closes[-5]) / closes[-5] * 100) if closes[-5] > 0 else 0
         dip_from_high = ((price - recent_high) / recent_high * 100) if recent_high > 0 else 0
         if recent_run >= 50 and dip_from_high <= -20 and pct_change > 0:
             return ("🎯 Morning Panic Dip Buy",
-                "Sykes #1 all-time favorite. Stock ran 50%+ recently then panicked hard. "
-                "Stop losses cascade creating massive sell-off. Buyers see price as discount.",
-                [f"✅ Stock ran {recent_run:.0f}% recently",
-                 f"✅ Down {abs(dip_from_high):.0f}% from recent high",
+                "Sykes #1 favorite. Stock ran 50%+ recently then panicked hard at open.",
+                [f"✅ Ran {recent_run:.0f}% recently",
+                 f"✅ Down {abs(dip_from_high):.0f}% from high — panic territory",
                  f"✅ Bouncing {pct_change:.1f}% today",
-                 "📌 Sykes Rule: Wait for selling to STOP — patience is key",
-                 "📌 Entry: Buy when Level 2 shows wall of buyers forming",
-                 "📌 Watch: Double bottom = stronger bounce",
-                 "📌 Exit: Quick scalp — sell into the bounce",
-                 "⚠️ Cut losses quickly if it breaks support"])
+                 "📌 Wait for selling to STOP before buying",
+                 "📌 Watch Level 2 for wall of buyers",
+                 "📌 Double bottom = stronger bounce",
+                 "📌 Exit: Quick scalp — sell into bounce"])
 
     if n >= 4:
         prev_days_red = all(closes[i] < closes[i-1] for i in range(-3, -1))
         if prev_days_red and pct_change > 5:
             return ("🟢 First Green Day",
-                "First green candle after multiple red days. Jack Kellogg's all-time favorite ($22M+). "
-                "Look for stocks closing near highs for overnight hold.",
-                [f"✅ First green day up {pct_change:.1f}% after 2+ red days",
-                 f"✅ Volume {vol_ratio:.1f}x" if vol_ratio>=2 else f"⚠️ Volume {vol_ratio:.1f}x (want 2x+)",
-                 "📌 Sykes Rule: Buy dips on the run-up — never chase the spike",
-                 "📌 Entry: Wait for morning dip, buy bounce toward HOD",
-                 "📌 If closing near HOD → consider overnight hold for gap up",
-                 "📌 Exit: Sell into gap up next morning",
-                 "⚠️ First red day after this = potential short"])
+                "First green candle after multiple red days. Jack Kellogg's favorite ($22M+).",
+                [f"✅ First green day up {pct_change:.1f}%",
+                 f"✅ RVOL {vol_ratio:.1f}x" if vol_ratio>=2 else f"⚠️ RVOL {vol_ratio:.1f}x (want 2x+)",
+                 "📌 Buy dips on run-up — never chase the spike",
+                 "📌 If closing near HOD → overnight hold for gap up",
+                 "📌 Exit: Sell into gap up next morning"])
 
     if n >= 6:
         green_days = sum(1 for i in range(-5, 0) if closes[i] > closes[i-1])
         total_run  = ((closes[-1] - closes[-6]) / closes[-6] * 100) if closes[-6] > 0 else 0
         if green_days >= 3 and pct_change > 0 and total_run >= 30:
             return ("📈 Multi-Day Breakout",
-                "Running consecutively for multiple days — Jack Kellogg's favorite. "
-                "Sykes: 'Stocks that spike 500% don't do it in one day.'",
+                "Running consecutively multiple days. Buy dips along the run.",
                 [f"✅ {green_days} of last 5 days green",
                  f"✅ Total {total_run:.0f}% run",
-                 f"✅ Up {pct_change:.1f}% continuing",
                  "📌 Buy 10-20% dips off morning highs",
-                 "📌 Watch: Stock closing near HOD = bullish continuation",
-                 "📌 Exit: Sell into strength — don't hold through the crash"])
+                 "📌 Watch: Closing near HOD = bullish continuation",
+                 "📌 Exit: Sell into strength"])
 
-    if pct_change >= 15 and vol_ratio >= 2:
+    if pct_change >= 15 and vol_ratio >= 3:
         return ("⚡ Gap and Go",
-            "Gapped up on catalyst and continues higher. Shorts get squeezed adding fuel. "
-            "Sykes only trades with confirmed news.",
+            "Gapped up on catalyst with RVOL 3x+. Classic momentum play.",
             [f"✅ Gapped up {pct_change:.1f}%",
-             f"✅ Volume {vol_ratio:.1f}x" if vol_ratio>=3 else f"⚠️ Volume {vol_ratio:.1f}x (want 3x+)",
-             "📌 ONLY trade with strong catalyst — no catalyst = skip",
+             f"✅ RVOL {vol_ratio:.1f}x" if vol_ratio>=3 else f"⚠️ RVOL {vol_ratio:.1f}x (need 3x+)",
+             "📌 Only trade with strong catalyst",
              "📌 Entry: Buy first pullback after open",
-             "📌 Exit: Scale out — T1 +10%, T2 +20%, T3 +30%",
-             "⚠️ Risk: Gap fills happen fast — stop below gap support"])
+             "📌 Exit: T1 +10%, T2 +20%, T3 +30%",
+             "⚠️ Stop below gap support"])
 
     if n >= 5 and pct_change >= 5:
         recent_max = max(closes[-5:])
@@ -553,39 +623,34 @@ def detect_sykes_pattern(ticker, price, prev_close, pct_change, closes, vol_rati
         flag_range = ((recent_max - min(closes[-3:])) / recent_max * 100) if recent_max > 0 else 0
         if flagpole >= 15 and flag_range <= 15 and pct_change < flagpole * 0.5:
             return ("🏳️ Bull Flag / Pennant",
-                "Spike (flagpole) + tight consolidation (flag) + breakout. "
-                "Volume drops during flag, spikes on breakout.",
+                "Spike + tight consolidation + breakout. Volume drops in flag, spikes on breakout.",
                 [f"✅ Flagpole: {flagpole:.0f}% spike",
-                 f"✅ Consolidation: {flag_range:.1f}% range (tight = bullish)",
-                 "📌 Wait for CONFIRMED breakout above flag top",
-                 "📌 Volume should DROP during flag, SPIKE on breakout",
-                 "📌 Exit: Flagpole length added to breakout point",
-                 "⚠️ Failed breakouts look exactly like real ones"])
+                 f"✅ Consolidation: {flag_range:.1f}% range",
+                 "📌 Wait for confirmed breakout above flag top",
+                 "📌 Volume drops during flag, spikes on breakout",
+                 "⚠️ Failed breakouts look identical — cut fast"])
 
     if n >= 6 and pct_change >= 3:
         step_pattern = all(closes[i] > closes[i-1] * 0.93 for i in range(-4, -1))
         total_climb  = ((closes[-1] - closes[-6]) / closes[-6] * 100) if closes[-6] > 0 else 0
         if step_pattern and total_climb >= 20:
             return ("🪜 Stair Stepper",
-                "Slower supernova — rises progressively with brief pullbacks. "
-                "Each step acts as support and resistance.",
-                [f"✅ Progressive uptrend {total_climb:.0f}%",
+                "Slower supernova — rises progressively with brief pullbacks.",
+                [f"✅ Progressive {total_climb:.0f}% uptrend",
                  f"✅ Up {pct_change:.1f}% today",
-                 "📌 Buy the pullbacks (steps), sell into spikes",
-                 "📌 Use bottom of green candles as your stop",
+                 "📌 Buy pullbacks, sell into spikes",
+                 "📌 Stop: bottom of large green candles",
                  "⚠️ Can reverse suddenly if catalyst fades"])
 
     if n >= 5:
         recent_high_5d = max(closes[-5:])
         if price >= recent_high_5d * 0.97 and vol_ratio >= 2 and pct_change > 5:
             return ("💥 Breakout",
-                "Breaking above recent resistance with volume confirmation. "
-                "Sykes: 'Buy breakouts only with volume.'",
+                "Breaking above recent resistance with volume confirmation.",
                 [f"✅ Price near 5-day high (${recent_high_5d:.2f})",
-                 f"✅ Up {pct_change:.1f}%",
-                 f"✅ Volume {vol_ratio:.1f}x" if vol_ratio>=2 else f"⚠️ Volume {vol_ratio:.1f}x (need 2x+)",
+                 f"✅ RVOL {vol_ratio:.1f}x",
                  "📌 Only buy with volume — no volume = fake breakout",
-                 "📌 Set stop below resistance level",
+                 "📌 Stop below resistance level",
                  "⚠️ Failed breakouts trap longs"])
 
     if n >= 7:
@@ -597,54 +662,48 @@ def detect_sykes_pattern(ticker, price, prev_close, pct_change, closes, vol_rati
         recovery   = ((right_high - cup_bottom) / cup_bottom * 100) if cup_bottom > 0 else 0
         if cup_depth >= 15 and cup_depth <= 60 and recovery >= 50 and pct_change > 0:
             return ("☕ Cup and Handle",
-                "U-shaped recovery + handle consolidation + breakout. "
-                "Sykes tweeted 'beautiful premarket cup and handle' Nov 2025.",
+                "U-shaped recovery + handle consolidation + breakout.",
                 [f"✅ Cup depth: {cup_depth:.0f}%",
                  f"✅ Recovery: {recovery:.0f}%",
                  "📌 Wait for handle breakout with volume",
                  "📌 Exit: Cup depth added to breakout point"])
 
     now_hour = datetime.now().hour
-    if 13 <= now_hour <= 16 and pct_change >= 5 and vol_ratio >= 1.5:
+    if 13 <= now_hour <= 16 and pct_change >= 5 and vol_ratio >= 2:
         return ("🌆 Afternoon Breakout",
-            "Breaking above morning HOD in afternoon. Safer for beginners — more info available.",
+            "Breaking above morning HOD in afternoon. Safer for beginners.",
             [f"✅ Up {pct_change:.1f}% in afternoon",
-             f"✅ Volume {vol_ratio:.1f}x" if vol_ratio>=2 else f"⚠️ Volume {vol_ratio:.1f}x",
+             f"✅ RVOL {vol_ratio:.1f}x",
              "📌 Draw line at morning HOD — if it breaks, buy it",
-             "📌 Safer than premarket — more info available",
-             "⚠️ Afternoon fades happen — exit fast if it reverses"])
+             "⚠️ Afternoon fades happen — exit fast if reverses"])
 
     if 15 <= now_hour <= 16 and n >= 3:
         prev_red = closes[-2] < closes[-3] if n >= 3 else False
         if pct_change >= 10 and prev_red:
             return ("🌙 Overnight Hold Setup",
-                "Stock closing strong near HOD on first green day. "
-                "Sykes: 'Buy before close. Goal is to sell into gap up next morning.'",
-                [f"✅ Up {pct_change:.1f}% closing strong near HOD",
+                "Closing strong near HOD on first green day. Hold overnight for gap up.",
+                [f"✅ Up {pct_change:.1f}% near HOD",
                  "✅ Previous days were red",
-                 "📌 Only hold overnight if closing within 10% of HOD",
-                 "📌 Entry: Buy in last 30 minutes of session",
-                 "📌 Exit: Sell into gap up next morning",
-                 "⚠️ Bad news overnight = gap DOWN — small position"])
+                 "📌 Only hold overnight if within 10% of HOD",
+                 "📌 Entry: Last 30 minutes of session",
+                 "⚠️ Bad news overnight = gap DOWN"])
 
     if n >= 3 and pct_change >= 3:
         dip1 = ((closes[-2] - closes[-3]) / closes[-3] * 100) if closes[-3] > 0 else 0
         if dip1 <= -10:
             return ("📉 Double Bottom Morning Panic",
-                "Two panic lows forming support. "
-                "Sykes: 'Second bottom holds better. Add on second bounce.'",
+                "Two panic lows forming support. Second bottom holds better.",
                 [f"✅ First panic: {dip1:.0f}%",
                  f"✅ Bouncing {pct_change:.1f}%",
                  "📌 Buy the SECOND bottom, not the first",
-                 "📌 W-shape on chart at similar price levels",
-                 "⚠️ If second bottom breaks lower, exit immediately"])
+                 "📌 W-shape at similar price levels",
+                 "⚠️ If second bottom breaks, exit immediately"])
 
     if n >= 3 and pct_change < -10:
         prev_was_big_up = closes[-2] > closes[-3] * 1.2 if n >= 3 else False
         if prev_was_big_up:
             return ("🔴 Supernova Fade (Short)",
-                "First red day after big run. Sykes' prime short setup. "
-                "Trapped longs panic selling adds to downside.",
+                "First red day after big run. Prime short setup.",
                 [f"✅ Down {abs(pct_change):.1f}% after big run",
                  "✅ Previous session was up 20%+",
                  "📌 Short the first red day — every bounce is a sell",
@@ -655,23 +714,22 @@ def detect_sykes_pattern(ticker, price, prev_close, pct_change, closes, vol_rati
         consec_red = sum(1 for i in range(-4, 0) if closes[i] < closes[i-1])
         if consec_red >= 3:
             return ("🦅 The Crow — AVOID",
-                "Continuous selling pressure. Every recovery gets sold. "
-                "Sykes: 'I don't recommend trading this pattern.'",
-                [f"⚠️ Down {abs(pct_change):.1f}% — continuing downtrend",
+                "Continuous selling pressure. Every recovery gets sold.",
+                [f"⚠️ Down {abs(pct_change):.1f}% — downtrend",
                  f"⚠️ {consec_red} of last 4 days red",
                  "🚨 DO NOT trade The Crow on the long side",
-                 "🚨 SKIP — wait for a better opportunity"])
+                 "🚨 SKIP — wait for better opportunity"])
 
     if pct_change >= 10:
         return ("📊 Momentum Play",
             "Decent move but no clean Sykes pattern. Trade with caution.",
             [f"⚠️ Up {pct_change:.1f}% — no clean pattern",
+             f"⚠️ RVOL {vol_ratio:.1f}x",
              "📌 Check: catalyst? float? sector hot?",
              "📌 Wait for cleaner setup"])
 
     return ("🔍 No Clear Pattern",
-        "Does not match any defined Sykes setup. "
-        "Sykes: 'If there's no pattern, there's no trade.'",
+        "Does not match any defined Sykes setup.",
         [f"⚠️ Move too small for Sykes patterns",
          "🚨 SKIP — wait for better opportunity"])
 
@@ -690,7 +748,6 @@ def check_catalyst(ticker):
             timeout=8
         )
         news_items = r.json()[:15] if r.status_code == 200 else []
-
         if not news_items:
             yf_news = yf.Ticker(ticker).news or []
             cutoff  = datetime.now() - timedelta(days=5)
@@ -704,43 +761,60 @@ def check_catalyst(ticker):
         strong_hits = 0
         danger_hits = 0
         warning     = False
-
         for item in news_items[:5]:
             title = (item.get('headline') or item.get('title') or '').lower()
             headlines.append(item.get('headline') or item.get('title') or '')
             if any(kw in title for kw in STRONG_KEYWORDS): strong_hits += 1
             if any(kw in title for kw in DANGER_KEYWORDS): danger_hits += 1; warning = True
 
-        if not news_items: return 'NONE', 0, [], False
-        if warning and danger_hits > strong_hits: return 'DANGER', news_count, headlines[:2], True
-        elif strong_hits >= 2: return 'STRONG', news_count, headlines[:2], False
-        elif strong_hits == 1: return 'MODERATE', news_count, headlines[:2], False
-        else: return 'WEAK', news_count, headlines[:2], False
+        if not news_items:         return 'NONE',    0,          [],           False
+        if warning and danger_hits > strong_hits: return 'DANGER',  news_count, headlines[:2], True
+        elif strong_hits >= 2:     return 'STRONG',  news_count, headlines[:2], False
+        elif strong_hits == 1:     return 'MODERATE',news_count, headlines[:2], False
+        else:                      return 'WEAK',    news_count, headlines[:2], False
     except:
         return 'NONE', 0, [], False
+
+def is_biotech(headlines):
+    return any(kw in ' '.join(headlines).lower() for kw in BIOTECH_KEYWORDS)
+
+# ============================================================
+# GRADING — updated with RVOL
+# ============================================================
+
+def grade_setup(gap_pct, dollar_vol, vol_ratio=0):
+    grade, notes = "B", []
+
+    # Gap grade
+    if gap_pct >= 50:   grade = "A+"; notes.append(f"Supernova +{gap_pct:.1f}% 🔥🔥🔥")
+    elif gap_pct >= 30: grade = "A+"; notes.append(f"Huge gap +{gap_pct:.1f}% 🔥🔥")
+    elif gap_pct >= 20: grade = "A";  notes.append(f"Strong gap +{gap_pct:.1f}% 🔥")
+    elif gap_pct >= 15: grade = "A";  notes.append(f"Good gap +{gap_pct:.1f}%")
+    elif gap_pct >= 10: grade = "B";  notes.append(f"Moderate gap +{gap_pct:.1f}%")
+    elif gap_pct > 0:   grade = "C";  notes.append(f"Weak gap +{gap_pct:.1f}%")
+    else:               grade = "D";  notes.append(f"Down {gap_pct:.1f}%")
+
+    # Dollar volume bonus
+    if dollar_vol >= 5_000_000:
+        notes.append(f"Monster $vol ${dollar_vol/1e6:.1f}M 🔥")
+        if grade == "A": grade = "A+"
+    elif dollar_vol >= 1_000_000:
+        notes.append(f"Strong $vol ${dollar_vol/1e6:.1f}M ✅")
+    elif dollar_vol >= 500_000:
+        notes.append(f"$Vol ${dollar_vol/1000:.0f}K ✅")
+    else:
+        notes.append(f"$Vol ${dollar_vol:,.0f}")
+
+    # RVOL bonus/penalty
+    if vol_ratio >= 5:   notes.append(f"RVOL {vol_ratio:.1f}x 🔥🔥")
+    elif vol_ratio >= 3: notes.append(f"RVOL {vol_ratio:.1f}x ✅")
+    elif vol_ratio > 0:  notes.append(f"RVOL {vol_ratio:.1f}x ⚠️")
+
+    return grade, notes
 
 # ============================================================
 # DATA SOURCES
 # ============================================================
-
-def get_company_info(ticker):
-    """Get company name, exchange, industry from Finnhub"""
-    try:
-        r = requests.get(
-            "https://finnhub.io/api/v1/stock/profile2",
-            params={'symbol': ticker, 'token': FINNHUB_KEY},
-            timeout=6
-        )
-        if r.status_code == 200:
-            d = r.json()
-            return {
-                'company_name': d.get('name', ''),
-                'exchange':     d.get('exchange', ''),
-                'industry':     d.get('finnhubIndustry', ''),
-            }
-    except:
-        pass
-    return {'company_name': '', 'exchange': '', 'industry': ''}
 
 def get_massive_gainers(filters):
     try:
@@ -759,18 +833,37 @@ def get_massive_gainers(filters):
                 price      = last.get('p') or day.get('c', 0)
                 prev_close = prev.get('c', 0)
                 volume     = day.get('v', 0)
-                if not (price and prev_close and price > 0 and prev_close > 0): continue
+                prev_vol   = prev.get('v', 1) or 1
+
+                if not (price and prev_close and price > 0 and prev_close > 0):
+                    continue
+
                 pct        = ((price - prev_close) / prev_close) * 100
                 dollar_vol = price * volume
-                if (sym and filters['min_price'] <= price <= filters['max_price']
-                        and pct >= filters['min_gap_pct'] and dollar_vol >= filters['min_dollar_vol']):
-                    candidates.append({
-                        'ticker': sym, 'price': float(price), 'prev_close': float(prev_close),
-                        'gap_pct': round(float(pct), 1), 'volume': float(volume),
-                        'dollar_vol': float(dollar_vol), 'source': 'Live'
-                    })
-            log_alert(f"📡 Massive: {len(candidates)} stocks")
+                rvol       = volume / prev_vol if prev_vol > 0 else 0
+
+                # Apply ALL filters
+                if not sym:                                        continue
+                if not (filters['min_price'] <= price <= filters['max_price']): continue
+                if pct < filters['min_gap_pct']:                   continue
+                if dollar_vol < filters['min_dollar_vol']:         continue
+                if volume < filters.get('min_volume', 0):          continue
+                if rvol < filters.get('min_rvol', 0):              continue
+
+                candidates.append({
+                    'ticker':     sym,
+                    'price':      float(price),
+                    'prev_close': float(prev_close),
+                    'gap_pct':    round(float(pct), 1),
+                    'volume':     float(volume),
+                    'dollar_vol': float(dollar_vol),
+                    'rvol':       round(float(rvol), 1),
+                    'source':     'Live',
+                })
+
+            log_alert(f"📡 Massive: {len(candidates)} stocks (after filters)")
             return candidates
+
         log_alert(f"⚠️ Massive error: {r.status_code}")
         return []
     except Exception as e:
@@ -795,52 +888,54 @@ def get_yahoo_gainers(filters):
                 pct        = q.get('regularMarketChangePercent', 0)
                 vol        = q.get('regularMarketVolume', 0)
                 prev       = q.get('regularMarketPreviousClose', 0)
+                avg_vol    = q.get('averageDailyVolume3Month', 1) or 1
                 dollar_vol = price * vol
-                if (sym and filters['min_price'] <= price <= filters['max_price']
-                        and pct >= filters['min_gap_pct'] and dollar_vol >= filters['min_dollar_vol']):
-                    candidates.append({
-                        'ticker': sym, 'price': float(price), 'prev_close': float(prev),
-                        'gap_pct': round(float(pct), 1), 'volume': float(vol),
-                        'dollar_vol': float(dollar_vol), 'source': 'Live'
-                    })
+                rvol       = vol / avg_vol if avg_vol > 0 else 0
+
+                if not sym:                                                continue
+                if not (filters['min_price'] <= price <= filters['max_price']): continue
+                if pct < filters['min_gap_pct']:                           continue
+                if dollar_vol < filters['min_dollar_vol']:                 continue
+                if vol < filters.get('min_volume', 0):                     continue
+                if rvol < filters.get('min_rvol', 0):                      continue
+
+                candidates.append({
+                    'ticker':     sym,
+                    'price':      float(price),
+                    'prev_close': float(prev),
+                    'gap_pct':    round(float(pct), 1),
+                    'volume':     float(vol),
+                    'dollar_vol': float(dollar_vol),
+                    'rvol':       round(float(rvol), 1),
+                    'source':     'Live',
+                })
         except:
             pass
-    log_alert(f"📡 Yahoo: {len(candidates)} stocks")
+    log_alert(f"📡 Yahoo: {len(candidates)} stocks (after filters)")
     return candidates
 
-def grade_setup(gap_pct, dollar_vol):
-    grade, notes = "B", []
-    if gap_pct >= 50:   grade = "A+"; notes.append(f"Supernova +{gap_pct:.1f}% 🔥🔥🔥")
-    elif gap_pct >= 30: grade = "A+"; notes.append(f"Huge gap +{gap_pct:.1f}% 🔥🔥")
-    elif gap_pct >= 20: grade = "A";  notes.append(f"Strong gap +{gap_pct:.1f}% 🔥")
-    elif gap_pct >= 15: grade = "A";  notes.append(f"Good gap +{gap_pct:.1f}%")
-    elif gap_pct >= 10: grade = "B";  notes.append(f"Moderate gap +{gap_pct:.1f}%")
-    elif gap_pct > 0:   grade = "C";  notes.append(f"Weak gap +{gap_pct:.1f}%")
-    else:               grade = "D";  notes.append(f"Down {gap_pct:.1f}%")
-    if dollar_vol >= 5_000_000:
-        notes.append(f"Monster $vol ${dollar_vol/1e6:.1f}M 🔥")
-        grade = "A+" if grade == "A" else grade
-    elif dollar_vol >= 1_000_000:
-        notes.append(f"Strong $vol ${dollar_vol/1e6:.1f}M ✅")
-    else:
-        notes.append(f"$Vol ${dollar_vol:,.0f}")
-    return grade, notes
+# ============================================================
+# PROCESS TICKER
+# ============================================================
 
-def is_biotech(headlines):
-    combined = " ".join(headlines).lower()
-    return any(kw in combined for kw in BIOTECH_KEYWORDS)
-
-def process_ticker(stock_data, mode='standard'):
+def process_ticker(stock_data, mode='standard', filters=None):
     try:
         ticker     = stock_data['ticker']
         price      = stock_data['price']
         prev_close = stock_data['prev_close']
         gap_pct    = stock_data['gap_pct']
         dollar_vol = stock_data['dollar_vol']
+        volume     = stock_data.get('volume', 0)
+        rvol       = stock_data.get('rvol', 0)
         source     = stock_data.get('source', 'Live')
+        filters    = filters or {}
 
-        grade, notes = grade_setup(gap_pct, dollar_vol)
+        grade, notes = grade_setup(gap_pct, dollar_vol, rvol)
         strength, news_count, headlines, warning = check_catalyst(ticker)
+
+        # Require news filter
+        if filters.get('require_news') and news_count == 0:
+            return None
 
         if mode == 'biotech' and not is_biotech(headlines):
             return None
@@ -862,23 +957,63 @@ def process_ticker(stock_data, mode='standard'):
         # Company info
         info = get_company_info(ticker)
 
+        # Exchange filter — NASDAQ, NYSE, AMEX only
+        exchange = info.get('exchange', '')
+        if exchange and not any(ex in exchange.upper() for ex in ['NASDAQ','NYSE','AMEX','BATS','CBOE']):
+            return None
+
+        # Market cap filter
+        max_mktcap = filters.get('max_market_cap_m', 500.0)
+        mktcap_m   = info.get('market_cap_m', 0)
+        if mktcap_m > 0 and max_mktcap > 0 and mktcap_m > max_mktcap:
+            return None
+
         # Halt check
         halt_info = get_halt_info(ticker)
 
+        # Historical data
         try:
             stock     = yf.Ticker(ticker)
             hist      = stock.history(period="10d", interval="1d")
             hist_1m   = stock.history(period="1d",  interval="1m")
-            volume    = float(hist_1m['Volume'].sum()) if not hist_1m.empty else dollar_vol / price if price > 0 else 0
-            avg_vol   = float(hist['Volume'].mean()) if not hist.empty else 0
-            vol_ratio = volume / avg_vol if avg_vol > 0 else 0
-            closes    = hist['Close'].values.tolist() if not hist.empty else []
+            if rvol == 0:
+                vol_sum = float(hist_1m['Volume'].sum()) if not hist_1m.empty else volume
+                avg_vol = float(hist['Volume'].mean()) if not hist.empty else 0
+                rvol    = vol_sum / avg_vol if avg_vol > 0 else 0
+            closes = hist['Close'].values.tolist() if not hist.empty else []
         except:
-            vol_ratio = 0
-            closes    = []
+            closes = []
+
+        # Float filter
+        float_m    = 0.0
+        max_float  = filters.get('max_float_m', 30.0)
+        try:
+            yf_info = yf.Ticker(ticker).info
+            float_shares = yf_info.get('floatShares', 0)
+            if float_shares:
+                float_m = float_shares / 1_000_000
+                if max_float > 0 and float_m > max_float:
+                    return None
+        except:
+            pass
+
+        # Spread estimate from high/low
+        spread_pct = 0.0
+        try:
+            q = requests.get(
+                "https://finnhub.io/api/v1/quote",
+                params={'symbol': ticker, 'token': FINNHUB_KEY},
+                timeout=5
+            ).json()
+            h, l = q.get('h', 0), q.get('l', 0)
+            if h > 0 and l > 0:
+                mid = (h + l) / 2
+                spread_pct = round(((h - l) / mid) * 100, 2) if mid > 0 else 0.0
+        except:
+            pass
 
         pattern, pattern_desc, pattern_criteria = detect_sykes_pattern(
-            ticker, price, prev_close, gap_pct, closes, vol_ratio, dollar_vol)
+            ticker, price, prev_close, gap_pct, closes, rvol, dollar_vol)
 
         entry_low  = round(price * 0.99, 2)
         entry_high = round(price * 1.02, 2)
@@ -890,12 +1025,17 @@ def process_ticker(stock_data, mode='standard'):
         return {
             'ticker':           ticker,
             'company_name':     info.get('company_name', ''),
-            'exchange':         info.get('exchange', ''),
+            'exchange':         exchange,
             'industry':         info.get('industry', ''),
+            'market_cap_m':     round(mktcap_m, 2),
+            'float_m':          round(float_m, 1),
             'price':            round(price, 2),
             'prev_close':       round(prev_close, 2),
             'gap_pct':          round(gap_pct, 1),
             'dollar_vol':       round(dollar_vol, 0),
+            'volume':           round(volume, 0),
+            'rvol':             round(rvol, 1),
+            'spread_pct':       spread_pct,
             'grade':            final_grade,
             'notes':            notes,
             'catalyst':         catalyst_label,
@@ -913,7 +1053,7 @@ def process_ticker(stock_data, mode='standard'):
             'target2':          target2,
             'target3':          target3,
             'source':           source,
-            'time':             datetime.now().strftime('%H:%M:%S')
+            'time':             datetime.now().strftime('%H:%M:%S'),
         }
     except:
         return None
@@ -926,8 +1066,9 @@ async def do_scan(user_id):
     s       = user_state[user_id]
     filters = s['filters'].copy()
     mode    = s['mode']
+    label   = SCAN_MODES.get(mode, {}).get('label', mode)
 
-    status = {'phase':'fetching','message':f'📡 Fetching [{SCAN_MODES[mode]["label"]}]...','progress':0,'total':0}
+    status = {'phase':'fetching','message':f'📡 Fetching [{label}]...','progress':0,'total':0}
     await broadcast_to_user(user_id, {'type':'scan_status','status':status})
     await asyncio.sleep(0)
 
@@ -956,7 +1097,7 @@ async def do_scan(user_id):
         await broadcast_to_user(user_id, {'type':'scan_status','status':status})
         await asyncio.sleep(0.05)
 
-        setup = process_ticker(stock_data, mode)
+        setup = process_ticker(stock_data, mode, filters)
         if setup:
             results.append(setup)
             await broadcast_to_user(user_id, {'type':'new_ticker','setup':setup})
@@ -967,11 +1108,14 @@ async def do_scan(user_id):
                 log_alert(f"🚀 [{user_id}] {setup['grade']}: {ticker} +{setup['gap_pct']}%")
                 send_email(
                     subject=f"🚀 {setup['grade']} — {ticker} +{setup['gap_pct']}%",
-                    body=(f"Grade: {setup['grade']}\nPattern: {setup['pattern']}\n"
-                          f"Company: {setup.get('company_name','')} {setup.get('exchange','')}\n"
-                          f"Gap: +{setup['gap_pct']}%\nPrice: ${setup['price']}\n\n"
-                          f"Entry: ${setup['entry_low']}–${setup['entry_high']}\n"
-                          f"Stop: ${setup['stop_loss']}\nT1: ${setup['target1']}\n")
+                    body=(
+                        f"Grade: {setup['grade']}\nPattern: {setup['pattern']}\n"
+                        f"Company: {setup.get('company_name','')} — {setup.get('exchange','')}\n"
+                        f"Gap: +{setup['gap_pct']}%  RVOL: {setup.get('rvol',0)}x\n"
+                        f"Price: ${setup['price']}  Float: {setup.get('float_m',0)}M\n\n"
+                        f"Entry: ${setup['entry_low']}–${setup['entry_high']}\n"
+                        f"Stop: ${setup['stop_loss']}\nT1: ${setup['target1']}\n"
+                    )
                 )
 
     results.sort(
@@ -983,7 +1127,7 @@ async def do_scan(user_id):
 
 async def scanner_loop(user_id):
     s = user_state[user_id]
-    log_alert(f"🔍 [{user_id}] Scanner started [{SCAN_MODES[s['mode']]['label']}]")
+    log_alert(f"🔍 [{user_id}] Scanner started")
     await broadcast_to_user(user_id, {'type':'status','running':True,'mode':s['mode'],'filters':s['filters']})
 
     while s['running']:
@@ -991,14 +1135,10 @@ async def scanner_loop(user_id):
             results, done_status = await do_scan(user_id)
             s['scan_results']    = results
             await broadcast_to_user(user_id, {
-                'type':        'scan_results',
-                'data':        results,
-                'time':        datetime.now().strftime('%H:%M:%S'),
-                'count':       len(results),
-                'alerts':      alert_log[:20],
-                'scan_status': done_status,
-                'mode':        s['mode'],
-                'filters':     s['filters']
+                'type':'scan_results','data':results,
+                'time':datetime.now().strftime('%H:%M:%S'),
+                'count':len(results),'alerts':alert_log[:20],
+                'scan_status':done_status,'mode':s['mode'],'filters':s['filters'],
             })
         except Exception as e:
             log_alert(f"⚠️ [{user_id}] Scanner error: {e}")
@@ -1020,13 +1160,13 @@ async def websocket_endpoint(websocket: WebSocket):
     user_id = websocket.query_params.get('user', 'shafkat')
     if user_id not in user_clients: user_id = 'shafkat'
     user_clients[user_id].append(websocket)
-    log_alert(f"📱 [{user_id}] Client connected")
+    log_alert(f"📱 [{user_id}] Connected")
 
     s = user_state[user_id]
     await websocket.send_json({
         'type':'scan_results','data':s['scan_results'],'alerts':alert_log[:20],
         'time':datetime.now().strftime('%H:%M:%S'),'count':len(s['scan_results']),
-        'scan_status':{'phase':'idle'},'mode':s['mode'],'filters':s['filters']
+        'scan_status':{'phase':'idle'},'mode':s['mode'],'filters':s['filters'],
     })
     await websocket.send_json({'type':'status','running':s['running'],'mode':s['mode']})
 
