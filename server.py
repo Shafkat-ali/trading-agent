@@ -29,12 +29,12 @@ EMAIL_TO        = os.getenv('EMAIL_TO', '')
 user_state = {
     'shafkat': {'scan_results':[], 'alerted':set(), 'mode':'standard', 'running':False,
                 'filters':{'min_price':0.20,'max_price':20.00,'min_gap_pct':10.0,
-                           'min_dollar_vol':500000,'min_volume':300000,'min_rvol':3.0,
-                           'max_float_m':30.0,'max_market_cap_m':500.0,'require_news':True}},
+                           'min_dollar_vol':100000,'min_volume':100000,'min_rvol':1.5,
+                           'max_float_m':50.0,'max_market_cap_m':1000.0,'require_news':False}},
     'irfan':   {'scan_results':[], 'alerted':set(), 'mode':'standard', 'running':False,
                 'filters':{'min_price':0.20,'max_price':20.00,'min_gap_pct':10.0,
-                           'min_dollar_vol':500000,'min_volume':300000,'min_rvol':3.0,
-                           'max_float_m':30.0,'max_market_cap_m':500.0,'require_news':True}},
+                           'min_dollar_vol':100000,'min_volume':100000,'min_rvol':1.5,
+                           'max_float_m':50.0,'max_market_cap_m':1000.0,'require_news':False}},
 }
 user_clients = {'shafkat':[], 'irfan':[]}
 alert_log    = []
@@ -46,9 +46,9 @@ halt_cache_ts  = None
 # ── SCAN MODES — updated with new recommended criteria ──
 SCAN_MODES = {
     'standard': {
-        'label':'🔍 Standard','desc':'Gap 10%+, $0.20–$20, $500K vol, RVOL 3x+',
-        'min_price':0.20,'max_price':20.00,'min_gap':10.0,'min_dvol':500_000,
-        'min_volume':300_000,'min_rvol':3.0,'max_float_m':30.0,'max_mktcap_m':500.0,'require_news':True,
+        'label':'🔍 Standard','desc':'Gap 10%+, $0.20–$20, $100K vol, RVOL 1.5x+',
+        'min_price':0.20,'max_price':20.00,'min_gap':10.0,'min_dvol':100_000,
+        'min_volume':100_000,'min_rvol':1.5,'max_float_m':50.0,'max_mktcap_m':1000.0,'require_news':False,
     },
     'premarket': {
         'label':'🌅 Pre-Market','desc':'Gap 10%+, vol 100K+, pre-market high break',
