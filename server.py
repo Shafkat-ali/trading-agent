@@ -19,11 +19,21 @@ load_dotenv(override=False)
 app = FastAPI(title="Payda x UyghurKid Trading Agent")
 app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"])
 
-POLYGON_API_KEY = os.getenv('POLYGON_API_KEY', 'W7T9tMZzRCsHUhJfPvL7SZOReXow4q8L')
-FINNHUB_KEY     = os.getenv('FINNHUB_API_KEY', 'd812vi9r01qler4gpnmgd812vi9r01qler4gpnn0')
-EMAIL_ADDRESS   = os.getenv('EMAIL_ADDRESS', '')
-EMAIL_PASSWORD  = os.getenv('EMAIL_PASSWORD', '')
-EMAIL_TO        = os.getenv('EMAIL_TO', '')
+POLYGON_API_KEY    = os.getenv('POLYGON_API_KEY',    'W7T9tMZzRCsHUhJfPvL7SZOReXow4q8L')
+FINNHUB_KEY        = os.getenv('FINNHUB_API_KEY',    'd812vi9r01qler4gpnmgd812vi9r01qler4gpnn0')
+ALPACA_API_KEY     = os.getenv('ALPACA_API_KEY',     'PKS5O37RJFFB5S4BJMWYOE65XE')
+ALPACA_SECRET_KEY  = os.getenv('ALPACA_SECRET_KEY',  'F8tASs56AzAorfKqYkNYEVgEH78pFFFUYmR5kvtnW3f9')
+EMAIL_ADDRESS      = os.getenv('EMAIL_ADDRESS', '')
+EMAIL_PASSWORD     = os.getenv('EMAIL_PASSWORD', '')
+EMAIL_TO           = os.getenv('EMAIL_TO', '')
+
+ALPACA_HEADERS = {
+    'APCA-API-KEY-ID':     ALPACA_API_KEY,
+    'APCA-API-SECRET-KEY': ALPACA_SECRET_KEY,
+    'accept':              'application/json',
+}
+ALPACA_DATA_URL  = 'https://data.alpaca.markets/v2'
+ALPACA_PAPER_URL = 'https://paper-api.alpaca.markets/v2'
 
 # ── PER-USER STATE ──
 user_state = {
@@ -43,81 +53,83 @@ alert_log    = []
 halted_tickers = {}
 halt_cache_ts  = None
 
-# ── SCAN MODES — updated with new recommended criteria ──
+# Company info cache
+_company_cache = {}
+
 SCAN_MODES = {
     'morning_gap': {
-        'label':'🌅 MorningGap',   'desc':'Price $0.10–$50, Gap 5%+, $Vol $250K+, Float ≤20M',
+        'label':'🌅 MorningGap', 'desc':'Price $0.10–$50, Gap 5%+, $Vol $250K+, Float ≤20M',
         'min_price':0.10,'max_price':50.00,'min_gap':5.0,'min_dvol':250_000,
         'min_volume':50_000,'min_rvol':0,'max_float_m':20.0,'max_mktcap_m':0,'require_news':False,
     },
     'scanopp': {
-        'label':'💡 ScanOpp',      'desc':'Price $0.50–$15, Gap 9%+, $Vol $3M+, Trades 3K+',
+        'label':'💡 ScanOpp', 'desc':'Price $0.50–$15, Gap 9%+, $Vol $3M+, Trades 3K+',
         'min_price':0.50,'max_price':15.00,'min_gap':9.0,'min_dvol':3_000_000,
         'min_volume':300_000,'min_rvol':0,'max_float_m':0,'max_mktcap_m':0,'require_news':False,
     },
     'standard': {
-        'label':'🔍 Standard',     'desc':'Gap 10%+, $0.20–$20, $100K vol, RVOL 1.5x+',
+        'label':'🔍 Standard', 'desc':'Gap 10%+, $0.20–$20, $100K vol, RVOL 1.5x+',
         'min_price':0.20,'max_price':20.00,'min_gap':10.0,'min_dvol':100_000,
         'min_volume':100_000,'min_rvol':1.5,'max_float_m':50.0,'max_mktcap_m':1000.0,'require_news':False,
     },
     'supernova': {
-        'label':'🚀 Supernovas',   'desc':'Gap 50%+ only — massive movers',
+        'label':'🚀 Supernovas', 'desc':'Gap 50%+ only — massive movers',
         'min_price':0.10,'max_price':50.00,'min_gap':50.0,'min_dvol':250_000,
         'min_volume':50_000,'min_rvol':0,'max_float_m':0,'max_mktcap_m':0,'require_news':False,
     },
     'biotech': {
-        'label':'🧬 Biotech',      'desc':'Biotech/FDA, gap 15%+, catalyst required',
+        'label':'🧬 Biotech', 'desc':'Biotech/FDA, gap 15%+, catalyst required',
         'min_price':0.50,'max_price':20.00,'min_gap':15.0,'min_dvol':500_000,
         'min_volume':100_000,'min_rvol':0,'max_float_m':50.0,'max_mktcap_m':500.0,'require_news':True,
     },
     'low_float': {
-        'label':'⚡ Low Float',    'desc':'Float under 10M, gap 15%+',
+        'label':'⚡ Low Float', 'desc':'Float under 10M, gap 15%+',
         'min_price':0.10,'max_price':20.00,'min_gap':15.0,'min_dvol':250_000,
         'min_volume':50_000,'min_rvol':0,'max_float_m':10.0,'max_mktcap_m':0,'require_news':False,
     },
     'premarket': {
-        'label':'🌄 Pre-Market',   'desc':'Gap 10%+, vol 100K+, pre-market gaps',
+        'label':'🌄 Pre-Market', 'desc':'Gap 10%+, vol 100K+',
         'min_price':0.10,'max_price':50.00,'min_gap':10.0,'min_dvol':100_000,
         'min_volume':100_000,'min_rvol':0,'max_float_m':0,'max_mktcap_m':0,'require_news':False,
     },
     'squeeze': {
-        'label':'💎 Squeeze',      'desc':'High dollar vol $3M+, gap 9%+',
+        'label':'💎 Squeeze', 'desc':'High dollar vol $3M+, gap 9%+',
         'min_price':0.50,'max_price':15.00,'min_gap':9.0,'min_dvol':3_000_000,
         'min_volume':300_000,'min_rvol':0,'max_float_m':0,'max_mktcap_m':0,'require_news':False,
     },
     'small_cap': {
-        'label':'📊 Small Cap',    'desc':'$1–$20, gap 15%+, $250K vol',
+        'label':'📊 Small Cap', 'desc':'$1–$20, gap 15%+',
         'min_price':1.00,'max_price':20.00,'min_gap':15.0,'min_dvol':250_000,
         'min_volume':50_000,'min_rvol':0,'max_float_m':0,'max_mktcap_m':500.0,'require_news':False,
     },
     'afternoon': {
-        'label':'🌆 Afternoon',    'desc':'HOD breakouts, gap 5%+',
+        'label':'🌆 Afternoon', 'desc':'HOD breakouts, gap 5%+',
         'min_price':0.10,'max_price':50.00,'min_gap':5.0,'min_dvol':250_000,
         'min_volume':50_000,'min_rvol':0,'max_float_m':0,'max_mktcap_m':0,'require_news':False,
     },
     'penny': {
-        'label':'🪙 Penny',        'desc':'Under $1, gap 20%+',
+        'label':'🪙 Penny', 'desc':'Under $1, gap 20%+',
         'min_price':0.01,'max_price':1.00,'min_gap':20.0,'min_dvol':100_000,
         'min_volume':50_000,'min_rvol':0,'max_float_m':0,'max_mktcap_m':0,'require_news':False,
     },
     'custom': {
-        'label':'⚙️ Custom',       'desc':'Your custom filter settings',
+        'label':'⚙️ Custom', 'desc':'Your custom filter settings',
         'min_price':0.10,'max_price':50.00,'min_gap':5.0,'min_dvol':250_000,
         'min_volume':50_000,'min_rvol':0,'max_float_m':0,'max_mktcap_m':0,'require_news':False,
     },
 }
 
-STRONG_KEYWORDS = ['fda','approval','approved','breakthrough','contract','partnership','merger',
+STRONG_KEYWORDS  = ['fda','approval','approved','breakthrough','contract','partnership','merger',
     'acquisition','earnings','beat','guidance','revenue','clinical','trial','phase','results',
     'patent','exclusive','launch','deal','awarded','wins','secures','signs','robot','ai',
     'technology','crypto','bitcoin']
-DANGER_KEYWORDS = ['offering','dilut','shelf','warrant','investigation','lawsuit','sec',
+DANGER_KEYWORDS  = ['offering','dilut','shelf','warrant','investigation','lawsuit','sec',
     'subpoena','delay','failed','withdrawn','suspended','reverse split','compliance']
 BIOTECH_KEYWORDS = ['fda','trial','phase','clinical','drug','therapy','biotech',
     'pharmaceutical','approval','nda','bla','cancer','oncology']
 SEC_DANGER_KEYWORDS = ['s-1','s-3','424b','offering','dilut','warrant','reverse split',
     'sec filing','8-k','going concern','non-compliance']
-VALID_EXCHANGES = {'NASDAQ','NYSE','AMEX','NYSE ARCA','NYSE MKT','BATS','CBOE'}
+VALID_EXCHANGES  = {'NASDAQ','NYSE','AMEX','NYSE ARCA','NYSE MKT','BATS','CBOE'}
 
 # ============================================================
 # HELPERS
@@ -132,7 +144,6 @@ def send_email(subject, body):
             s = smtplib.SMTP('smtp.gmail.com', 587); s.starttls()
             s.login(EMAIL_ADDRESS, EMAIL_PASSWORD)
             s.sendmail(EMAIL_ADDRESS, EMAIL_TO, msg.as_string()); s.quit()
-            log_alert(f"📧 Email: {subject}")
         except Exception as e:
             log_alert(f"⚠️ Email failed: {e}")
     threading.Thread(target=_send, daemon=True).start()
@@ -154,6 +165,135 @@ async def broadcast_to_user(user_id, data):
             user_clients[user_id].remove(c)
 
 # ============================================================
+# ALPACA — QUOTE (replaces Finnhub quote)
+# ============================================================
+
+def alpaca_get_quote(ticker):
+    """
+    Returns real bid/ask/last/high/low/volume from Alpaca.
+    Falls back to Finnhub if Alpaca fails.
+    """
+    try:
+        # Latest quote (bid/ask)
+        q_url = f"{ALPACA_DATA_URL}/stocks/{ticker}/quotes/latest"
+        q_r   = requests.get(q_url, headers=ALPACA_HEADERS, timeout=6)
+
+        # Latest trade (last price)
+        t_url = f"{ALPACA_DATA_URL}/stocks/{ticker}/trades/latest"
+        t_r   = requests.get(t_url, headers=ALPACA_HEADERS, timeout=6)
+
+        # Latest bar (open/high/low/close/volume)
+        b_url = f"{ALPACA_DATA_URL}/stocks/{ticker}/bars/latest?timeframe=1Day"
+        b_r   = requests.get(b_url, headers=ALPACA_HEADERS, timeout=6)
+
+        result = {}
+
+        if q_r.status_code == 200:
+            q = q_r.json().get('quote', {})
+            result['bid']      = q.get('bp', 0)
+            result['ask']      = q.get('ap', 0)
+            result['bid_size'] = q.get('bs', 0)
+            result['ask_size'] = q.get('as', 0)
+
+        if t_r.status_code == 200:
+            t = t_r.json().get('trade', {})
+            result['last']  = t.get('p', 0)
+            result['size']  = t.get('s', 0)
+
+        if b_r.status_code == 200:
+            b = b_r.json().get('bar', {})
+            result['open']   = b.get('o', 0)
+            result['high']   = b.get('h', 0)
+            result['low']    = b.get('l', 0)
+            result['close']  = b.get('c', 0)
+            result['volume'] = b.get('v', 0)
+            result['vwap']   = b.get('vw', 0)
+
+        if result:
+            result['source'] = 'alpaca'
+            return result
+
+    except Exception as e:
+        log_alert(f"⚠️ Alpaca quote error {ticker}: {e}")
+
+    # Fallback to Finnhub
+    try:
+        r = requests.get(
+            "https://finnhub.io/api/v1/quote",
+            params={'symbol': ticker, 'token': FINNHUB_KEY},
+            timeout=8
+        )
+        if r.status_code == 200:
+            d = r.json()
+            return {
+                'last':   d.get('c', 0),
+                'open':   d.get('o', 0),
+                'high':   d.get('h', 0),
+                'low':    d.get('l', 0),
+                'bid':    0,
+                'ask':    0,
+                'volume': 0,
+                'vwap':   0,
+                'source': 'finnhub',
+            }
+    except:
+        pass
+
+    return {}
+
+def alpaca_get_snapshot(ticker):
+    """
+    Snapshot = quote + trade + daily bar in one call.
+    Gives us price, RVOL, VWAP, bid/ask all at once.
+    """
+    try:
+        url = f"{ALPACA_DATA_URL}/stocks/{ticker}/snapshot"
+        r   = requests.get(url, headers=ALPACA_HEADERS, timeout=8)
+        if r.status_code == 200:
+            d             = r.json()
+            daily_bar     = d.get('dailyBar', {})
+            prev_daily    = d.get('prevDailyBar', {})
+            latest_trade  = d.get('latestTrade', {})
+            latest_quote  = d.get('latestQuote', {})
+
+            price      = latest_trade.get('p', 0) or daily_bar.get('c', 0)
+            prev_close = prev_daily.get('c', 0)
+            volume     = daily_bar.get('v', 0)
+            prev_vol   = prev_daily.get('v', 1) or 1
+            pct_change = ((price - prev_close) / prev_close * 100) if prev_close > 0 else 0
+            dollar_vol = price * volume
+            rvol       = round(volume / prev_vol, 1) if prev_vol > 0 else 0
+            vwap       = daily_bar.get('vw', 0)
+
+            return {
+                'price':      round(price, 4),
+                'prev_close': round(prev_close, 4),
+                'pct_change': round(pct_change, 2),
+                'open':       daily_bar.get('o', 0),
+                'high':       daily_bar.get('h', 0),
+                'low':        daily_bar.get('l', 0),
+                'volume':     volume,
+                'dollar_vol': round(dollar_vol, 0),
+                'rvol':       rvol,
+                'vwap':       round(vwap, 4),
+                'bid':        latest_quote.get('bp', 0),
+                'ask':        latest_quote.get('ap', 0),
+                'bid_size':   latest_quote.get('bs', 0),
+                'ask_size':   latest_quote.get('as', 0),
+                'source':     'alpaca',
+            }
+    except Exception as e:
+        log_alert(f"⚠️ Alpaca snapshot error {ticker}: {e}")
+    return {}
+
+def alpaca_get_gainers():
+    """
+    Alpaca doesn't have a built-in gainers endpoint,
+    so we use Polygon as primary and Alpaca snapshots for enrichment.
+    """
+    return []
+
+# ============================================================
 # NYSE HALT DETECTION
 # ============================================================
 
@@ -169,14 +309,14 @@ def refresh_halt_cache():
             reader = csv.DictReader(io.StringIO(r.text))
             for row in reader:
                 sym       = (row.get('Symbol') or row.get('symbol') or '').strip().upper()
-                reason    = (row.get('Reason Halted') or row.get('reasonHalted') or row.get('Reason') or 'Unknown').strip()
-                halt_time = (row.get('Halt Time') or row.get('haltTime') or row.get('Time') or '').strip()
+                reason    = (row.get('Reason Halted') or row.get('reasonHalted') or 'Unknown').strip()
+                halt_time = (row.get('Halt Time') or row.get('haltTime') or '').strip()
                 if sym:
                     halted_tickers[sym] = {'reason': reason, 'halt_time': halt_time}
             halt_cache_ts = datetime.now()
             log_alert(f"🛑 NYSE halts: {len(halted_tickers)} stocks")
     except Exception as e:
-        log_alert(f"⚠️ NYSE halt fetch failed: {e}")
+        log_alert(f"⚠️ NYSE halt fetch: {e}")
 
 def get_halt_info(ticker):
     global halt_cache_ts
@@ -185,10 +325,8 @@ def get_halt_info(ticker):
     return halted_tickers.get(ticker.upper(), None)
 
 # ============================================================
-# COMPANY INFO CACHE
+# COMPANY INFO (Finnhub — free, reliable)
 # ============================================================
-
-_company_cache = {}
 
 def get_company_info(ticker):
     if ticker in _company_cache:
@@ -205,26 +343,34 @@ def get_company_info(ticker):
                 'company_name': d.get('name', ''),
                 'exchange':     d.get('exchange', ''),
                 'industry':     d.get('finnhubIndustry', ''),
-                'market_cap_m': d.get('marketCapitalization', 0),  # already in millions
-                'float_m':      0,
+                'market_cap_m': d.get('marketCapitalization', 0),
             }
             _company_cache[ticker] = info
             return info
     except:
         pass
-    return {'company_name':'','exchange':'','industry':'','market_cap_m':0,'float_m':0}
+    return {'company_name':'','exchange':'','industry':'','market_cap_m':0}
 
 # ============================================================
-# DEBUG & SCAN MODE ENDPOINTS
+# API ENDPOINTS
 # ============================================================
 
 @app.get("/api/debug")
 async def debug():
+    # Test Alpaca connection
+    try:
+        r = requests.get(f"{ALPACA_PAPER_URL}/account", headers=ALPACA_HEADERS, timeout=5)
+        alpaca_ok = r.status_code == 200
+        alpaca_status = r.json().get('status','unknown') if alpaca_ok else f"Error {r.status_code}"
+    except Exception as e:
+        alpaca_ok = False; alpaca_status = str(e)
+
     return {
-        'finnhub_key_set':     bool(FINNHUB_KEY),
-        'finnhub_key_preview': FINNHUB_KEY[:8]+'...' if FINNHUB_KEY else 'NOT SET',
-        'polygon_key_set':     bool(POLYGON_API_KEY),
-        'halted_count':        len(halted_tickers),
+        'alpaca_connected': alpaca_ok,
+        'alpaca_status':    alpaca_status,
+        'finnhub_key_set':  bool(FINNHUB_KEY),
+        'polygon_key_set':  bool(POLYGON_API_KEY),
+        'halted_count':     len(halted_tickers),
         'users': {uid: {'mode':s['mode'],'running':s['running'],'results':len(s['scan_results'])}
                   for uid, s in user_state.items()}
     }
@@ -239,41 +385,37 @@ async def get_halts():
     return {'halted': halted_tickers, 'count': len(halted_tickers),
             'as_of': datetime.now().strftime('%H:%M:%S')}
 
-# ============================================================
-# PER-USER ENDPOINTS
-# ============================================================
+# ── PER USER ──
 
 @app.post("/api/scanner/mode/{user_id}/{mode}")
 async def set_scan_mode(user_id: str, mode: str):
-    if user_id not in user_state: return {'error': 'Unknown user'}
-    if mode not in SCAN_MODES:   return {'error': f'Unknown mode: {mode}'}
+    if user_id not in user_state: return {'error':'Unknown user'}
+    if mode not in SCAN_MODES:   return {'error':f'Unknown mode: {mode}'}
     m = SCAN_MODES[mode]
     user_state[user_id]['mode'] = mode
     user_state[user_id]['filters'] = {
-        'min_price':      m['min_price'],
-        'max_price':      m['max_price'],
-        'min_gap_pct':    m['min_gap'],
-        'min_dollar_vol': m['min_dvol'],
-        'min_volume':     m['min_volume'],
-        'min_rvol':       m['min_rvol'],
-        'max_float_m':    m['max_float_m'],
+        'min_price':        m['min_price'],
+        'max_price':        m['max_price'],
+        'min_gap_pct':      m['min_gap'],
+        'min_dollar_vol':   m['min_dvol'],
+        'min_volume':       m['min_volume'],
+        'min_rvol':         m['min_rvol'],
+        'max_float_m':      m['max_float_m'],
         'max_market_cap_m': m['max_mktcap_m'],
-        'require_news':   m['require_news'],
+        'require_news':     m['require_news'],
     }
     log_alert(f"🔄 [{user_id}] Mode: {m['label']}")
     return {'status':'ok','mode':mode,'filters':user_state[user_id]['filters']}
 
 @app.post("/api/scanner/filters/{user_id}")
 async def set_filters(user_id: str, filters: dict):
-    if user_id not in user_state: return {'error': 'Unknown user'}
+    if user_id not in user_state: return {'error':'Unknown user'}
     user_state[user_id]['mode'] = 'custom'
     f = user_state[user_id]['filters']
     for key in ['min_price','max_price','min_gap_pct','min_dollar_vol',
                 'min_volume','min_rvol','max_float_m','max_market_cap_m']:
-        if key in filters:
-            f[key] = float(filters[key])
-    if 'require_news' in filters:
-        f['require_news'] = bool(filters['require_news'])
+        if key in filters: f[key] = float(filters[key])
+    if 'require_news' in filters: f['require_news'] = bool(filters['require_news'])
     log_alert(f"⚙️ [{user_id}] Custom filters applied")
     return {'status':'ok','filters':f,'mode':'custom'}
 
@@ -296,10 +438,9 @@ async def start_scanner(user_id: str):
     if user_id not in user_state: return {'error':'Unknown user'}
     s = user_state[user_id]
     if not s['running']:
-        s['running'] = True
-        s['scan_results'] = []
+        s['running'] = True; s['scan_results'] = []
         asyncio.create_task(scanner_loop(user_id))
-        log_alert(f"✅ [{user_id}] Scanner started [{SCAN_MODES.get(s['mode'],{}).get('label',s['mode'])}]")
+        log_alert(f"✅ [{user_id}] Scanner started")
         return {'status':'started','mode':s['mode']}
     return {'status':'already running','mode':s['mode']}
 
@@ -313,15 +454,32 @@ async def stop_scanner(user_id: str):
 @app.post("/api/clear-alerts/{user_id}")
 async def clear_alerts_route(user_id: str):
     if user_id in user_state: user_state[user_id]['alerted'].clear()
-    log_alert(f"🗑️ [{user_id}] Alerts cleared")
     return {'status':'cleared'}
 
-# ============================================================
-# STOCK DATA ENDPOINTS
-# ============================================================
+# ── STOCK DATA — Alpaca primary, Finnhub fallback ──
 
 @app.get("/api/stock/quote/{ticker}")
 async def get_stock_quote(ticker: str):
+    """Real bid/ask from Alpaca, fallback to Finnhub"""
+    snap = alpaca_get_snapshot(ticker)
+    if snap and snap.get('price', 0) > 0:
+        # Format to match what dashboard expects (c, pc, h, l, o fields)
+        return {
+            'c':      snap['price'],
+            'pc':     snap['prev_close'],
+            'h':      snap['high'],
+            'l':      snap['low'],
+            'o':      snap['open'],
+            'v':      snap['volume'],
+            'bid':    snap['bid'],
+            'ask':    snap['ask'],
+            'bid_size': snap.get('bid_size', 0),
+            'ask_size': snap.get('ask_size', 0),
+            'vwap':   snap['vwap'],
+            'rvol':   snap['rvol'],
+            'source': 'alpaca',
+        }
+    # Finnhub fallback
     try:
         r = requests.get(
             "https://finnhub.io/api/v1/quote",
@@ -329,10 +487,16 @@ async def get_stock_quote(ticker: str):
             timeout=8
         )
         if r.status_code == 200:
-            return r.json()
-        return {'error': f'Status {r.status_code}'}
-    except Exception as e:
-        return {'error': str(e)}
+            d = r.json(); d['source'] = 'finnhub'; return d
+    except:
+        pass
+    return {'error': 'Quote unavailable'}
+
+@app.get("/api/stock/snapshot/{ticker}")
+async def get_stock_snapshot(ticker: str):
+    """Full Alpaca snapshot — price, RVOL, VWAP, bid/ask"""
+    snap = alpaca_get_snapshot(ticker)
+    return snap if snap else {'error': 'Snapshot unavailable'}
 
 @app.get("/api/stock/profile/{ticker}")
 async def get_stock_profile(ticker: str):
@@ -342,9 +506,7 @@ async def get_stock_profile(ticker: str):
             params={'symbol': ticker, 'token': FINNHUB_KEY},
             timeout=8
         )
-        if r.status_code == 200:
-            return r.json()
-        return {'error': f'Status {r.status_code}'}
+        return r.json() if r.status_code == 200 else {'error': f'Status {r.status_code}'}
     except Exception as e:
         return {'error': str(e)}
 
@@ -358,7 +520,7 @@ async def get_stock_metrics(ticker: str):
         )
         finnhub_data = r.json() if r.status_code == 200 else {}
         m = finnhub_data.get('metric', {})
-        # Supplement float & short from yfinance if missing
+        # yfinance fallback for float + short
         if not m.get('float') or not m.get('shortInterestRatio'):
             try:
                 info = yf.Ticker(ticker).info
@@ -389,7 +551,7 @@ async def get_stock_news(ticker: str):
             params={'symbol': ticker, 'from': from_date, 'to': to_date, 'token': FINNHUB_KEY},
             timeout=8
         )
-        return {'news': r.json()} if r.status_code == 200 else {'news': [], 'error': f'Status {r.status_code}'}
+        return {'news': r.json()} if r.status_code == 200 else {'news': []}
     except Exception as e:
         return {'news': [], 'error': str(e)}
 
@@ -402,11 +564,12 @@ async def get_sec_filings(ticker: str):
             timeout=8
         )
         filings = r.json() if r.status_code == 200 else []
-        danger = []
+        danger  = []
         for f in filings[:20]:
             form = (f.get('form') or '').upper()
             desc = (f.get('description') or '').lower()
-            if any(d in form for d in ['S-1','S-3','424B','8-K']) or any(kw in desc for kw in SEC_DANGER_KEYWORDS):
+            if any(d in form for d in ['S-1','S-3','424B','8-K']) or \
+               any(kw in desc for kw in SEC_DANGER_KEYWORDS):
                 f['danger'] = True
             danger.append(f)
         return {'filings': danger}
@@ -436,7 +599,7 @@ async def get_sec_news():
         news = r.json() if r.status_code == 200 else []
         tagged = []
         for n in news[:30]:
-            headline = (n.get('headline') or '').lower()
+            headline   = (n.get('headline') or '').lower()
             n['danger'] = any(kw in headline for kw in SEC_DANGER_KEYWORDS)
             tagged.append(n)
         return {'news': tagged}
@@ -447,60 +610,74 @@ async def get_sec_news():
 async def search_ticker(ticker: str):
     try:
         ticker = ticker.upper().strip()
-        quote_r = requests.get(
-            "https://finnhub.io/api/v1/quote",
-            params={'symbol': ticker, 'token': FINNHUB_KEY},
-            timeout=8
-        )
-        quote      = quote_r.json() if quote_r.status_code == 200 else {}
-        price      = quote.get('c', 0)
-        prev_close = quote.get('pc', 0)
-        high       = quote.get('h', 0)
-        low        = quote.get('l', 0)
-        open_price = quote.get('o', 0)
 
-        if not price or price == 0:
+        # Use Alpaca snapshot as primary
+        snap = alpaca_get_snapshot(ticker)
+
+        if snap and snap.get('price', 0) > 0:
+            price      = snap['price']
+            prev_close = snap['prev_close']
+            pct_change = snap['pct_change']
+            high       = snap['high']
+            low        = snap['low']
+            open_price = snap['open']
+            volume     = snap['volume']
+            dollar_vol = snap['dollar_vol']
+            rvol       = snap['rvol']
+            vwap       = snap['vwap']
+        else:
+            # Fallback to Finnhub + yfinance
+            quote_r = requests.get(
+                "https://finnhub.io/api/v1/quote",
+                params={'symbol': ticker, 'token': FINNHUB_KEY},
+                timeout=8
+            )
+            quote      = quote_r.json() if quote_r.status_code == 200 else {}
+            price      = quote.get('c', 0)
+            prev_close = quote.get('pc', 0)
+            high       = quote.get('h', 0)
+            low        = quote.get('l', 0)
+            open_price = quote.get('o', 0)
+            if not price or price == 0:
+                info       = yf.Ticker(ticker).fast_info
+                price      = getattr(info, 'last_price', 0) or 0
+                prev_close = getattr(info, 'previous_close', 0) or 0
+            pct_change = ((price - prev_close) / prev_close * 100) if prev_close > 0 else 0
             stock      = yf.Ticker(ticker)
-            info       = stock.fast_info
-            price      = getattr(info, 'last_price', 0) or 0
-            prev_close = getattr(info, 'previous_close', 0) or 0
+            hist_1m    = stock.history(period="1d",  interval="1m")
+            hist_10d   = stock.history(period="10d", interval="1d")
+            volume     = float(hist_1m['Volume'].sum()) if not hist_1m.empty else 0
+            avg_vol    = float(hist_10d['Volume'].mean()) if not hist_10d.empty else 0
+            dollar_vol = price * volume
+            rvol       = round(volume / avg_vol, 1) if avg_vol > 0 else 0
+            vwap       = 0
 
         if not price or price == 0:
             return {'error': f'Could not find ticker {ticker}'}
 
-        pct_change = ((price - prev_close) / prev_close * 100) if prev_close > 0 else 0
+        # Company info from Finnhub
+        info         = get_company_info(ticker)
+        company_name = info.get('company_name', '')
+        exchange     = info.get('exchange', '')
+        industry     = info.get('industry', '')
+        market_cap_m = info.get('market_cap_m', 0)
 
-        profile_r  = requests.get(
-            "https://finnhub.io/api/v1/stock/profile2",
-            params={'symbol': ticker, 'token': FINNHUB_KEY},
-            timeout=8
-        )
-        profile      = profile_r.json() if profile_r.status_code == 200 else {}
-        company_name = profile.get('name', '')
-        exchange     = profile.get('exchange', '')
-        industry     = profile.get('finnhubIndustry', '')
-        market_cap_m = profile.get('marketCapitalization', 0)
+        # Historical closes for pattern detection
+        try:
+            hist   = yf.Ticker(ticker).history(period="10d", interval="1d")
+            closes = hist['Close'].values.tolist() if not hist.empty else []
+        except:
+            closes = []
 
-        stock    = yf.Ticker(ticker)
-        hist     = stock.history(period="10d", interval="1d")
-        hist_1m  = stock.history(period="1d",  interval="1m")
-        volume   = float(hist_1m['Volume'].sum()) if not hist_1m.empty else 0
-        avg_vol  = float(hist['Volume'].mean())   if not hist.empty else 0
-        vol_ratio = volume / avg_vol if avg_vol > 0 else 0
-        closes   = hist['Close'].values.tolist()  if not hist.empty else []
-        dollar_vol = price * volume
+        # Spread from real bid/ask
+        bid       = snap.get('bid', 0) if snap else 0
+        ask       = snap.get('ask', 0) if snap else 0
+        spread_pct = round(((ask - bid) / ((ask + bid) / 2)) * 100, 2) if bid > 0 and ask > 0 else 0
 
-        # Spread estimate
-        spread_pct = 0.0
-        if high > 0 and low > 0:
-            mid = (high + low) / 2
-            spread_pct = round(((high - low) / mid) * 100, 2) if mid > 0 else 0.0
-
-        halt_info = get_halt_info(ticker)
-
+        halt_info                              = get_halt_info(ticker)
         pattern, pattern_desc, pattern_criteria = detect_sykes_pattern(
-            ticker, price, prev_close, pct_change, closes, vol_ratio, dollar_vol)
-        grade, notes = grade_setup(pct_change, dollar_vol, vol_ratio)
+            ticker, price, prev_close, pct_change, closes, rvol, dollar_vol)
+        grade, notes                            = grade_setup(pct_change, dollar_vol, rvol)
         strength, news_count, headlines, warning = check_catalyst(ticker)
 
         final_grade = grade
@@ -525,6 +702,9 @@ async def search_ticker(ticker: str):
         target2    = round(entry_high * 1.20, 2)
         target3    = round(entry_high * 1.30, 2)
 
+        # Above VWAP flag
+        above_vwap = price > vwap if vwap > 0 else None
+
         return {
             'ticker':           ticker,
             'company_name':     company_name,
@@ -539,7 +719,11 @@ async def search_ticker(ticker: str):
             'open':             round(open_price, 2),
             'dollar_vol':       round(dollar_vol, 0),
             'volume':           round(volume, 0),
-            'vol_ratio':        round(vol_ratio, 1),
+            'rvol':             rvol,
+            'vwap':             round(vwap, 2),
+            'above_vwap':       above_vwap,
+            'bid':              bid,
+            'ask':              ask,
             'spread_pct':       spread_pct,
             'grade':            final_grade,
             'notes':            notes,
@@ -557,7 +741,7 @@ async def search_ticker(ticker: str):
             'target1':          target1,
             'target2':          target2,
             'target3':          target3,
-            'source':           'Search',
+            'source':           'alpaca' if snap else 'finnhub',
             'time':             datetime.now().strftime('%H:%M:%S'),
         }
     except Exception as e:
@@ -587,10 +771,9 @@ def detect_sykes_pattern(ticker, price, prev_close, pct_change, closes, vol_rati
             return ("🎯 Morning Panic Dip Buy",
                 "Sykes #1 favorite. Stock ran 50%+ recently then panicked hard at open.",
                 [f"✅ Ran {recent_run:.0f}% recently",
-                 f"✅ Down {abs(dip_from_high):.0f}% from high — panic territory",
+                 f"✅ Down {abs(dip_from_high):.0f}% from high",
                  f"✅ Bouncing {pct_change:.1f}% today",
                  "📌 Wait for selling to STOP before buying",
-                 "📌 Watch Level 2 for wall of buyers",
                  "📌 Double bottom = stronger bounce",
                  "📌 Exit: Quick scalp — sell into bounce"])
 
@@ -602,8 +785,7 @@ def detect_sykes_pattern(ticker, price, prev_close, pct_change, closes, vol_rati
                 [f"✅ First green day up {pct_change:.1f}%",
                  f"✅ RVOL {vol_ratio:.1f}x" if vol_ratio>=2 else f"⚠️ RVOL {vol_ratio:.1f}x (want 2x+)",
                  "📌 Buy dips on run-up — never chase the spike",
-                 "📌 If closing near HOD → overnight hold for gap up",
-                 "📌 Exit: Sell into gap up next morning"])
+                 "📌 If closing near HOD → overnight hold for gap up"])
 
     if n >= 6:
         green_days = sum(1 for i in range(-5, 0) if closes[i] > closes[i-1])
@@ -614,18 +796,16 @@ def detect_sykes_pattern(ticker, price, prev_close, pct_change, closes, vol_rati
                 [f"✅ {green_days} of last 5 days green",
                  f"✅ Total {total_run:.0f}% run",
                  "📌 Buy 10-20% dips off morning highs",
-                 "📌 Watch: Closing near HOD = bullish continuation",
                  "📌 Exit: Sell into strength"])
 
     if pct_change >= 15 and vol_ratio >= 3:
         return ("⚡ Gap and Go",
-            "Gapped up on catalyst with RVOL 3x+. Classic momentum play.",
+            "Gapped up on catalyst with RVOL 3x+.",
             [f"✅ Gapped up {pct_change:.1f}%",
-             f"✅ RVOL {vol_ratio:.1f}x" if vol_ratio>=3 else f"⚠️ RVOL {vol_ratio:.1f}x (need 3x+)",
+             f"✅ RVOL {vol_ratio:.1f}x",
              "📌 Only trade with strong catalyst",
              "📌 Entry: Buy first pullback after open",
-             "📌 Exit: T1 +10%, T2 +20%, T3 +30%",
-             "⚠️ Stop below gap support"])
+             "📌 Exit: T1 +10%, T2 +20%, T3 +30%"])
 
     if n >= 5 and pct_change >= 5:
         recent_max = max(closes[-5:])
@@ -633,11 +813,10 @@ def detect_sykes_pattern(ticker, price, prev_close, pct_change, closes, vol_rati
         flag_range = ((recent_max - min(closes[-3:])) / recent_max * 100) if recent_max > 0 else 0
         if flagpole >= 15 and flag_range <= 15 and pct_change < flagpole * 0.5:
             return ("🏳️ Bull Flag / Pennant",
-                "Spike + tight consolidation + breakout. Volume drops in flag, spikes on breakout.",
+                "Spike + tight consolidation + breakout.",
                 [f"✅ Flagpole: {flagpole:.0f}% spike",
                  f"✅ Consolidation: {flag_range:.1f}% range",
                  "📌 Wait for confirmed breakout above flag top",
-                 "📌 Volume drops during flag, spikes on breakout",
                  "⚠️ Failed breakouts look identical — cut fast"])
 
     if n >= 6 and pct_change >= 3:
@@ -645,12 +824,9 @@ def detect_sykes_pattern(ticker, price, prev_close, pct_change, closes, vol_rati
         total_climb  = ((closes[-1] - closes[-6]) / closes[-6] * 100) if closes[-6] > 0 else 0
         if step_pattern and total_climb >= 20:
             return ("🪜 Stair Stepper",
-                "Slower supernova — rises progressively with brief pullbacks.",
+                "Rises progressively with brief pullbacks.",
                 [f"✅ Progressive {total_climb:.0f}% uptrend",
-                 f"✅ Up {pct_change:.1f}% today",
-                 "📌 Buy pullbacks, sell into spikes",
-                 "📌 Stop: bottom of large green candles",
-                 "⚠️ Can reverse suddenly if catalyst fades"])
+                 "📌 Buy pullbacks, sell into spikes"])
 
     if n >= 5:
         recent_high_5d = max(closes[-5:])
@@ -659,9 +835,7 @@ def detect_sykes_pattern(ticker, price, prev_close, pct_change, closes, vol_rati
                 "Breaking above recent resistance with volume confirmation.",
                 [f"✅ Price near 5-day high (${recent_high_5d:.2f})",
                  f"✅ RVOL {vol_ratio:.1f}x",
-                 "📌 Only buy with volume — no volume = fake breakout",
-                 "📌 Stop below resistance level",
-                 "⚠️ Failed breakouts trap longs"])
+                 "📌 Only buy with volume — no volume = fake breakout"])
 
     if n >= 7:
         mid        = n // 2
@@ -675,72 +849,61 @@ def detect_sykes_pattern(ticker, price, prev_close, pct_change, closes, vol_rati
                 "U-shaped recovery + handle consolidation + breakout.",
                 [f"✅ Cup depth: {cup_depth:.0f}%",
                  f"✅ Recovery: {recovery:.0f}%",
-                 "📌 Wait for handle breakout with volume",
-                 "📌 Exit: Cup depth added to breakout point"])
+                 "📌 Wait for handle breakout with volume"])
 
     now_hour = datetime.now().hour
     if 13 <= now_hour <= 16 and pct_change >= 5 and vol_ratio >= 2:
         return ("🌆 Afternoon Breakout",
-            "Breaking above morning HOD in afternoon. Safer for beginners.",
+            "Breaking above morning HOD in afternoon.",
             [f"✅ Up {pct_change:.1f}% in afternoon",
              f"✅ RVOL {vol_ratio:.1f}x",
-             "📌 Draw line at morning HOD — if it breaks, buy it",
-             "⚠️ Afternoon fades happen — exit fast if reverses"])
+             "📌 Draw line at morning HOD — if it breaks, buy it"])
 
     if 15 <= now_hour <= 16 and n >= 3:
         prev_red = closes[-2] < closes[-3] if n >= 3 else False
         if pct_change >= 10 and prev_red:
             return ("🌙 Overnight Hold Setup",
-                "Closing strong near HOD on first green day. Hold overnight for gap up.",
+                "Closing strong near HOD on first green day.",
                 [f"✅ Up {pct_change:.1f}% near HOD",
-                 "✅ Previous days were red",
                  "📌 Only hold overnight if within 10% of HOD",
-                 "📌 Entry: Last 30 minutes of session",
                  "⚠️ Bad news overnight = gap DOWN"])
 
     if n >= 3 and pct_change >= 3:
         dip1 = ((closes[-2] - closes[-3]) / closes[-3] * 100) if closes[-3] > 0 else 0
         if dip1 <= -10:
             return ("📉 Double Bottom Morning Panic",
-                "Two panic lows forming support. Second bottom holds better.",
+                "Two panic lows forming support.",
                 [f"✅ First panic: {dip1:.0f}%",
                  f"✅ Bouncing {pct_change:.1f}%",
                  "📌 Buy the SECOND bottom, not the first",
-                 "📌 W-shape at similar price levels",
                  "⚠️ If second bottom breaks, exit immediately"])
 
     if n >= 3 and pct_change < -10:
         prev_was_big_up = closes[-2] > closes[-3] * 1.2 if n >= 3 else False
         if prev_was_big_up:
             return ("🔴 Supernova Fade (Short)",
-                "First red day after big run. Prime short setup.",
+                "First red day after big run.",
                 [f"✅ Down {abs(pct_change):.1f}% after big run",
-                 "✅ Previous session was up 20%+",
-                 "📌 Short the first red day — every bounce is a sell",
-                 "📌 Cover into panics",
+                 "📌 Short the first red day",
                  "⚠️ Short squeezes brutal — keep position small"])
 
     if n >= 5 and pct_change < -5:
         consec_red = sum(1 for i in range(-4, 0) if closes[i] < closes[i-1])
         if consec_red >= 3:
             return ("🦅 The Crow — AVOID",
-                "Continuous selling pressure. Every recovery gets sold.",
+                "Continuous selling pressure.",
                 [f"⚠️ Down {abs(pct_change):.1f}% — downtrend",
-                 f"⚠️ {consec_red} of last 4 days red",
-                 "🚨 DO NOT trade The Crow on the long side",
-                 "🚨 SKIP — wait for better opportunity"])
+                 "🚨 DO NOT trade The Crow on the long side"])
 
     if pct_change >= 10:
         return ("📊 Momentum Play",
-            "Decent move but no clean Sykes pattern. Trade with caution.",
+            "Decent move but no clean Sykes pattern.",
             [f"⚠️ Up {pct_change:.1f}% — no clean pattern",
-             f"⚠️ RVOL {vol_ratio:.1f}x",
-             "📌 Check: catalyst? float? sector hot?",
              "📌 Wait for cleaner setup"])
 
     return ("🔍 No Clear Pattern",
         "Does not match any defined Sykes setup.",
-        [f"⚠️ Move too small for Sykes patterns",
+        ["⚠️ Move too small for Sykes patterns",
          "🚨 SKIP — wait for better opportunity"])
 
 # ============================================================
@@ -764,24 +927,25 @@ def check_catalyst(ticker):
             for n in yf_news[:10]:
                 pub = n.get('providerPublishTime', 0)
                 if pub and datetime.fromtimestamp(pub) >= cutoff:
-                    news_items.append({'headline': n.get('title', ''), 'source': 'yf'})
+                    news_items.append({'headline': n.get('title', '')})
 
         news_count  = len(news_items)
         headlines   = []
         strong_hits = 0
         danger_hits = 0
         warning     = False
+
         for item in news_items[:5]:
             title = (item.get('headline') or item.get('title') or '').lower()
             headlines.append(item.get('headline') or item.get('title') or '')
             if any(kw in title for kw in STRONG_KEYWORDS): strong_hits += 1
             if any(kw in title for kw in DANGER_KEYWORDS): danger_hits += 1; warning = True
 
-        if not news_items:         return 'NONE',    0,          [],           False
-        if warning and danger_hits > strong_hits: return 'DANGER',  news_count, headlines[:2], True
-        elif strong_hits >= 2:     return 'STRONG',  news_count, headlines[:2], False
-        elif strong_hits == 1:     return 'MODERATE',news_count, headlines[:2], False
-        else:                      return 'WEAK',    news_count, headlines[:2], False
+        if not news_items:                         return 'NONE',    0,          [],           False
+        if warning and danger_hits > strong_hits:  return 'DANGER',  news_count, headlines[:2], True
+        elif strong_hits >= 2:                     return 'STRONG',  news_count, headlines[:2], False
+        elif strong_hits == 1:                     return 'MODERATE',news_count, headlines[:2], False
+        else:                                      return 'WEAK',    news_count, headlines[:2], False
     except:
         return 'NONE', 0, [], False
 
@@ -789,13 +953,11 @@ def is_biotech(headlines):
     return any(kw in ' '.join(headlines).lower() for kw in BIOTECH_KEYWORDS)
 
 # ============================================================
-# GRADING — updated with RVOL
+# GRADING
 # ============================================================
 
 def grade_setup(gap_pct, dollar_vol, vol_ratio=0):
     grade, notes = "B", []
-
-    # Gap grade
     if gap_pct >= 50:   grade = "A+"; notes.append(f"Supernova +{gap_pct:.1f}% 🔥🔥🔥")
     elif gap_pct >= 30: grade = "A+"; notes.append(f"Huge gap +{gap_pct:.1f}% 🔥🔥")
     elif gap_pct >= 20: grade = "A";  notes.append(f"Strong gap +{gap_pct:.1f}% 🔥")
@@ -804,7 +966,6 @@ def grade_setup(gap_pct, dollar_vol, vol_ratio=0):
     elif gap_pct > 0:   grade = "C";  notes.append(f"Weak gap +{gap_pct:.1f}%")
     else:               grade = "D";  notes.append(f"Down {gap_pct:.1f}%")
 
-    # Dollar volume bonus
     if dollar_vol >= 5_000_000:
         notes.append(f"Monster $vol ${dollar_vol/1e6:.1f}M 🔥")
         if grade == "A": grade = "A+"
@@ -815,7 +976,6 @@ def grade_setup(gap_pct, dollar_vol, vol_ratio=0):
     else:
         notes.append(f"$Vol ${dollar_vol:,.0f}")
 
-    # RVOL bonus/penalty
     if vol_ratio >= 5:   notes.append(f"RVOL {vol_ratio:.1f}x 🔥🔥")
     elif vol_ratio >= 3: notes.append(f"RVOL {vol_ratio:.1f}x ✅")
     elif vol_ratio > 0:  notes.append(f"RVOL {vol_ratio:.1f}x ⚠️")
@@ -823,10 +983,10 @@ def grade_setup(gap_pct, dollar_vol, vol_ratio=0):
     return grade, notes
 
 # ============================================================
-# DATA SOURCES
+# DATA SOURCES — Polygon gainers + Alpaca snapshot enrichment
 # ============================================================
 
-def get_massive_gainers(filters):
+def get_polygon_gainers(filters):
     try:
         r = requests.get(
             f"https://api.polygon.io/v2/snapshot/locale/us/markets/stocks/gainers"
@@ -844,21 +1004,17 @@ def get_massive_gainers(filters):
                 prev_close = prev.get('c', 0)
                 volume     = day.get('v', 0)
                 prev_vol   = prev.get('v', 1) or 1
-
-                if not (price and prev_close and price > 0 and prev_close > 0):
-                    continue
-
+                if not (price and prev_close and price > 0 and prev_close > 0): continue
                 pct        = ((price - prev_close) / prev_close) * 100
                 dollar_vol = price * volume
-                rvol       = volume / prev_vol if prev_vol > 0 else 0
+                rvol       = round(volume / prev_vol, 1) if prev_vol > 0 else 0
 
-                # Apply ALL filters
-                if not sym:                                        continue
+                if not sym: continue
                 if not (filters['min_price'] <= price <= filters['max_price']): continue
-                if pct < filters['min_gap_pct']:                   continue
-                if dollar_vol < filters['min_dollar_vol']:         continue
-                if volume < filters.get('min_volume', 0):          continue
-                if rvol < filters.get('min_rvol', 0):              continue
+                if pct < filters['min_gap_pct']:                               continue
+                if dollar_vol < filters['min_dollar_vol']:                     continue
+                if volume < filters.get('min_volume', 0):                      continue
+                if rvol < filters.get('min_rvol', 0):                          continue
 
                 candidates.append({
                     'ticker':     sym,
@@ -867,17 +1023,15 @@ def get_massive_gainers(filters):
                     'gap_pct':    round(float(pct), 1),
                     'volume':     float(volume),
                     'dollar_vol': float(dollar_vol),
-                    'rvol':       round(float(rvol), 1),
-                    'source':     'Live',
+                    'rvol':       rvol,
+                    'source':     'polygon',
                 })
-
-            log_alert(f"📡 Massive: {len(candidates)} stocks (after filters)")
+            log_alert(f"📡 Polygon: {len(candidates)} candidates")
             return candidates
-
-        log_alert(f"⚠️ Massive error: {r.status_code}")
+        log_alert(f"⚠️ Polygon error: {r.status_code}")
         return []
     except Exception as e:
-        log_alert(f"⚠️ Massive error: {e}")
+        log_alert(f"⚠️ Polygon error: {e}")
         return []
 
 def get_yahoo_gainers(filters):
@@ -900,14 +1054,14 @@ def get_yahoo_gainers(filters):
                 prev       = q.get('regularMarketPreviousClose', 0)
                 avg_vol    = q.get('averageDailyVolume3Month', 1) or 1
                 dollar_vol = price * vol
-                rvol       = vol / avg_vol if avg_vol > 0 else 0
+                rvol       = round(vol / avg_vol, 1) if avg_vol > 0 else 0
 
-                if not sym:                                                continue
+                if not sym: continue
                 if not (filters['min_price'] <= price <= filters['max_price']): continue
-                if pct < filters['min_gap_pct']:                           continue
-                if dollar_vol < filters['min_dollar_vol']:                 continue
-                if vol < filters.get('min_volume', 0):                     continue
-                if rvol < filters.get('min_rvol', 0):                      continue
+                if pct < filters['min_gap_pct']:                               continue
+                if dollar_vol < filters['min_dollar_vol']:                     continue
+                if vol < filters.get('min_volume', 0):                         continue
+                if rvol < filters.get('min_rvol', 0):                          continue
 
                 candidates.append({
                     'ticker':     sym,
@@ -916,39 +1070,60 @@ def get_yahoo_gainers(filters):
                     'gap_pct':    round(float(pct), 1),
                     'volume':     float(vol),
                     'dollar_vol': float(dollar_vol),
-                    'rvol':       round(float(rvol), 1),
-                    'source':     'Live',
+                    'rvol':       rvol,
+                    'source':     'yahoo',
                 })
         except:
             pass
-    log_alert(f"📡 Yahoo: {len(candidates)} stocks (after filters)")
+    log_alert(f"📡 Yahoo: {len(candidates)} candidates")
     return candidates
 
 # ============================================================
-# PROCESS TICKER
+# PROCESS TICKER — enrich with Alpaca snapshot
 # ============================================================
 
-def process_ticker(stock_data, mode='standard', filters=None):
+def process_ticker(stock_data, mode='morning_gap', filters=None):
     try:
         ticker     = stock_data['ticker']
-        price      = stock_data['price']
-        prev_close = stock_data['prev_close']
-        gap_pct    = stock_data['gap_pct']
-        dollar_vol = stock_data['dollar_vol']
-        volume     = stock_data.get('volume', 0)
-        rvol       = stock_data.get('rvol', 0)
-        source     = stock_data.get('source', 'Live')
         filters    = filters or {}
 
-        grade, notes = grade_setup(gap_pct, dollar_vol, rvol)
+        # Try Alpaca snapshot first for enriched data
+        snap = alpaca_get_snapshot(ticker)
+
+        if snap and snap.get('price', 0) > 0:
+            price      = snap['price']
+            prev_close = snap['prev_close']
+            gap_pct    = snap['pct_change']
+            dollar_vol = snap['dollar_vol']
+            volume     = snap['volume']
+            rvol       = snap['rvol']
+            vwap       = snap['vwap']
+            bid        = snap['bid']
+            ask        = snap['ask']
+        else:
+            price      = stock_data['price']
+            prev_close = stock_data['prev_close']
+            gap_pct    = stock_data['gap_pct']
+            dollar_vol = stock_data['dollar_vol']
+            volume     = stock_data.get('volume', 0)
+            rvol       = stock_data.get('rvol', 0)
+            vwap       = 0
+            bid        = 0
+            ask        = 0
+
+        # Re-check filters with fresh Alpaca data
+        if price < filters.get('min_price', 0):      return None
+        if price > filters.get('max_price', 9999):   return None
+        if gap_pct < filters.get('min_gap_pct', 0):  return None
+        if dollar_vol < filters.get('min_dollar_vol', 0): return None
+        if volume < filters.get('min_volume', 0):    return None
+        if rvol < filters.get('min_rvol', 0):         return None
+
+        grade, notes             = grade_setup(gap_pct, dollar_vol, rvol)
         strength, news_count, headlines, warning = check_catalyst(ticker)
 
-        # Require news filter
-        if filters.get('require_news') and news_count == 0:
-            return None
-
-        if mode == 'biotech' and not is_biotech(headlines):
-            return None
+        if filters.get('require_news') and news_count == 0: return None
+        if mode == 'biotech' and not is_biotech(headlines): return None
 
         final_grade = grade
         if warning:                                  final_grade = "D"
@@ -958,72 +1133,50 @@ def process_ticker(stock_data, mode='standard', filters=None):
             elif grade == 'A': final_grade = 'B'
 
         catalyst_label = (
-            f"☠️ Danger — {news_count} article(s)" if warning else
+            f"☠️ Danger — {news_count}" if warning else
             f"🔥 Strong Catalyst — {news_count}" if strength == 'STRONG' else
             f"✅ Moderate — {news_count}" if strength == 'MODERATE' else
-            f"📰 {news_count} article(s)" if news_count > 0 else "📰 0 articles"
+            f"📰 {news_count} articles" if news_count > 0 else "📰 0 articles"
         )
 
-        # Company info
-        info = get_company_info(ticker)
+        # Company info + exchange filter
+        info         = get_company_info(ticker)
+        exchange     = info.get('exchange', '')
+        market_cap_m = info.get('market_cap_m', 0)
 
-        # Exchange filter — NASDAQ, NYSE, AMEX only
-        exchange = info.get('exchange', '')
         if exchange and not any(ex in exchange.upper() for ex in ['NASDAQ','NYSE','AMEX','BATS','CBOE']):
             return None
 
-        # Market cap filter
-        max_mktcap = filters.get('max_market_cap_m', 500.0)
-        mktcap_m   = info.get('market_cap_m', 0)
-        if mktcap_m > 0 and max_mktcap > 0 and mktcap_m > max_mktcap:
+        max_mktcap = filters.get('max_market_cap_m', 0)
+        if max_mktcap > 0 and market_cap_m > 0 and market_cap_m > max_mktcap:
             return None
 
-        # Halt check
-        halt_info = get_halt_info(ticker)
+        # Float check
+        float_m   = 0.0
+        max_float = filters.get('max_float_m', 0)
+        if max_float > 0:
+            try:
+                yf_info      = yf.Ticker(ticker).info
+                float_shares = yf_info.get('floatShares', 0)
+                if float_shares:
+                    float_m = float_shares / 1_000_000
+                    if float_m > max_float: return None
+            except:
+                pass
 
-        # Historical data
+        # Historical closes for pattern
         try:
-            stock     = yf.Ticker(ticker)
-            hist      = stock.history(period="10d", interval="1d")
-            hist_1m   = stock.history(period="1d",  interval="1m")
-            if rvol == 0:
-                vol_sum = float(hist_1m['Volume'].sum()) if not hist_1m.empty else volume
-                avg_vol = float(hist['Volume'].mean()) if not hist.empty else 0
-                rvol    = vol_sum / avg_vol if avg_vol > 0 else 0
+            hist   = yf.Ticker(ticker).history(period="10d", interval="1d")
             closes = hist['Close'].values.tolist() if not hist.empty else []
         except:
             closes = []
 
-        # Float filter
-        float_m    = 0.0
-        max_float  = filters.get('max_float_m', 30.0)
-        try:
-            yf_info = yf.Ticker(ticker).info
-            float_shares = yf_info.get('floatShares', 0)
-            if float_shares:
-                float_m = float_shares / 1_000_000
-                if max_float > 0 and float_m > max_float:
-                    return None
-        except:
-            pass
-
-        # Spread estimate from high/low
-        spread_pct = 0.0
-        try:
-            q = requests.get(
-                "https://finnhub.io/api/v1/quote",
-                params={'symbol': ticker, 'token': FINNHUB_KEY},
-                timeout=5
-            ).json()
-            h, l = q.get('h', 0), q.get('l', 0)
-            if h > 0 and l > 0:
-                mid = (h + l) / 2
-                spread_pct = round(((h - l) / mid) * 100, 2) if mid > 0 else 0.0
-        except:
-            pass
-
-        pattern, pattern_desc, pattern_criteria = detect_sykes_pattern(
+        halt_info                               = get_halt_info(ticker)
+        pattern, pattern_desc, pattern_criteria  = detect_sykes_pattern(
             ticker, price, prev_close, gap_pct, closes, rvol, dollar_vol)
+
+        above_vwap = price > vwap if vwap > 0 else None
+        spread_pct = round(((ask - bid) / ((ask + bid) / 2)) * 100, 2) if bid > 0 and ask > 0 else 0
 
         entry_low  = round(price * 0.99, 2)
         entry_high = round(price * 1.02, 2)
@@ -1037,7 +1190,7 @@ def process_ticker(stock_data, mode='standard', filters=None):
             'company_name':     info.get('company_name', ''),
             'exchange':         exchange,
             'industry':         info.get('industry', ''),
-            'market_cap_m':     round(mktcap_m, 2),
+            'market_cap_m':     round(market_cap_m, 2),
             'float_m':          round(float_m, 1),
             'price':            round(price, 2),
             'prev_close':       round(prev_close, 2),
@@ -1045,6 +1198,10 @@ def process_ticker(stock_data, mode='standard', filters=None):
             'dollar_vol':       round(dollar_vol, 0),
             'volume':           round(volume, 0),
             'rvol':             round(rvol, 1),
+            'vwap':             round(vwap, 2),
+            'above_vwap':       above_vwap,
+            'bid':              bid,
+            'ask':              ask,
             'spread_pct':       spread_pct,
             'grade':            final_grade,
             'notes':            notes,
@@ -1062,7 +1219,7 @@ def process_ticker(stock_data, mode='standard', filters=None):
             'target1':          target1,
             'target2':          target2,
             'target3':          target3,
-            'source':           source,
+            'source':           'alpaca' if snap else stock_data.get('source','live'),
             'time':             datetime.now().strftime('%H:%M:%S'),
         }
     except:
@@ -1082,9 +1239,10 @@ async def do_scan(user_id):
     await broadcast_to_user(user_id, {'type':'scan_status','status':status})
     await asyncio.sleep(0)
 
-    candidates = get_massive_gainers(filters)
+    # Polygon primary, Yahoo fallback
+    candidates = get_polygon_gainers(filters)
     if not candidates:
-        status['message'] = '⚠️ Massive empty, trying Yahoo...'
+        status['message'] = '⚠️ Polygon empty, trying Yahoo...'
         await broadcast_to_user(user_id, {'type':'scan_status','status':status})
         await asyncio.sleep(0)
         candidates = get_yahoo_gainers(filters)
@@ -1092,7 +1250,7 @@ async def do_scan(user_id):
     total = len(candidates)
     log_alert(f"📊 [{user_id}] {total} candidates")
 
-    status = {'phase':'analyzing','message':f'Analyzing {total} candidates...','progress':0,'total':total}
+    status = {'phase':'analyzing','message':f'Enriching {total} with Alpaca data...','progress':0,'total':total}
     await broadcast_to_user(user_id, {'type':'scan_status','status':status})
     await asyncio.sleep(0)
 
@@ -1122,7 +1280,8 @@ async def do_scan(user_id):
                         f"Grade: {setup['grade']}\nPattern: {setup['pattern']}\n"
                         f"Company: {setup.get('company_name','')} — {setup.get('exchange','')}\n"
                         f"Gap: +{setup['gap_pct']}%  RVOL: {setup.get('rvol',0)}x\n"
-                        f"Price: ${setup['price']}  Float: {setup.get('float_m',0)}M\n\n"
+                        f"Price: ${setup['price']}  VWAP: ${setup.get('vwap',0)}\n"
+                        f"Float: {setup.get('float_m',0)}M\n\n"
                         f"Entry: ${setup['entry_low']}–${setup['entry_high']}\n"
                         f"Stop: ${setup['stop_loss']}\nT1: ${setup['target1']}\n"
                     )
