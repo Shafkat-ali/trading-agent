@@ -39,11 +39,11 @@ ALPACA_PAPER_URL = 'https://paper-api.alpaca.markets/v2'
 user_state = {
     'shafkat': {'scan_results':[], 'alerted':set(), 'mode':'morning_gap', 'running':False,
                 'filters':{'min_price':0.10,'max_price':50.00,'min_gap_pct':5.0,
-                           'min_dollar_vol':250_000,'min_volume':14_000,'min_rvol':0,
+                           'min_dollar_vol':250000,'min_volume':50000,'min_rvol':0,
                            'max_float_m':20.0,'max_market_cap_m':0,'require_news':False}},
     'irfan':   {'scan_results':[], 'alerted':set(), 'mode':'morning_gap', 'running':False,
                 'filters':{'min_price':0.10,'max_price':50.00,'min_gap_pct':5.0,
-                           'min_dollar_vol':250_000,'min_volume':14_000,'min_rvol':0,
+                           'min_dollar_vol':250000,'min_volume':50000,'min_rvol':0,
                            'max_float_m':20.0,'max_market_cap_m':0,'require_news':False}},
 }
 user_clients = {'shafkat':[], 'irfan':[]}
@@ -58,18 +58,20 @@ _company_cache = {}
 
 SCAN_MODES = {
     'morning_gap': {
-        # EXACT STT MorningGap criteria from CSV analysis:
-        # Price $0.10–$50, Gap 5%+, $Vol $250K+, Float ≤20M
         'label':'🌅 MorningGap', 'desc':'Price $0.10–$50, Gap 5%+, $Vol $250K+, Float ≤20M',
         'min_price':0.10,'max_price':50.00,'min_gap':5.0,'min_dvol':250_000,
-        'min_volume':14_000,'min_rvol':0,'max_float_m':20.0,'max_mktcap_m':0,'require_news':False,
+        'min_volume':50_000,'min_rvol':0,'max_float_m':20.0,'max_mktcap_m':0,'require_news':False,
     },
     'scanopp': {
-        # EXACT STT ScanOpp criteria from CSV analysis:
-        # Price $0.50–$15, Gap 9%+, $Vol $3M+, Trades $3K+
         'label':'💡 ScanOpp', 'desc':'Price $0.50–$15, Gap 9%+, $Vol $3M+, Trades 3K+',
         'min_price':0.50,'max_price':15.00,'min_gap':9.0,'min_dvol':3_000_000,
         'min_volume':300_000,'min_rvol':0,'max_float_m':0,'max_mktcap_m':0,'require_news':False,
+    },
+    'afterhrs': {
+        'label':'🌆 AfterHrs', 'desc':'Under $50, within 10% of VWAP — coiled for a spike',
+        'min_price':0.10,'max_price':50.00,'min_gap':0.0,'min_dvol':100_000,
+        'min_volume':10_000,'min_rvol':0,'max_float_m':0,'max_mktcap_m':0,'require_news':False,
+        'vwap_proximity_pct': 10.0,  # within 10% above or below VWAP
     },
     'standard': {
         'label':'🔍 Standard', 'desc':'Gap 10%+, $0.20–$20, $100K vol, RVOL 1.5x+',
@@ -187,7 +189,7 @@ def alpaca_get_quote(ticker):
         t_r   = requests.get(t_url, headers=ALPACA_HEADERS, timeout=6)
 
         # Latest bar (open/high/low/close/volume)
-        b_url = f"{ALPACA_DATA_URL}/stocks/{ticker}/bars/latest?timeframe=1Day"
+        b_url = f"{ALPACA_DATA_URL}/stocks/{ticker}/bars/latest?timeframe=1Day&feed=sip"
         b_r   = requests.get(b_url, headers=ALPACA_HEADERS, timeout=6)
 
         result = {}
@@ -398,15 +400,16 @@ async def set_scan_mode(user_id: str, mode: str):
     m = SCAN_MODES[mode]
     user_state[user_id]['mode'] = mode
     user_state[user_id]['filters'] = {
-        'min_price':        m['min_price'],
-        'max_price':        m['max_price'],
-        'min_gap_pct':      m['min_gap'],
-        'min_dollar_vol':   m['min_dvol'],
-        'min_volume':       m['min_volume'],
-        'min_rvol':         m['min_rvol'],
-        'max_float_m':      m['max_float_m'],
-        'max_market_cap_m': m['max_mktcap_m'],
-        'require_news':     m['require_news'],
+        'min_price':          m['min_price'],
+        'max_price':          m['max_price'],
+        'min_gap_pct':        m['min_gap'],
+        'min_dollar_vol':     m['min_dvol'],
+        'min_volume':         m['min_volume'],
+        'min_rvol':           m['min_rvol'],
+        'max_float_m':        m['max_float_m'],
+        'max_market_cap_m':   m['max_mktcap_m'],
+        'require_news':       m['require_news'],
+        'vwap_proximity_pct': m.get('vwap_proximity_pct', 0),
     }
     log_alert(f"🔄 [{user_id}] Mode: {m['label']}")
     return {'status':'ok','mode':mode,'filters':user_state[user_id]['filters']}
@@ -501,6 +504,61 @@ async def get_stock_snapshot(ticker: str):
     """Full Alpaca snapshot — price, RVOL, VWAP, bid/ask"""
     snap = alpaca_get_snapshot(ticker)
     return snap if snap else {'error': 'Snapshot unavailable'}
+
+@app.get("/api/stock/bars/{ticker}")
+async def get_stock_bars(ticker: str, timeframe: str = "1Min", days: int = 1):
+    """
+    Returns OHLCV bars including PRE and POST market data.
+    Fetches from 4:00am today through 8:00pm — full extended hours.
+    Used by the dashboard chart to show real premarket candles.
+    """
+    try:
+        ticker = ticker.upper().strip()
+        now    = datetime.now()
+
+        # Start from 4am today (premarket open), end at 8pm (afterhours close)
+        start  = now.replace(hour=4, minute=0, second=0, microsecond=0)
+        end    = now.replace(hour=20, minute=0, second=0, microsecond=0)
+
+        # If before 4am, go back to yesterday's session
+        if now.hour < 4:
+            start = (now - timedelta(days=1)).replace(hour=4, minute=0, second=0, microsecond=0)
+            end   = (now - timedelta(days=1)).replace(hour=20, minute=0, second=0, microsecond=0)
+
+        start_str = start.strftime('%Y-%m-%dT%H:%M:%SZ')
+        end_str   = end.strftime('%Y-%m-%dT%H:%M:%SZ')
+
+        # Alpaca bars endpoint — feed=sip gives full extended hours data
+        url = (f"{ALPACA_DATA_URL}/stocks/{ticker}/bars"
+               f"?timeframe={timeframe}&start={start_str}&end={end_str}"
+               f"&feed=sip&limit=1000")
+
+        r = requests.get(url, headers=ALPACA_HEADERS, timeout=10)
+
+        if r.status_code == 200:
+            raw_bars = r.json().get('bars', [])
+            # Format for frontend charting (TradingView lightweight charts format)
+            bars = []
+            for b in raw_bars:
+                bars.append({
+                    'time':   b.get('t', ''),
+                    'open':   round(b.get('o', 0), 4),
+                    'high':   round(b.get('h', 0), 4),
+                    'low':    round(b.get('l', 0), 4),
+                    'close':  round(b.get('c', 0), 4),
+                    'volume': b.get('v', 0),
+                    'vwap':   round(b.get('vw', 0), 4),
+                })
+            log_alert(f"📊 Chart bars [{ticker}]: {len(bars)} candles ({timeframe}, extended hrs)")
+            return {'ticker': ticker, 'timeframe': timeframe, 'bars': bars,
+                    'start': start_str, 'end': end_str, 'count': len(bars)}
+        else:
+            log_alert(f"⚠️ Bars error [{ticker}]: HTTP {r.status_code}")
+            return {'error': f'Alpaca bars HTTP {r.status_code}', 'bars': []}
+
+    except Exception as e:
+        log_alert(f"⚠️ Bars exception [{ticker}]: {e}")
+        return {'error': str(e), 'bars': []}
 
 @app.get("/api/stock/profile/{ticker}")
 async def get_stock_profile(ticker: str):
@@ -987,212 +1045,8 @@ def grade_setup(gap_pct, dollar_vol, vol_ratio=0):
     return grade, notes
 
 # ============================================================
-# DATA SOURCES — Multi-source large universe scanner
-# KEY FIX: Polygon free tier only returns ~20 tickers.
-# STT scans 5000+ tickers. We now pull from 6 sources to
-# build a large candidate universe before filtering.
+# DATA SOURCES — Polygon gainers + Alpaca snapshot enrichment
 # ============================================================
-
-def get_large_universe(filters):
-    """
-    Pulls tickers from ALL available free sources to build
-    the largest possible candidate pool — mimicking STT's
-    full market scan. Returns deduplicated list of candidates.
-    """
-    seen    = {}   # ticker -> best candidate data
-    headers = {'User-Agent': 'Mozilla/5.0'}
-
-    min_price   = filters.get('min_price', 0.10)
-    max_price   = filters.get('max_price', 50.00)
-    min_gap     = filters.get('min_gap_pct', 5.0)
-    min_dvol    = filters.get('min_dollar_vol', 250_000)
-    min_volume  = filters.get('min_volume', 0)
-
-    log_alert(f"🌐 Universe scan: price ${min_price}–${max_price} | gap {min_gap}%+ | dvol ${min_dvol:,}")
-
-    # ── SOURCE 1: Polygon gainers (top ~20, free tier) ──
-    try:
-        r = requests.get(
-            f"https://api.polygon.io/v2/snapshot/locale/us/markets/stocks/gainers"
-            f"?apiKey={POLYGON_API_KEY}&include_otc=false",
-            timeout=12
-        )
-        if r.status_code == 200:
-            raw = r.json().get('tickers', [])
-            log_alert(f"📡 Polygon gainers: {len(raw)} raw")
-            for t in raw:
-                sym        = t.get('ticker', '')
-                day        = t.get('day', {})
-                prev       = t.get('prevDay', {})
-                last       = t.get('lastTrade', {})
-                price      = last.get('p') or day.get('c', 0)
-                prev_close = prev.get('c', 0)
-                volume     = day.get('v', 0)
-                prev_vol   = prev.get('v', 1) or 1
-                if not sym or not price or not prev_close: continue
-                pct        = ((price - prev_close) / prev_close) * 100
-                dollar_vol = price * volume
-                rvol       = round(volume / prev_vol, 1) if prev_vol > 0 else 0
-                if sym not in seen and min_price <= price <= max_price:
-                    seen[sym] = {'ticker':sym,'price':float(price),'prev_close':float(prev_close),
-                                 'gap_pct':round(float(pct),1),'volume':float(volume),
-                                 'dollar_vol':float(dollar_vol),'rvol':rvol,'source':'polygon'}
-        else:
-            log_alert(f"⚠️ Polygon HTTP {r.status_code}")
-    except Exception as e:
-        log_alert(f"⚠️ Polygon error: {e}")
-
-    # ── SOURCE 2: Polygon losers (catches anything Polygon missed) ──
-    try:
-        r = requests.get(
-            f"https://api.polygon.io/v2/snapshot/locale/us/markets/stocks/losers"
-            f"?apiKey={POLYGON_API_KEY}&include_otc=false",
-            timeout=12
-        )
-        if r.status_code == 200:
-            raw = r.json().get('tickers', [])
-            # We only want gainers so skip negatives, but Polygon sometimes puts gainers here too
-            for t in raw:
-                sym        = t.get('ticker', '')
-                day        = t.get('day', {})
-                prev       = t.get('prevDay', {})
-                last       = t.get('lastTrade', {})
-                price      = last.get('p') or day.get('c', 0)
-                prev_close = prev.get('c', 0)
-                volume     = day.get('v', 0)
-                prev_vol   = prev.get('v', 1) or 1
-                if not sym or not price or not prev_close: continue
-                pct = ((price - prev_close) / prev_close) * 100
-                if pct < min_gap: continue  # only gainers
-                dollar_vol = price * volume
-                rvol = round(volume / prev_vol, 1) if prev_vol > 0 else 0
-                if sym not in seen and min_price <= price <= max_price:
-                    seen[sym] = {'ticker':sym,'price':float(price),'prev_close':float(prev_close),
-                                 'gap_pct':round(float(pct),1),'volume':float(volume),
-                                 'dollar_vol':float(dollar_vol),'rvol':rvol,'source':'polygon'}
-    except Exception as e:
-        log_alert(f"⚠️ Polygon losers error: {e}")
-
-    # ── SOURCE 3: Yahoo Finance — day_gainers ──
-    for scrId in ['day_gainers', 'small_cap_gainers', 'most_actives', 'undervalued_growth_stocks']:
-        try:
-            r = requests.get(
-                f"https://query1.finance.yahoo.com/v1/finance/screener/predefined/saved"
-                f"?formatted=false&scrIds={scrId}&count=100",
-                headers=headers, timeout=10
-            )
-            if r.status_code != 200: continue
-            quotes = r.json().get('finance',{}).get('result',[{}])[0].get('quotes',[])
-            added = 0
-            for q in quotes:
-                sym        = q.get('symbol','')
-                price      = q.get('regularMarketPrice', 0)
-                pct        = q.get('regularMarketChangePercent', 0)
-                vol        = q.get('regularMarketVolume', 0)
-                prev       = q.get('regularMarketPreviousClose', 0)
-                avg_vol    = q.get('averageDailyVolume3Month', 1) or 1
-                dollar_vol = price * vol
-                rvol       = round(vol / avg_vol, 1) if avg_vol > 0 else 0
-                if not sym or not (min_price <= price <= max_price): continue
-                if sym not in seen:
-                    seen[sym] = {'ticker':sym,'price':float(price),'prev_close':float(prev),
-                                 'gap_pct':round(float(pct),1),'volume':float(vol),
-                                 'dollar_vol':float(dollar_vol),'rvol':rvol,'source':'yahoo'}
-                    added += 1
-            log_alert(f"📡 Yahoo [{scrId}]: {len(quotes)} raw, {added} new unique")
-        except Exception as e:
-            log_alert(f"⚠️ Yahoo [{scrId}] error: {e}")
-
-    # ── SOURCE 4: Finviz screener — captures OTC/small caps STT sees ──
-    finviz_searches = [
-        # Gap up >= 5%, price $0.10-$50
-        f"https://finviz.com/screener.ashx?v=111&f=geo_usa,price_u50,price_o0.1,change_o5&ft=4&o=-change&r=1",
-        # Gap up >= 10%
-        f"https://finviz.com/screener.ashx?v=111&f=geo_usa,price_u50,price_o0.1,change_o10&ft=4&o=-change&r=1",
-        # Gap up >= 20%, small cap
-        f"https://finviz.com/screener.ashx?v=111&f=geo_usa,price_u20,price_o0.1,change_o20,cap_micro&ft=4&o=-change&r=1",
-    ]
-    import re
-    for furl in finviz_searches:
-        try:
-            r = requests.get(furl, headers=headers, timeout=10)
-            if r.status_code == 200:
-                found = re.findall(r'quote\.ashx\?t=([A-Z]+)&', r.text)
-                unique_found = [t for t in found if t not in seen]
-                log_alert(f"📡 Finviz: {len(found)} raw, {len(unique_found)} new")
-                # Add as placeholder — will be enriched by Alpaca snapshot later
-                for t in unique_found[:100]:
-                    seen[t] = {'ticker':t,'price':0,'prev_close':0,'gap_pct':0,
-                               'volume':0,'dollar_vol':0,'rvol':0,'source':'finviz'}
-        except Exception as e:
-            log_alert(f"⚠️ Finviz error: {e}")
-
-    # ── SOURCE 5: Alpaca most active stocks ──
-    try:
-        r = requests.get(
-            f"{ALPACA_DATA_URL}/stocks/most-actives?by=volume&top=50",
-            headers=ALPACA_HEADERS, timeout=10
-        )
-        if r.status_code == 200:
-            most_active = r.json().get('most_actives', [])
-            added = 0
-            for s in most_active:
-                sym = s.get('symbol','')
-                if sym and sym not in seen:
-                    seen[sym] = {'ticker':sym,'price':0,'prev_close':0,'gap_pct':0,
-                                 'volume':s.get('volume',0),'dollar_vol':0,'rvol':0,'source':'alpaca_active'}
-                    added += 1
-            log_alert(f"📡 Alpaca most-active: {len(most_active)} raw, {added} new")
-        else:
-            log_alert(f"⚠️ Alpaca most-active HTTP {r.status_code}")
-    except Exception as e:
-        log_alert(f"⚠️ Alpaca most-active error: {e}")
-
-    # ── SOURCE 6: Alpaca top gainers (if available on your plan) ──
-    try:
-        r = requests.get(
-            f"{ALPACA_DATA_URL}/stocks/market/movers?top=50",
-            headers=ALPACA_HEADERS, timeout=10
-        )
-        if r.status_code == 200:
-            data = r.json()
-            gainers = data.get('gainers', [])
-            added = 0
-            for s in gainers:
-                sym   = s.get('symbol','')
-                price = s.get('price', 0)
-                pct   = s.get('percent_change', 0) * 100 if s.get('percent_change',0) < 10 else s.get('percent_change',0)
-                if sym and sym not in seen and min_price <= price <= max_price:
-                    seen[sym] = {'ticker':sym,'price':float(price),'prev_close':0,
-                                 'gap_pct':round(float(pct),1),'volume':0,
-                                 'dollar_vol':0,'rvol':0,'source':'alpaca_movers'}
-                    added += 1
-            log_alert(f"📡 Alpaca movers: {len(gainers)} gainers, {added} new")
-    except Exception as e:
-        log_alert(f"⚠️ Alpaca movers error: {e}")
-
-    all_candidates = list(seen.values())
-    log_alert(f"🌐 Universe total: {len(all_candidates)} unique tickers before filtering")
-
-    # Now apply basic pre-filters (loose — let process_ticker do the strict check)
-    passed = []
-    for c in all_candidates:
-        price     = c['price']
-        pct       = c['gap_pct']
-        dollar_vol = c['dollar_vol']
-        volume    = c['volume']
-
-        # If we have real data, pre-filter loosely
-        if price > 0:
-            if not (min_price <= price <= max_price * 1.5): continue  # generous
-            if pct < (min_gap * 0.5): continue  # half threshold — Alpaca will recheck
-            if dollar_vol > 0 and dollar_vol < (min_dvol * 0.3): continue  # 30% of threshold
-
-        passed.append(c)
-
-    log_alert(f"🌐 Universe after pre-filter: {len(passed)} candidates entering enrichment")
-    return passed
-
 
 def get_polygon_gainers(filters):
     try:
@@ -1327,6 +1181,13 @@ def process_ticker(stock_data, mode='morning_gap', filters=None):
         if volume < filters.get('min_volume', 0):    return None
         if rvol < filters.get('min_rvol', 0):         return None
 
+        # AfterHrs — VWAP proximity filter (within X% above or below VWAP)
+        vwap_prox = filters.get('vwap_proximity_pct', 0)
+        if vwap_prox > 0 and vwap > 0:
+            pct_from_vwap = abs((price - vwap) / vwap) * 100
+            if pct_from_vwap > vwap_prox:
+                return None  # too far from VWAP, skip
+
         grade, notes             = grade_setup(gap_pct, dollar_vol, rvol)
         strength, news_count, headlines, warning = check_catalyst(ticker)
 
@@ -1443,47 +1304,39 @@ async def do_scan(user_id):
     mode    = s['mode']
     label   = SCAN_MODES.get(mode, {}).get('label', mode)
 
-    log_alert(f"🔎 [{user_id}] SCAN START | mode={mode} | "
-              f"price ${filters.get('min_price')}–${filters.get('max_price')} | "
-              f"gap {filters.get('min_gap_pct')}%+ | dvol ${filters.get('min_dollar_vol',0):,}")
-
-    status = {'phase':'fetching','message':f'📡 Building universe for [{label}]...','progress':0,'total':0}
+    status = {'phase':'fetching','message':f'📡 Fetching [{label}]...','progress':0,'total':0}
     await broadcast_to_user(user_id, {'type':'scan_status','status':status})
     await asyncio.sleep(0)
 
-    # Use large multi-source universe — 6 data sources combined
-    candidates = get_large_universe(filters)
-
+    # Polygon primary, Yahoo fallback
+    candidates = get_polygon_gainers(filters)
     if not candidates:
-        log_alert(f"🔎 [{user_id}] ⚠️ ZERO candidates — check API keys or market hours")
-        done_status = {'phase':'done','message':'⚠️ 0 candidates — check API keys or market hours','progress':0,'total':0}
-        return [], done_status
+        status['message'] = '⚠️ Polygon empty, trying Yahoo...'
+        await broadcast_to_user(user_id, {'type':'scan_status','status':status})
+        await asyncio.sleep(0)
+        candidates = get_yahoo_gainers(filters)
 
     total = len(candidates)
-    log_alert(f"📊 [{user_id}] {total} candidates entering Alpaca enrichment")
+    log_alert(f"📊 [{user_id}] {total} candidates")
 
-    status = {'phase':'analyzing','message':f'Enriching {total} tickers with live Alpaca data...','progress':0,'total':total}
+    status = {'phase':'analyzing','message':f'Enriching {total} with Alpaca data...','progress':0,'total':total}
     await broadcast_to_user(user_id, {'type':'scan_status','status':status})
     await asyncio.sleep(0)
 
     results = []
     count   = 0
-    passed  = 0
-    filtered = 0
 
     for stock_data in candidates:
         if not s['running']: break
         count  += 1
         ticker  = stock_data.get('ticker', '')
-        status  = {'phase':'analyzing','message':f'Checking {ticker} ({count}/{total})... [{passed} found so far]','progress':count,'total':total}
+        status  = {'phase':'analyzing','message':f'Checking {ticker} ({count}/{total})...','progress':count,'total':total}
         await broadcast_to_user(user_id, {'type':'scan_status','status':status})
         await asyncio.sleep(0.05)
 
         setup = process_ticker(stock_data, mode, filters)
         if setup:
-            passed += 1
             results.append(setup)
-            log_alert(f"✅ [{user_id}] {ticker} | grade={setup.get('grade')} | +{setup.get('gap_pct')}% | ${setup.get('dollar_vol',0):,.0f}")
             await broadcast_to_user(user_id, {'type':'new_ticker','setup':setup})
             await asyncio.sleep(0)
 
@@ -1502,11 +1355,6 @@ async def do_scan(user_id):
                         f"Stop: ${setup['stop_loss']}\nT1: ${setup['target1']}\n"
                     )
                 )
-        else:
-            filtered += 1
-
-    log_alert(f"🔎 [{user_id}] DONE | {total} scanned → {passed} passed | {filtered} filtered | "
-              f"tickers: {[r['ticker'] for r in results]}")
 
     results.sort(
         key=lambda x: (0 if x['warning'] else {'A+':4,'A':3,'B':2}.get(x['grade'],1)),

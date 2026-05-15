@@ -63,7 +63,7 @@
     .controls{padding:7px 14px;display:flex;gap:8px;flex-wrap:wrap;background:#0d1220;border-bottom:1px solid #1a2035;align-items:center;}
 
     /* DUAL SCAN BUTTONS */
-    .scan-start-btn{display:flex;flex-direction:column;align-items:center;justify-content:center;padding:6px 16px;border:2px solid #1e2d4a;border-radius:8px;background:#0d1525;cursor:pointer;transition:all .25s;gap:1px;min-width:120px;}
+    .scan-start-btn{display:flex;flex-direction:column;align-items:center;justify-content:center;padding:6px 16px;border:2px solid #1e2d4a;border-radius:8px;background:#0d1525;cursor:pointer;transition:all .25s;gap:1px;min-width:120px;position:relative;}
     .scan-start-btn:hover{transform:translateY(-2px);}
     .scan-btn-icon{font-size:1rem;line-height:1;}
     .scan-btn-label{font-size:.76rem;font-weight:800;color:#e0e6f0;line-height:1.3;}
@@ -76,8 +76,33 @@
     #btn-scanopp.active{border-color:#00d4ff;background:linear-gradient(135deg,#00101a,#001e2e);box-shadow:0 0 16px rgba(0,212,255,.4);animation:glow-blue 2s ease-in-out infinite;}
     #btn-scanopp.active .scan-btn-label{color:#00d4ff;}
     #btn-scanopp.active .scan-btn-sub{color:#0090b0;}
-    @keyframes glow-green{0%,100%{box-shadow:0 0 10px rgba(0,200,83,.3)}50%{box-shadow:0 0 24px rgba(0,200,83,.65)}}
-    @keyframes glow-blue {0%,100%{box-shadow:0 0 10px rgba(0,212,255,.3)}50%{box-shadow:0 0 24px rgba(0,212,255,.65)}}
+    #btn-afterhrs:hover{border-color:#ff9100;box-shadow:0 4px 14px rgba(255,145,0,.2);}
+    #btn-afterhrs.active{border-color:#ff9100;background:linear-gradient(135deg,#1a0e00,#2e1a00);box-shadow:0 0 16px rgba(255,145,0,.4);animation:glow-orange 2s ease-in-out infinite;}
+    #btn-afterhrs.active .scan-btn-label{color:#ff9100;}
+    #btn-afterhrs.active .scan-btn-sub{color:#b36400;}
+    @keyframes glow-green {0%,100%{box-shadow:0 0 10px rgba(0,200,83,.3)}50%{box-shadow:0 0 24px rgba(0,200,83,.65)}}
+    @keyframes glow-blue  {0%,100%{box-shadow:0 0 10px rgba(0,212,255,.3)}50%{box-shadow:0 0 24px rgba(0,212,255,.65)}}
+    @keyframes glow-orange{0%,100%{box-shadow:0 0 10px rgba(255,145,0,.3)}50%{box-shadow:0 0 24px rgba(255,145,0,.65)}}
+
+    /* TOOLTIPS */
+    .scan-tooltip{
+      display:none;position:absolute;bottom:calc(100% + 10px);left:50%;transform:translateX(-50%);
+      background:#0d1525;border:1px solid #2a3a5a;border-radius:8px;padding:10px 13px;
+      width:220px;z-index:9999;pointer-events:none;text-align:left;
+      box-shadow:0 8px 24px rgba(0,0,0,.6);
+    }
+    .scan-start-btn:hover .scan-tooltip{display:block;}
+    .scan-tooltip::after{
+      content:'';position:absolute;top:100%;left:50%;transform:translateX(-50%);
+      border:6px solid transparent;border-top-color:#2a3a5a;
+    }
+    .tt-title{font-size:.72rem;font-weight:800;color:#e0e6f0;margin-bottom:6px;padding-bottom:5px;border-bottom:1px solid #1e2d4a;}
+    .tt-row{display:flex;justify-content:space-between;gap:8px;margin:3px 0;}
+    .tt-key{font-size:.62rem;color:#4a6a8a;}
+    .tt-val{font-size:.62rem;color:#a0c4ff;font-weight:700;text-align:right;}
+    .tt-divider{border:none;border-top:1px solid #1e2d4a;margin:6px 0;}
+    .tt-desc{font-size:.6rem;color:#6a8aaa;line-height:1.4;}
+    .tt-best{font-size:.58rem;color:#ffd700;margin-top:4px;font-weight:600;}
 
     .btn{padding:5px 11px;border:none;border-radius:5px;font-size:.7rem;font-weight:600;cursor:pointer;transition:all .2s;display:flex;align-items:center;gap:4px;}
     .btn:hover{transform:translateY(-1px);filter:brightness(1.1);}
@@ -475,11 +500,45 @@
     <span class="scan-btn-icon">🌅</span>
     <span class="scan-btn-label">MorningGap</span>
     <span class="scan-btn-sub">$0.10–$50 · Gap 5%+ · Float ≤20M</span>
+    <div class="scan-tooltip">
+      <div class="tt-title">🌅 MorningGap Scanner</div>
+      <div class="tt-row"><span class="tt-key">Price</span><span class="tt-val">$0.10 – $50.00</span></div>
+      <div class="tt-row"><span class="tt-key">% Change</span><span class="tt-val">+5% or more</span></div>
+      <div class="tt-row"><span class="tt-key">Dollar Vol</span><span class="tt-val">$250,000+</span></div>
+      <div class="tt-row"><span class="tt-key">Float</span><span class="tt-val">Under 20M shares</span></div>
+      <hr class="tt-divider">
+      <div class="tt-desc">Finds stocks gapping up premarket with small float for explosive moves.</div>
+      <div class="tt-best">⏰ Best: 4:00am – 9:30am EST</div>
+    </div>
   </button>
   <button class="scan-start-btn" id="btn-scanopp" onclick="startWithMode('scanopp')">
     <span class="scan-btn-icon">💡</span>
     <span class="scan-btn-label">ScanOpp</span>
     <span class="scan-btn-sub">$0.50–$15 · Gap 9%+ · $Vol $3M+</span>
+    <div class="scan-tooltip">
+      <div class="tt-title">💡 ScanOpp Scanner</div>
+      <div class="tt-row"><span class="tt-key">Price</span><span class="tt-val">$0.50 – $15.00</span></div>
+      <div class="tt-row"><span class="tt-key">% Change</span><span class="tt-val">+9% or more</span></div>
+      <div class="tt-row"><span class="tt-key">Dollar Vol</span><span class="tt-val">$3,000,000+</span></div>
+      <div class="tt-row"><span class="tt-key">Trades</span><span class="tt-val">3,000+</span></div>
+      <hr class="tt-divider">
+      <div class="tt-desc">High-liquidity momentum plays. Stricter criteria = higher quality setups.</div>
+      <div class="tt-best">⏰ Best: Market open 9:30am EST</div>
+    </div>
+  </button>
+  <button class="scan-start-btn" id="btn-afterhrs" onclick="startWithMode('afterhrs')">
+    <span class="scan-btn-icon">🌆</span>
+    <span class="scan-btn-label">AfterHrs</span>
+    <span class="scan-btn-sub">Under $50 · Within 10% of VWAP</span>
+    <div class="scan-tooltip">
+      <div class="tt-title">🌆 AfterHrs Scanner</div>
+      <div class="tt-row"><span class="tt-key">Price</span><span class="tt-val">Under $50.00</span></div>
+      <div class="tt-row"><span class="tt-key">VWAP Range</span><span class="tt-val">Within 10% above or below</span></div>
+      <div class="tt-row"><span class="tt-key">Dollar Vol</span><span class="tt-val">$100,000+</span></div>
+      <hr class="tt-divider">
+      <div class="tt-desc">Stocks hugging VWAP — coiled for a spike long or short in after hours.</div>
+      <div class="tt-best">⏰ Best: 4:00pm – 8:00pm EST</div>
+    </div>
   </button>
   <button class="btn btn-pause" id="pauseBtn" onclick="togglePause()" style="display:none">⏸ Pause</button>
   <button class="btn btn-clear" onclick="clearResults()">🗑 Clear</button>
@@ -556,7 +615,6 @@
       <div style="margin-bottom:10px">
         <div class="filter-tab-title">📡 Other Scan Modes</div>
         <div class="mode-grid">
-          <button class="mode-btn" id="mode-high_quality" onclick="setScanMode('high_quality')">⭐ High Quality</button>
           <button class="mode-btn" id="mode-standard"  onclick="setScanMode('standard')">🔍 Standard</button>
           <button class="mode-btn" id="mode-supernova" onclick="setScanMode('supernova')">🚀 Supernovas</button>
           <button class="mode-btn" id="mode-biotech"   onclick="setScanMode('biotech')">🧬 Biotech</button>
@@ -659,19 +717,19 @@
   setLogos();
 
   const MODES = {
-    morning_gap:  { label:'🌅 MorningGap',    desc:'Price $0.50–$20, Gap 8%+, $Vol $500K+, Vol 100K+' },
-    scanopp:      { label:'💡 ScanOpp',        desc:'Price $0.30–$15, Gap 12%+, $Vol $1M+, Vol 500K+' },
-    high_quality: { label:'⭐ High Quality',   desc:'Price $1–$10, Gap 15%+, $Vol $2M+, RVOL 2x+, Float ≤50M' },
-    standard:     { label:'🔍 Standard',       desc:'Gap 10%+, $0.20–$20, $100K vol, RVOL 1.5x+' },
-    supernova:    { label:'🚀 Supernovas',     desc:'Gap 50%+ only — massive movers' },
-    biotech:      { label:'🧬 Biotech',        desc:'Biotech/FDA, gap 15%+, catalyst required' },
-    low_float:    { label:'⚡ Low Float',      desc:'Float under 10M, gap 15%+' },
-    premarket:    { label:'🌄 Pre-Market',     desc:'Gap 10%+, vol 100K+' },
-    squeeze:      { label:'💎 Squeeze',        desc:'High dollar vol $3M+, gap 9%+' },
-    small_cap:    { label:'📊 Small Cap',      desc:'$1–$20, gap 15%+' },
-    afternoon:    { label:'🌆 Afternoon',      desc:'HOD breakouts, gap 5%+' },
-    penny:        { label:'🪙 Penny',          desc:'Pure penny stocks under $1' },
-    custom:       { label:'⚙️ Custom',         desc:'Your custom filter settings' },
+    morning_gap: { label:'🌅 MorningGap', desc:'Price $0.10–$50, Gap 5%+, $Vol $250K+, Float ≤20M' },
+    scanopp:     { label:'💡 ScanOpp',    desc:'Price $0.50–$15, Gap 9%+, $Vol $3M+, Trades 3K+' },
+    afterhrs:    { label:'🌆 AfterHrs',   desc:'Under $50 · Within 10% of VWAP — coiled for a spike' },
+    standard:    { label:'🔍 Standard',   desc:'Gap 10%+, $0.20–$20, $100K vol, RVOL 1.5x+' },
+    supernova:   { label:'🚀 Supernovas', desc:'Gap 50%+ only — massive movers' },
+    biotech:     { label:'🧬 Biotech',    desc:'Biotech/FDA, gap 15%+, catalyst required' },
+    low_float:   { label:'⚡ Low Float',  desc:'Float under 10M, gap 15%+' },
+    premarket:   { label:'🌄 Pre-Market', desc:'Gap 10%+, vol 100K+' },
+    squeeze:     { label:'💎 Squeeze',    desc:'High dollar vol $3M+, gap 9%+' },
+    small_cap:   { label:'📊 Small Cap',  desc:'$1–$20, gap 15%+' },
+    afternoon:   { label:'🌆 Afternoon',  desc:'HOD breakouts, gap 5%+' },
+    penny:       { label:'🪙 Penny',      desc:'Pure penny stocks under $1' },
+    custom:      { label:'⚙️ Custom',     desc:'Your custom filter settings' },
   };
 
   const DVOL_VALUES=[10000,25000,50000,75000,100000,150000,200000,250000,300000,500000,750000,
@@ -756,7 +814,7 @@
   function connectWS(userId){
     if(!userId)return;
     try{
-      ws=new WebSocket(`${location.protocol==='https:'?'wss':'ws'}://${location.host}/ws?user=${userId}`);
+      ws=new WebSocket(`ws://${location.host}/ws?user=${userId}`);
       ws.onopen=()=>console.log(`WS [${userId}]`);
       ws.onmessage=handleMessage;
       ws.onclose=()=>{if(currentUser&&currentUser.id===userId)setTimeout(()=>connectWS(userId),3000);};
@@ -856,7 +914,7 @@
   }
 
   function updateScanBtns(activeMode){
-    ['morning_gap','scanopp'].forEach(m=>{
+    ['morning_gap','scanopp','afterhrs'].forEach(m=>{
       const btn=document.getElementById(`btn-${m}`);if(!btn)return;
       const running=(m===activeMode)&&isRunning&&!isPaused;
       btn.classList.toggle('active',running);
@@ -865,12 +923,14 @@
       if(icon){
         if(running)icon.textContent='⏳';
         else if(m==='morning_gap')icon.textContent='🌅';
-        else icon.textContent='💡';
+        else if(m==='scanopp')icon.textContent='💡';
+        else icon.textContent='🌆';
       }
       if(sub){
         if(running)sub.textContent='Click to rescan';
-        else if(m==='morning_gap')sub.textContent='$0.50–$20 · Gap 8%+ · $Vol $500K+';
-        else sub.textContent='$0.30–$15 · Gap 12%+ · $Vol $1M+';
+        else if(m==='morning_gap')sub.textContent='$0.10–$50 · Gap 5%+ · Float ≤20M';
+        else if(m==='scanopp')sub.textContent='$0.50–$15 · Gap 9%+ · $Vol $3M+';
+        else sub.textContent='Under $50 · Within 10% of VWAP';
       }
     });
   }
@@ -1108,14 +1168,63 @@
   }
 
   function buildTradingViewChart(ticker){
-    const container=document.getElementById('popupChartContainer');container.innerHTML='';
-    const iframe=document.createElement('iframe');
-    iframe.className='chart-frame';iframe.frameBorder='0';iframe.scrolling='no';
-    iframe.src=`https://s.tradingview.com/widgetembed/?frameElementId=tv_${ticker}`
-      +`&symbol=${encodeURIComponent(ticker)}&interval=5&hidesidetoolbar=0`
-      +`&saveimage=0&theme=dark&style=1&timezone=America%2FNew_York`
-      +`&studies=Volume%40tv-basicstudies&hideideas=1&withdateranges=1&locale=en`;
-    container.appendChild(iframe);
+    const container=document.getElementById('popupChartContainer');
+    container.innerHTML=`<div id="lw_chart_${ticker}" style="width:100%;height:340px;background:#080c18;border-radius:5px;display:flex;align-items:center;justify-content:center;"><span style="color:#4a6a8a;font-size:.8rem">⏳ Loading premarket chart for ${ticker}...</span></div>`;
+    // Load lightweight-charts then fetch real bars from our backend
+    if(!window.LightweightCharts){
+      const s=document.createElement('script');
+      s.src='https://unpkg.com/lightweight-charts/dist/lightweight-charts.standalone.production.js';
+      s.onload=()=>fetchAndRenderBars(ticker);
+      document.head.appendChild(s);
+    } else {
+      fetchAndRenderBars(ticker);
+    }
+  }
+
+  async function fetchAndRenderBars(ticker){
+    try{
+      const r=await fetch(`${API_URL}/api/stock/bars/${ticker}?timeframe=1Min`);
+      const data=await r.json();
+      const bars=data.bars||[];
+      const el=document.getElementById(`lw_chart_${ticker}`);
+      if(!el)return;
+      if(!bars.length){
+        el.innerHTML=`<span style="color:#4a6a8a;font-size:.8rem">No bar data for ${ticker} — market may be closed</span>`;
+        return;
+      }
+      el.innerHTML='';
+      const chart=LightweightCharts.createChart(el,{
+        width:el.offsetWidth||600, height:340,
+        layout:{background:{color:'#080c18'},textColor:'#a0b0c8'},
+        grid:{vertLines:{color:'#1a2035'},horzLines:{color:'#1a2035'}},
+        timeScale:{timeVisible:true,secondsVisible:false,borderColor:'#1a2035'},
+        rightPriceScale:{borderColor:'#1a2035'},
+        crosshair:{mode:1},
+      });
+      const candleSeries=chart.addCandlestickSeries({
+        upColor:'#00c853',downColor:'#ff1744',
+        borderUpColor:'#00c853',borderDownColor:'#ff1744',
+        wickUpColor:'#00c853',wickDownColor:'#ff1744',
+      });
+      // Convert ISO timestamps to unix seconds for lightweight-charts
+      const formatted=bars.map(b=>({
+        time: Math.floor(new Date(b.time).getTime()/1000),
+        open:b.open, high:b.high, low:b.low, close:b.close
+      })).sort((a,b)=>a.time-b.time);
+      candleSeries.setData(formatted);
+      // VWAP line
+      const vwapData=bars.filter(b=>b.vwap>0).map(b=>({
+        time:Math.floor(new Date(b.time).getTime()/1000),value:b.vwap
+      })).sort((a,b)=>a.time-b.time);
+      if(vwapData.length){
+        const vwapSeries=chart.addLineSeries({color:'#ffd700',lineWidth:1,title:'VWAP'});
+        vwapSeries.setData(vwapData);
+      }
+      chart.timeScale().fitContent();
+    }catch(e){
+      const el=document.getElementById(`lw_chart_${ticker}`);
+      if(el)el.innerHTML=`<span style="color:#ff4444;font-size:.75rem">Chart error: ${e.message}</span>`;
+    }
   }
 
   function closePopup(){
