@@ -36,15 +36,16 @@ ALPACA_DATA_URL  = 'https://data.alpaca.markets/v2'
 ALPACA_PAPER_URL = 'https://paper-api.alpaca.markets/v2'
 
 # ── PER-USER STATE ──
+_DEFAULT_FILTERS = {
+    'min_price':0.50,'max_price':20.00,'min_gap_pct':8.0,
+    'min_dollar_vol':500_000,'min_volume':100_000,'min_rvol':0,
+    'max_float_m':0,'max_market_cap_m':0,'require_news':False
+}
 user_state = {
     'shafkat': {'scan_results':[], 'alerted':set(), 'mode':'morning_gap', 'running':False,
-                'filters':{'min_price':0.10,'max_price':50.00,'min_gap_pct':5.0,
-                           'min_dollar_vol':250000,'min_volume':50000,'min_rvol':0,
-                           'max_float_m':20.0,'max_market_cap_m':0,'require_news':False}},
+                'filters': _DEFAULT_FILTERS.copy()},
     'irfan':   {'scan_results':[], 'alerted':set(), 'mode':'morning_gap', 'running':False,
-                'filters':{'min_price':0.10,'max_price':50.00,'min_gap_pct':5.0,
-                           'min_dollar_vol':250000,'min_volume':50000,'min_rvol':0,
-                           'max_float_m':20.0,'max_market_cap_m':0,'require_news':False}},
+                'filters': _DEFAULT_FILTERS.copy()},
 }
 user_clients = {'shafkat':[], 'irfan':[]}
 alert_log    = []
@@ -58,14 +59,19 @@ _company_cache = {}
 
 SCAN_MODES = {
     'morning_gap': {
-        'label':'🌅 MorningGap', 'desc':'Price $0.10–$50, Gap 5%+, $Vol $250K+, Float ≤20M',
-        'min_price':0.10,'max_price':50.00,'min_gap':5.0,'min_dvol':250_000,
-        'min_volume':50_000,'min_rvol':0,'max_float_m':20.0,'max_mktcap_m':0,'require_news':False,
+        'label':'🌅 MorningGap', 'desc':'Price $0.50–$20, Gap 8%+, $Vol $500K+, Float ≤20M',
+        'min_price':0.50,'max_price':20.00,'min_gap':8.0,'min_dvol':500_000,
+        'min_volume':100_000,'min_rvol':0,'max_float_m':20.0,'max_mktcap_m':0,'require_news':False,
     },
     'scanopp': {
-        'label':'💡 ScanOpp', 'desc':'Price $0.50–$15, Gap 9%+, $Vol $3M+, Trades 3K+',
-        'min_price':0.50,'max_price':15.00,'min_gap':9.0,'min_dvol':3_000_000,
-        'min_volume':300_000,'min_rvol':0,'max_float_m':0,'max_mktcap_m':0,'require_news':False,
+        'label':'💡 ScanOpp', 'desc':'Price $0.30–$15, Gap 12%+, $Vol $1M+, Vol 500K+',
+        'min_price':0.30,'max_price':15.00,'min_gap':12.0,'min_dvol':1_000_000,
+        'min_volume':500_000,'min_rvol':0,'max_float_m':0,'max_mktcap_m':0,'require_news':False,
+    },
+    'hq_premarket': {
+        'label':'⭐ HQ Pre-Market', 'desc':'Price $1–$10, Gap 15%+, $Vol $2M+, Vol 1M+, Float ≤50M',
+        'min_price':1.00,'max_price':10.00,'min_gap':15.0,'min_dvol':2_000_000,
+        'min_volume':1_000_000,'min_rvol':0,'max_float_m':50.0,'max_mktcap_m':0,'require_news':False,
     },
     'afterhrs': {
         'label':'🌆 AfterHrs', 'desc':'Under $50, within 10% of VWAP — coiled for a spike',
@@ -380,6 +386,58 @@ async def debug():
         'users': {uid: {'mode':s['mode'],'running':s['running'],'results':len(s['scan_results'])}
                   for uid, s in user_state.items()}
     }
+
+@app.get("/api/diag/{user_id}")
+async def run_diag(user_id: str):
+    """
+    Diagnostic endpoint — runs one scan cycle and returns a detailed
+    breakdown of every filtering step without touching the live scanner.
+    Open: http://localhost:8000/api/diag/shafkat
+    """
+    s       = user_state.get(user_id, user_state['shafkat'])
+    filters = s['filters'].copy()
+    mode    = s['mode']
+    report  = {
+        'mode':    mode,
+        'filters': filters,
+        'steps':   [],
+    }
+
+    # Step 1 — Polygon
+    poly = get_polygon_gainers(filters)
+    report['steps'].append({
+        'source':    'polygon',
+        'raw_count': len(poly),
+        'tickers':   [c['ticker'] for c in poly[:20]],
+    })
+
+    # Step 2 — Yahoo (always run in diag so we can see both)
+    yah = get_yahoo_gainers(filters)
+    report['steps'].append({
+        'source':    'yahoo',
+        'raw_count': len(yah),
+        'tickers':   [c['ticker'] for c in yah[:20]],
+    })
+
+    candidates = poly or yah
+    report['total_candidates'] = len(candidates)
+
+    # Step 3 — process_ticker on first 5
+    processed = []
+    for c in candidates[:5]:
+        result = process_ticker(c, mode, filters)
+        processed.append({
+            'ticker':  c['ticker'],
+            'passed':  result is not None,
+            'grade':   result.get('grade') if result else None,
+            'gap_pct': c['gap_pct'],
+            'dollar_vol': c['dollar_vol'],
+            'volume':  c.get('volume', 0),
+        })
+    report['sample_process'] = processed
+    report['time'] = datetime.now().strftime('%H:%M:%S')
+    report['recent_logs'] = alert_log[:30]
+    return report
 
 @app.get("/api/scan_modes")
 async def get_scan_modes():
@@ -1055,9 +1113,13 @@ def get_polygon_gainers(filters):
             f"?apiKey={POLYGON_API_KEY}&include_otc=false",
             timeout=15
         )
+        log_alert(f"📡 Polygon HTTP {r.status_code} (need 200)")
         candidates = []
         if r.status_code == 200:
-            for t in r.json().get('tickers', []):
+            raw_tickers = r.json().get('tickers', [])
+            log_alert(f"📡 Polygon raw tickers: {len(raw_tickers)}")
+            filtered_out = {'price':0,'gap':0,'dvol':0,'vol':0,'rvol':0}
+            for t in raw_tickers:
                 sym        = t.get('ticker', '')
                 day        = t.get('day', {})
                 prev       = t.get('prevDay', {})
@@ -1072,11 +1134,16 @@ def get_polygon_gainers(filters):
                 rvol       = round(volume / prev_vol, 1) if prev_vol > 0 else 0
 
                 if not sym: continue
-                if not (filters['min_price'] <= price <= filters['max_price']): continue
-                if pct < filters['min_gap_pct']:                               continue
-                if dollar_vol < filters['min_dollar_vol']:                     continue
-                if volume < filters.get('min_volume', 0):                      continue
-                if rvol < filters.get('min_rvol', 0):                          continue
+                if not (filters['min_price'] <= price <= filters['max_price']):
+                    filtered_out['price'] += 1; continue
+                if pct < filters['min_gap_pct']:
+                    filtered_out['gap'] += 1; continue
+                if dollar_vol < filters['min_dollar_vol']:
+                    filtered_out['dvol'] += 1; continue
+                if volume < filters.get('min_volume', 0):
+                    filtered_out['vol'] += 1; continue
+                if rvol < filters.get('min_rvol', 0):
+                    filtered_out['rvol'] += 1; continue
 
                 candidates.append({
                     'ticker':     sym,
@@ -1088,56 +1155,177 @@ def get_polygon_gainers(filters):
                     'rvol':       rvol,
                     'source':     'polygon',
                 })
-            log_alert(f"📡 Polygon: {len(candidates)} candidates")
+            log_alert(
+                f"📡 Polygon: {len(candidates)} passed | filtered → "
+                f"price:{filtered_out['price']} gap:{filtered_out['gap']} "
+                f"dvol:{filtered_out['dvol']} vol:{filtered_out['vol']} rvol:{filtered_out['rvol']}"
+            )
             return candidates
-        log_alert(f"⚠️ Polygon error: {r.status_code}")
+        elif r.status_code == 403:
+            log_alert("⚠️ Polygon 403 — free tier doesn't support gainers endpoint. Trying Yahoo...")
+        else:
+            log_alert(f"⚠️ Polygon error: {r.status_code} — {r.text[:100]}")
         return []
     except Exception as e:
         log_alert(f"⚠️ Polygon error: {e}")
         return []
 
-def get_yahoo_gainers(filters):
+def get_yahoo_custom_screener(filters):
+    """
+    Yahoo Finance custom POST screener — filters by our price/gap criteria
+    at the API level, so we get actual small-cap movers, not just large caps.
+    """
     candidates = []
-    headers    = {'User-Agent': 'Mozilla/5.0'}
-    for scrId in ['day_gainers', 'small_cap_gainers']:
-        try:
-            r = requests.get(
-                f"https://query1.finance.yahoo.com/v1/finance/screener/predefined/saved"
-                f"?formatted=false&scrIds={scrId}&count=50",
-                headers=headers, timeout=10
-            )
-            if r.status_code != 200: continue
-            quotes = r.json().get('finance', {}).get('result', [{}])[0].get('quotes', [])
-            for q in quotes:
-                sym        = q.get('symbol', '')
-                price      = q.get('regularMarketPrice', 0)
-                pct        = q.get('regularMarketChangePercent', 0)
-                vol        = q.get('regularMarketVolume', 0)
-                prev       = q.get('regularMarketPreviousClose', 0)
-                avg_vol    = q.get('averageDailyVolume3Month', 1) or 1
-                dollar_vol = price * vol
-                rvol       = round(vol / avg_vol, 1) if avg_vol > 0 else 0
+    seen       = set()
+    headers    = {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+        'Content-Type': 'application/json',
+        'Accept': 'application/json',
+    }
+    try:
+        payload = {
+            "offset": 0, "size": 100,
+            "sortField": "percentchange", "sortType": "DESC",
+            "quoteType": "EQUITY", "topOperator": "AND",
+            "query": {
+                "operator": "AND",
+                "operands": [
+                    {"operator": "GT", "operands": ["percentchange",      filters.get('min_gap_pct', 8.0)]},
+                    {"operator": "GT", "operands": ["regularMarketPrice", filters.get('min_price',  0.50)]},
+                    {"operator": "LT", "operands": ["regularMarketPrice", filters.get('max_price', 20.00)]},
+                    {"operator": "GT", "operands": ["regularMarketVolume",filters.get('min_volume', 100_000)]},
+                    {"operator": "EQ", "operands": ["region", "us"]},
+                ]
+            },
+            "userId": "", "userIdType": "guid",
+        }
 
-                if not sym: continue
-                if not (filters['min_price'] <= price <= filters['max_price']): continue
-                if pct < filters['min_gap_pct']:                               continue
-                if dollar_vol < filters['min_dollar_vol']:                     continue
-                if vol < filters.get('min_volume', 0):                         continue
-                if rvol < filters.get('min_rvol', 0):                          continue
+        for host in ['query1.finance.yahoo.com', 'query2.finance.yahoo.com']:
+            try:
+                url = f"https://{host}/v1/finance/screener?formatted=false&lang=en-US&region=US"
+                r   = requests.post(url, json=payload, headers=headers, timeout=15)
+                log_alert(f"📡 Yahoo Custom POST {host} → HTTP {r.status_code}")
+                if r.status_code != 200:
+                    continue
+                quotes = (r.json()
+                           .get('finance', {})
+                           .get('result', [{}])[0]
+                           .get('quotes', []))
+                log_alert(f"📡 Yahoo Custom: {len(quotes)} raw quotes")
+                filtered_out = {'price':0,'gap':0,'dvol':0,'vol':0}
+                for q in quotes:
+                    sym        = q.get('symbol', '')
+                    if not sym or sym in seen: continue
+                    price      = q.get('regularMarketPrice', 0)
+                    pct        = q.get('regularMarketChangePercent', 0)
+                    vol        = q.get('regularMarketVolume', 0)
+                    prev       = q.get('regularMarketPreviousClose', 0)
+                    avg_vol    = q.get('averageDailyVolume3Month', 1) or 1
+                    dollar_vol = price * vol
+                    rvol       = round(vol / avg_vol, 1) if avg_vol > 0 else 0
 
-                candidates.append({
-                    'ticker':     sym,
-                    'price':      float(price),
-                    'prev_close': float(prev),
-                    'gap_pct':    round(float(pct), 1),
-                    'volume':     float(vol),
-                    'dollar_vol': float(dollar_vol),
-                    'rvol':       rvol,
-                    'source':     'yahoo',
-                })
-        except:
-            pass
-    log_alert(f"📡 Yahoo: {len(candidates)} candidates")
+                    if not (filters['min_price'] <= price <= filters['max_price']):
+                        filtered_out['price'] += 1; continue
+                    if pct < filters['min_gap_pct']:
+                        filtered_out['gap'] += 1; continue
+                    if dollar_vol < filters['min_dollar_vol']:
+                        filtered_out['dvol'] += 1; continue
+                    if vol < filters.get('min_volume', 0):
+                        filtered_out['vol'] += 1; continue
+
+                    seen.add(sym)
+                    candidates.append({
+                        'ticker':     sym,
+                        'price':      float(price),
+                        'prev_close': float(prev),
+                        'gap_pct':    round(float(pct), 1),
+                        'volume':     float(vol),
+                        'dollar_vol': float(dollar_vol),
+                        'rvol':       rvol,
+                        'source':     'yahoo_custom',
+                    })
+                log_alert(
+                    f"📡 Yahoo Custom: {len(candidates)} passed | "
+                    f"price:{filtered_out['price']} gap:{filtered_out['gap']} dvol:{filtered_out['dvol']}"
+                )
+                break  # Host worked, no need to try the other
+            except Exception as e:
+                log_alert(f"⚠️ Yahoo Custom {host}: {e}")
+    except Exception as e:
+        log_alert(f"⚠️ Yahoo Custom screener error: {e}")
+    return candidates
+
+
+def get_yahoo_gainers(filters):
+    candidates  = []
+    seen        = set()
+    headers     = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'}
+    # Try both Yahoo hosts — query1 often rate-limits, query2 is the fallback
+    hosts        = ['query1.finance.yahoo.com', 'query2.finance.yahoo.com']
+    # All screeners run — each screener tries hosts in order until one works
+    screener_ids = ['day_gainers', 'small_cap_gainers', 'most_actives', 'aggressive_small_caps']
+
+    for scrId in screener_ids:        # outer: each screener
+        for host in hosts:            # inner: try each host until one works
+            try:
+                url = (
+                    f"https://{host}/v1/finance/screener/predefined/saved"
+                    f"?formatted=false&scrIds={scrId}&count=100"
+                )
+                r = requests.get(url, headers=headers, timeout=12)
+                log_alert(f"📡 Yahoo {host}/{scrId} → HTTP {r.status_code}")
+                if r.status_code != 200:
+                    continue
+                quotes = r.json().get('finance', {}).get('result', [{}])[0].get('quotes', [])
+                log_alert(f"📡 Yahoo {scrId}: {len(quotes)} raw quotes")
+
+                filtered_out = {'price':0,'gap':0,'dvol':0,'vol':0,'rvol':0}
+                added = 0
+                for q in quotes:
+                    sym        = q.get('symbol', '')
+                    if not sym or sym in seen: continue
+                    price      = q.get('regularMarketPrice', 0)
+                    pct        = q.get('regularMarketChangePercent', 0)
+                    vol        = q.get('regularMarketVolume', 0)
+                    prev       = q.get('regularMarketPreviousClose', 0)
+                    avg_vol    = q.get('averageDailyVolume3Month', 1) or 1
+                    dollar_vol = price * vol
+                    rvol       = round(vol / avg_vol, 1) if avg_vol > 0 else 0
+
+                    if not (filters['min_price'] <= price <= filters['max_price']):
+                        filtered_out['price'] += 1; continue
+                    if pct < filters['min_gap_pct']:
+                        filtered_out['gap'] += 1; continue
+                    if dollar_vol < filters['min_dollar_vol']:
+                        filtered_out['dvol'] += 1; continue
+                    if vol < filters.get('min_volume', 0):
+                        filtered_out['vol'] += 1; continue
+                    if rvol < filters.get('min_rvol', 0):
+                        filtered_out['rvol'] += 1; continue
+
+                    seen.add(sym)
+                    added += 1
+                    candidates.append({
+                        'ticker':     sym,
+                        'price':      float(price),
+                        'prev_close': float(prev),
+                        'gap_pct':    round(float(pct), 1),
+                        'volume':     float(vol),
+                        'dollar_vol': float(dollar_vol),
+                        'rvol':       rvol,
+                        'source':     'yahoo',
+                    })
+                log_alert(
+                    f"📡 Yahoo {scrId}: {added} passed | filtered → "
+                    f"price:{filtered_out['price']} gap:{filtered_out['gap']} "
+                    f"dvol:{filtered_out['dvol']} vol:{filtered_out['vol']} rvol:{filtered_out['rvol']}"
+                )
+                break  # This host worked — move to next screener
+            except Exception as e:
+                log_alert(f"⚠️ Yahoo {host}/{scrId}: {e}")
+                # Loop continues to next host automatically
+
+    log_alert(f"📡 Yahoo total: {len(candidates)} unique candidates")
     return candidates
 
 # ============================================================
@@ -1146,40 +1334,55 @@ def get_yahoo_gainers(filters):
 
 def process_ticker(stock_data, mode='morning_gap', filters=None):
     try:
-        ticker     = stock_data['ticker']
-        filters    = filters or {}
+        ticker  = stock_data['ticker']
+        filters = filters or {}
 
-        # Try Alpaca snapshot first for enriched data
+        # Start with the original Polygon/Yahoo data (reliable premarket volumes)
+        price      = stock_data['price']
+        prev_close = stock_data['prev_close']
+        gap_pct    = stock_data['gap_pct']
+        dollar_vol = stock_data['dollar_vol']
+        volume     = stock_data.get('volume', 0)
+        rvol       = stock_data.get('rvol', 0)
+        vwap       = 0
+        bid        = 0
+        ask        = 0
+
+        # Enrich with Alpaca snapshot for live price, bid/ask, and VWAP.
+        # IMPORTANT: Never override volume or dollar_vol from Alpaca.
+        # Alpaca paper/free accounts use IEX feed which captures only ~20%
+        # of real market volume — it would severely undercount and kill valid setups.
+        # Yahoo/Polygon volume data is authoritative and stays as-is.
         snap = alpaca_get_snapshot(ticker)
-
         if snap and snap.get('price', 0) > 0:
-            price      = snap['price']
-            prev_close = snap['prev_close']
-            gap_pct    = snap['pct_change']
-            dollar_vol = snap['dollar_vol']
-            volume     = snap['volume']
-            rvol       = snap['rvol']
-            vwap       = snap['vwap']
-            bid        = snap['bid']
-            ask        = snap['ask']
+            price = snap['price']               # live price from Alpaca ✅
+            vwap  = snap.get('vwap', 0)         # VWAP from Alpaca ✅
+            bid   = snap.get('bid', 0)          # bid/ask from Alpaca ✅
+            ask   = snap.get('ask', 0)
+            # Recalculate gap with fresh price, keep original volume
+            if prev_close > 0:
+                gap_pct    = round((price - prev_close) / prev_close * 100, 2)
+            dollar_vol = price * volume  # recalculate with fresh price, original volume
+            # RVOL: use Alpaca only if it's plausible (not IEX-underreported)
+            if snap.get('rvol', 0) > 0 and snap.get('volume', 0) >= volume * 0.5:
+                rvol = snap['rvol']
+            log_alert(f"📊 {ticker}: price=${price:.2f} gap={gap_pct:+.1f}% vol={volume:,.0f} dvol=${dollar_vol:,.0f}")
         else:
-            price      = stock_data['price']
-            prev_close = stock_data['prev_close']
-            gap_pct    = stock_data['gap_pct']
-            dollar_vol = stock_data['dollar_vol']
-            volume     = stock_data.get('volume', 0)
-            rvol       = stock_data.get('rvol', 0)
-            vwap       = 0
-            bid        = 0
-            ask        = 0
+            log_alert(f"⚠️ {ticker}: Alpaca unavailable — using scan data price=${price:.2f}")
 
-        # Re-check filters with fresh Alpaca data
-        if price < filters.get('min_price', 0):      return None
-        if price > filters.get('max_price', 9999):   return None
-        if gap_pct < filters.get('min_gap_pct', 0):  return None
-        if dollar_vol < filters.get('min_dollar_vol', 0): return None
-        if volume < filters.get('min_volume', 0):    return None
-        if rvol < filters.get('min_rvol', 0):         return None
+        # Filter check — each rejection is logged so the Log tab explains every skip
+        if price < filters.get('min_price', 0):
+            log_alert(f"❌ {ticker}: price ${price:.2f} < min ${filters.get('min_price',0):.2f}"); return None
+        if price > filters.get('max_price', 9999):
+            log_alert(f"❌ {ticker}: price ${price:.2f} > max ${filters.get('max_price',9999):.2f}"); return None
+        if gap_pct < filters.get('min_gap_pct', 0):
+            log_alert(f"❌ {ticker}: gap {gap_pct:.1f}% < min {filters.get('min_gap_pct',0):.1f}%"); return None
+        if dollar_vol < filters.get('min_dollar_vol', 0):
+            log_alert(f"❌ {ticker}: dvol ${dollar_vol:,.0f} < min ${filters.get('min_dollar_vol',0):,.0f}"); return None
+        if volume < filters.get('min_volume', 0):
+            log_alert(f"❌ {ticker}: vol {volume:,.0f} < min {filters.get('min_volume',0):,.0f}"); return None
+        if rvol < filters.get('min_rvol', 0):
+            log_alert(f"❌ {ticker}: rvol {rvol:.1f}x < min {filters.get('min_rvol',0):.1f}x"); return None
 
         # AfterHrs — VWAP proximity filter (within X% above or below VWAP)
         vwap_prox = filters.get('vwap_proximity_pct', 0)
@@ -1213,23 +1416,33 @@ def process_ticker(stock_data, mode='morning_gap', filters=None):
         exchange     = info.get('exchange', '')
         market_cap_m = info.get('market_cap_m', 0)
 
-        if exchange and not any(ex in exchange.upper() for ex in ['NASDAQ','NYSE','AMEX','BATS','CBOE']):
+        if exchange and not any(ex in exchange.upper() for ex in [
+            'NASDAQ', 'NYSE', 'NEW YORK STOCK EXCHANGE', 'AMEX', 'BATS', 'CBOE', 'ARCA'
+        ]):
+            log_alert(f"❌ {ticker}: exchange '{exchange}' not in allowed list")
             return None
 
         max_mktcap = filters.get('max_market_cap_m', 0)
         if max_mktcap > 0 and market_cap_m > 0 and market_cap_m > max_mktcap:
+            log_alert(f"❌ {ticker}: mktcap ${market_cap_m:.0f}M > max ${max_mktcap:.0f}M")
             return None
 
-        # Float check
+        # Float check — only run when explicitly requested AND only via company
+        # info cache (avoid slow per-ticker yfinance.info calls that block everything)
         float_m   = 0.0
         max_float = filters.get('max_float_m', 0)
-        if max_float > 0:
+        # Note: yfinance .info is ~2s per ticker and kills scan speed.
+        # Float is checked informatively in the card but not used to hard-filter
+        # unless the user has set a specific mode (biotech/low_float) that needs it.
+        if max_float > 0 and mode in ('biotech', 'low_float', 'hq_premarket'):
             try:
                 yf_info      = yf.Ticker(ticker).info
                 float_shares = yf_info.get('floatShares', 0)
                 if float_shares:
                     float_m = float_shares / 1_000_000
-                    if float_m > max_float: return None
+                    if float_m > max_float:
+                        log_alert(f"🔢 {ticker}: float {float_m:.1f}M > {max_float}M — skipped")
+                        return None
             except:
                 pass
 
@@ -1304,20 +1517,51 @@ async def do_scan(user_id):
     mode    = s['mode']
     label   = SCAN_MODES.get(mode, {}).get('label', mode)
 
+    log_alert(
+        f"🔍 [{user_id}] Scan START — mode={mode} "
+        f"price=${filters['min_price']}–${filters['max_price']} "
+        f"gap≥{filters['min_gap_pct']}% "
+        f"dvol≥${filters['min_dollar_vol']:,.0f} "
+        f"vol≥{filters.get('min_volume',0):,.0f}"
+    )
+
     status = {'phase':'fetching','message':f'📡 Fetching [{label}]...','progress':0,'total':0}
     await broadcast_to_user(user_id, {'type':'scan_status','status':status})
     await asyncio.sleep(0)
 
-    # Polygon primary, Yahoo fallback
-    candidates = get_polygon_gainers(filters)
-    if not candidates:
-        status['message'] = '⚠️ Polygon empty, trying Yahoo...'
-        await broadcast_to_user(user_id, {'type':'scan_status','status':status})
-        await asyncio.sleep(0)
-        candidates = get_yahoo_gainers(filters)
+    # Run all sources in parallel for speed
+    status['message'] = '📡 Fetching from all sources simultaneously...'
+    await broadcast_to_user(user_id, {'type':'scan_status','status':status})
+    await asyncio.sleep(0)
+
+    poly_task   = asyncio.to_thread(get_polygon_gainers,       filters)
+    yahoo_task  = asyncio.to_thread(get_yahoo_gainers,         filters)
+    custom_task = asyncio.to_thread(get_yahoo_custom_screener, filters)
+
+    poly_results, yahoo_results, custom_results = await asyncio.gather(
+        poly_task, yahoo_task, custom_task, return_exceptions=True
+    )
+
+    # Merge all sources — dedupe by ticker
+    seen_tickers = set()
+    candidates   = []
+    labels       = {}
+    for source_list in [poly_results, yahoo_results, custom_results]:
+        if isinstance(source_list, Exception):
+            log_alert(f"⚠️ Source error: {source_list}")
+            continue
+        for c in (source_list or []):
+            if c['ticker'] not in seen_tickers:
+                seen_tickers.add(c['ticker'])
+                candidates.append(c)
+
+    n_poly   = len(poly_results)   if not isinstance(poly_results,   Exception) else 0
+    n_yahoo  = len(yahoo_results)  if not isinstance(yahoo_results,  Exception) else 0
+    n_custom = len(custom_results) if not isinstance(custom_results, Exception) else 0
+    log_alert(f"📊 Combined: {len(candidates)} unique (polygon={n_poly} yahoo={n_yahoo} custom={n_custom})")
 
     total = len(candidates)
-    log_alert(f"📊 [{user_id}] {total} candidates")
+    log_alert(f"📊 [{user_id}] {total} candidates after source filters")
 
     status = {'phase':'analyzing','message':f'Enriching {total} with Alpaca data...','progress':0,'total':total}
     await broadcast_to_user(user_id, {'type':'scan_status','status':status})
@@ -1360,6 +1604,16 @@ async def do_scan(user_id):
         key=lambda x: (0 if x['warning'] else {'A+':4,'A':3,'B':2}.get(x['grade'],1)),
         reverse=True
     )
+    tickers_found = [r['ticker'] for r in results]
+    log_alert(
+        f"✅ [{user_id}] Scan DONE — {len(results)}/{total} passed process_ticker | "
+        f"tickers: {', '.join(tickers_found[:10]) or 'none'}"
+    )
+    if not results:
+        log_alert(
+            f"⛔ [{user_id}] Zero results — check Log tab. "
+            f"Filters: gap≥{filters['min_gap_pct']}% dvol≥${filters['min_dollar_vol']:,.0f} vol≥{filters.get('min_volume',0):,.0f}"
+        )
     done_status = {'phase':'done','message':f'✅ {len(results)} setup(s) found','progress':total,'total':total}
     return results, done_status
 

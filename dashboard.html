@@ -81,8 +81,13 @@
     #btn-afterhrs.active .scan-btn-label{color:#ff9100;}
     #btn-afterhrs.active .scan-btn-sub{color:#b36400;}
     @keyframes glow-orange{0%,100%{box-shadow:0 0 10px rgba(255,145,0,.3)}50%{box-shadow:0 0 24px rgba(255,145,0,.65)}}
+    #btn-hq_premarket:hover{border-color:#ffd700;box-shadow:0 4px 14px rgba(255,215,0,.2);}
+    #btn-hq_premarket.active{border-color:#ffd700;background:linear-gradient(135deg,#1a1400,#2a2000);box-shadow:0 0 16px rgba(255,215,0,.4);animation:glow-gold 2s ease-in-out infinite;}
+    #btn-hq_premarket.active .scan-btn-label{color:#ffd700;}
+    #btn-hq_premarket.active .scan-btn-sub{color:#b09000;}
     @keyframes glow-green{0%,100%{box-shadow:0 0 10px rgba(0,200,83,.3)}50%{box-shadow:0 0 24px rgba(0,200,83,.65)}}
     @keyframes glow-blue {0%,100%{box-shadow:0 0 10px rgba(0,212,255,.3)}50%{box-shadow:0 0 24px rgba(0,212,255,.65)}}
+    @keyframes glow-gold {0%,100%{box-shadow:0 0 10px rgba(255,215,0,.3)}50%{box-shadow:0 0 24px rgba(255,215,0,.65)}}
 
     .btn{padding:5px 11px;border:none;border-radius:5px;font-size:.7rem;font-weight:600;cursor:pointer;transition:all .2s;display:flex;align-items:center;gap:4px;}
     .btn:hover{transform:translateY(-1px);filter:brightness(1.1);}
@@ -525,7 +530,7 @@
     <button class="scan-start-btn" id="btn-morning_gap" onclick="startWithMode('morning_gap')">
       <span class="scan-btn-icon">🌅</span>
       <span class="scan-btn-label">MorningGap</span>
-      <span class="scan-btn-sub">$0.10–$50 · Gap 5%+ · Float ≤20M</span>
+      <span class="scan-btn-sub">$0.50–$20 · Gap 8%+ · $Vol $500K+</span>
     </button>
     <span class="info-icon" onmouseenter="showTip(event,'morning_gap')" onmouseleave="hideTip()">ⓘ</span>
   </div>
@@ -533,9 +538,17 @@
     <button class="scan-start-btn" id="btn-scanopp" onclick="startWithMode('scanopp')">
       <span class="scan-btn-icon">💡</span>
       <span class="scan-btn-label">ScanOpp</span>
-      <span class="scan-btn-sub">$0.50–$15 · Gap 9%+ · $Vol $3M+</span>
+      <span class="scan-btn-sub">$0.30–$15 · Gap 12%+ · $Vol $1M+</span>
     </button>
     <span class="info-icon" onmouseenter="showTip(event,'scanopp')" onmouseleave="hideTip()">ⓘ</span>
+  </div>
+  <div class="scan-btn-wrap">
+    <button class="scan-start-btn" id="btn-hq_premarket" onclick="startWithMode('hq_premarket')" style="border-color:#ffd700">
+      <span class="scan-btn-icon">⭐</span>
+      <span class="scan-btn-label" style="color:#ffd700">HQ Pre-Mkt</span>
+      <span class="scan-btn-sub">$1–$10 · Gap 15%+ · $Vol $2M+</span>
+    </button>
+    <span class="info-icon" onmouseenter="showTip(event,'hq_premarket')" onmouseleave="hideTip()">ⓘ</span>
   </div>
   <div class="scan-btn-wrap">
     <button class="scan-start-btn" id="btn-afterhrs" onclick="startWithMode('afterhrs')">
@@ -780,18 +793,19 @@
   setLogos();
 
   const MODES = {
-    morning_gap: { label:'🌅 MorningGap', desc:'Price $0.10–$50, Gap 5%+, $Vol $250K+, Float ≤20M' },
-    scanopp:     { label:'💡 ScanOpp',    desc:'Price $0.50–$15, Gap 9%+, $Vol $3M+, Trades 3K+' },
-    standard:    { label:'🔍 Standard',   desc:'Gap 10%+, $0.20–$20, $100K vol, RVOL 1.5x+' },
-    supernova:   { label:'🚀 Supernovas', desc:'Gap 50%+ only — massive movers' },
-    biotech:     { label:'🧬 Biotech',    desc:'Biotech/FDA, gap 15%+, catalyst required' },
-    low_float:   { label:'⚡ Low Float',  desc:'Float under 10M, gap 15%+' },
-    premarket:   { label:'🌄 Pre-Market', desc:'Gap 10%+, vol 100K+' },
-    squeeze:     { label:'💎 Squeeze',    desc:'High dollar vol $3M+, gap 9%+' },
-    small_cap:   { label:'📊 Small Cap',  desc:'$1–$20, gap 15%+' },
-    afternoon:   { label:'🌆 Afternoon',  desc:'HOD breakouts, gap 5%+' },
-    penny:       { label:'🪙 Penny',      desc:'Pure penny stocks under $1' },
-    custom:      { label:'⚙️ Custom',     desc:'Your custom filter settings' },
+    morning_gap:  { label:'🌅 MorningGap',    desc:'Price $0.50–$20, Gap 8%+, $Vol $500K+, Float ≤20M' },
+    scanopp:      { label:'💡 ScanOpp',        desc:'Price $0.30–$15, Gap 12%+, $Vol $1M+, Vol 500K+' },
+    hq_premarket: { label:'⭐ HQ Pre-Market',  desc:'Price $1–$10, Gap 15%+, $Vol $2M+, Vol 1M+, Float ≤50M' },
+    standard:     { label:'🔍 Standard',       desc:'Gap 10%+, $0.20–$20, $100K vol, RVOL 1.5x+' },
+    supernova:    { label:'🚀 Supernovas',     desc:'Gap 50%+ only — massive movers' },
+    biotech:      { label:'🧬 Biotech',        desc:'Biotech/FDA, gap 15%+, catalyst required' },
+    low_float:    { label:'⚡ Low Float',      desc:'Float under 10M, gap 15%+' },
+    premarket:    { label:'🌄 Pre-Market',     desc:'Gap 10%+, vol 100K+' },
+    squeeze:      { label:'💎 Squeeze',        desc:'High dollar vol $3M+, gap 9%+' },
+    small_cap:    { label:'📊 Small Cap',      desc:'$1–$20, gap 15%+' },
+    afternoon:    { label:'🌆 Afternoon',      desc:'HOD breakouts, gap 5%+' },
+    penny:        { label:'🪙 Penny',          desc:'Pure penny stocks under $1' },
+    custom:       { label:'⚙️ Custom',         desc:'Your custom filter settings' },
   };
 
   const DVOL_VALUES=[10000,25000,50000,75000,100000,150000,200000,250000,300000,500000,750000,
@@ -953,9 +967,17 @@
   // ── DUAL SCAN BUTTONS ──
   async function startWithMode(mode){
     if(!currentUser){alert('Please select a user first');return;}
+
+    // ── DEBUG: log every scan start ──
+    console.group(`🔍 startWithMode("${mode}")`);
+    console.log('User:', currentUser.id);
+    console.log('Mode:', mode, MODES[mode]);
+    console.log('Was running:', isRunning, '| Was paused:', isPaused);
+
     const alreadyRunningThisMode=isRunning&&!isPaused&&currentMode===mode;
     if(isRunning||isPaused){
-      await fetch(`${API_URL}/api/scanner/stop/${currentUser.id}`,{method:'POST'});
+      const stopResp = await fetch(`${API_URL}/api/scanner/stop/${currentUser.id}`,{method:'POST'});
+      console.log('Stop response:', await stopResp.json().catch(()=>stopResp.status));
       await new Promise(r=>setTimeout(r,300));
       isRunning=false;isPaused=false;stopPolling();
     }
@@ -976,38 +998,47 @@
       </div>`;
     document.getElementById('screenerList').innerHTML='<div class="screener-empty">Scanning...</div>';
     ['statSetups','statAplus','fStatSetups','fStatAplus'].forEach(id=>document.getElementById(id).textContent='0');
-    await fetch(`${API_URL}/api/scanner/mode/${currentUser.id}/${mode}`,{method:'POST'});
     currentMode=mode;
     updateActiveModeLabel(mode);
     try{
-      await fetch(`${API_URL}/api/scanner/start/${currentUser.id}`,{method:'POST'});
+      const modeResp = await fetch(`${API_URL}/api/scanner/mode/${currentUser.id}/${mode}`,{method:'POST'});
+      const modeData = await modeResp.json().catch(()=>({}));
+      console.log('Mode set response:', modeData);
+
+      const startResp = await fetch(`${API_URL}/api/scanner/start/${currentUser.id}`,{method:'POST'});
+      const startData = await startResp.json().catch(()=>({}));
+      console.log('Start response:', startData);
+      console.log('Active filters:', modeData.filters || '(check /api/status/'+currentUser.id+')');
+      console.groupEnd();
+
       isRunning=true;isPaused=false;
       updateStatusUI(true);updateScanBtns(mode);
       document.getElementById('pauseBtn').style.display='flex';
       document.getElementById('pauseBtn').textContent='⏸ Pause';
       startPolling();
-    }catch(e){alert('Cannot connect to server.');}
+    }catch(e){
+      console.error('startWithMode error:', e);
+      console.groupEnd();
+      alert('Cannot connect to server. Is the backend running?');
+    }
   }
 
+  const BTN_DEFAULTS = {
+    morning_gap:  { icon:'🌅', sub:'$0.50–$20 · Gap 8%+ · $Vol $500K+' },
+    scanopp:      { icon:'💡', sub:'$0.30–$15 · Gap 12%+ · $Vol $1M+' },
+    hq_premarket: { icon:'⭐', sub:'$1–$10 · Gap 15%+ · $Vol $2M+' },
+    afterhrs:     { icon:'🌆', sub:'Under $50 · Within 10% of VWAP' },
+  };
+
   function updateScanBtns(activeMode){
-    ['morning_gap','scanopp','afterhrs'].forEach(m=>{
+    Object.keys(BTN_DEFAULTS).forEach(m=>{
       const btn=document.getElementById(`btn-${m}`);if(!btn)return;
       const running=(m===activeMode)&&isRunning&&!isPaused;
       btn.classList.toggle('active',running);
       const icon=btn.querySelector('.scan-btn-icon');
-      const sub=btn.querySelector('.scan-btn-sub');
-      if(icon){
-        if(running)icon.textContent='⏳';
-        else if(m==='morning_gap')icon.textContent='🌅';
-        else if(m==='scanopp')icon.textContent='💡';
-        else icon.textContent='🌆';
-      }
-      if(sub){
-        if(running)sub.textContent='Click to rescan';
-        else if(m==='morning_gap')sub.textContent='$0.10–$50 · Gap 5%+ · Float ≤20M';
-        else if(m==='scanopp')sub.textContent='$0.50–$15 · Gap 9%+ · $Vol $3M+';
-        else sub.textContent='Under $50 · Within 10% of VWAP';
-      }
+      const sub =btn.querySelector('.scan-btn-sub');
+      if(icon) icon.textContent = running ? '⏳' : BTN_DEFAULTS[m].icon;
+      if(sub)  sub.textContent  = running ? 'Click to rescan' : BTN_DEFAULTS[m].sub;
     });
   }
 
