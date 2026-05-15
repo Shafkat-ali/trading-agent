@@ -63,7 +63,7 @@
     .controls{padding:7px 14px;display:flex;gap:8px;flex-wrap:wrap;background:#0d1220;border-bottom:1px solid #1a2035;align-items:center;}
 
     /* DUAL SCAN BUTTONS */
-    .scan-start-btn{display:flex;flex-direction:column;align-items:center;justify-content:center;padding:6px 16px;border:2px solid #1e2d4a;border-radius:8px;background:#0d1525;cursor:pointer;transition:all .25s;gap:1px;min-width:120px;position:relative;}
+    .scan-start-btn{display:flex;flex-direction:column;align-items:center;justify-content:center;padding:6px 16px;border:2px solid #1e2d4a;border-radius:8px;background:#0d1525;cursor:pointer;transition:all .25s;gap:1px;min-width:120px;}
     .scan-start-btn:hover{transform:translateY(-2px);}
     .scan-btn-icon{font-size:1rem;line-height:1;}
     .scan-btn-label{font-size:.76rem;font-weight:800;color:#e0e6f0;line-height:1.3;}
@@ -80,29 +80,9 @@
     #btn-afterhrs.active{border-color:#ff9100;background:linear-gradient(135deg,#1a0e00,#2e1a00);box-shadow:0 0 16px rgba(255,145,0,.4);animation:glow-orange 2s ease-in-out infinite;}
     #btn-afterhrs.active .scan-btn-label{color:#ff9100;}
     #btn-afterhrs.active .scan-btn-sub{color:#b36400;}
-    @keyframes glow-green {0%,100%{box-shadow:0 0 10px rgba(0,200,83,.3)}50%{box-shadow:0 0 24px rgba(0,200,83,.65)}}
-    @keyframes glow-blue  {0%,100%{box-shadow:0 0 10px rgba(0,212,255,.3)}50%{box-shadow:0 0 24px rgba(0,212,255,.65)}}
     @keyframes glow-orange{0%,100%{box-shadow:0 0 10px rgba(255,145,0,.3)}50%{box-shadow:0 0 24px rgba(255,145,0,.65)}}
-
-    /* TOOLTIPS */
-    .scan-tooltip{
-      display:none;position:absolute;bottom:calc(100% + 10px);left:50%;transform:translateX(-50%);
-      background:#0d1525;border:1px solid #2a3a5a;border-radius:8px;padding:10px 13px;
-      width:220px;z-index:9999;pointer-events:none;text-align:left;
-      box-shadow:0 8px 24px rgba(0,0,0,.6);
-    }
-    .scan-start-btn:hover .scan-tooltip{display:block;}
-    .scan-tooltip::after{
-      content:'';position:absolute;top:100%;left:50%;transform:translateX(-50%);
-      border:6px solid transparent;border-top-color:#2a3a5a;
-    }
-    .tt-title{font-size:.72rem;font-weight:800;color:#e0e6f0;margin-bottom:6px;padding-bottom:5px;border-bottom:1px solid #1e2d4a;}
-    .tt-row{display:flex;justify-content:space-between;gap:8px;margin:3px 0;}
-    .tt-key{font-size:.62rem;color:#4a6a8a;}
-    .tt-val{font-size:.62rem;color:#a0c4ff;font-weight:700;text-align:right;}
-    .tt-divider{border:none;border-top:1px solid #1e2d4a;margin:6px 0;}
-    .tt-desc{font-size:.6rem;color:#6a8aaa;line-height:1.4;}
-    .tt-best{font-size:.58rem;color:#ffd700;margin-top:4px;font-weight:600;}
+    @keyframes glow-green{0%,100%{box-shadow:0 0 10px rgba(0,200,83,.3)}50%{box-shadow:0 0 24px rgba(0,200,83,.65)}}
+    @keyframes glow-blue {0%,100%{box-shadow:0 0 10px rgba(0,212,255,.3)}50%{box-shadow:0 0 24px rgba(0,212,255,.65)}}
 
     .btn{padding:5px 11px;border:none;border-radius:5px;font-size:.7rem;font-weight:600;cursor:pointer;transition:all .2s;display:flex;align-items:center;gap:4px;}
     .btn:hover{transform:translateY(-1px);filter:brightness(1.1);}
@@ -114,12 +94,15 @@
     .stat-label{font-size:.48rem;color:#4a6a8a;text-transform:uppercase;}
 
     /* PROGRESS */
-    .scan-progress-bar{padding:3px 14px;background:#080c18;border-bottom:1px solid #1a2035;display:none;}
+    .scan-progress-bar{padding:5px 14px 6px;background:#080e1e;border-bottom:2px solid #1a2035;display:none;transition:all .3s;}
     .scan-progress-bar.visible{display:block;}
-    .progress-label{font-size:.58rem;color:#4a6a8a;margin-bottom:2px;display:flex;justify-content:space-between;}
-    .progress-track{height:2px;background:#1a2035;border-radius:2px;overflow:hidden;}
-    .progress-fill{height:100%;background:linear-gradient(90deg,#ffd700,#00d4ff);border-radius:2px;transition:width .3s;}
-    .progress-fill.indeterminate{width:30%!important;animation:ind 1.5s ease-in-out infinite;}
+    .progress-label{font-size:.62rem;color:#a0b8d0;margin-bottom:4px;display:flex;justify-content:space-between;align-items:center;gap:8px;}
+    .progress-msg-text{flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+    .progress-count-badge{background:#1a2a4a;border:1px solid #2a3a5a;border-radius:10px;padding:1px 7px;font-size:.58rem;color:#ffd700;font-weight:700;white-space:nowrap;flex-shrink:0;}
+    .progress-track{height:4px;background:#1a2035;border-radius:4px;overflow:hidden;}
+    .progress-fill{height:100%;background:linear-gradient(90deg,#00c853,#00d4ff,#ffd700);border-radius:4px;transition:width .4s ease;box-shadow:0 0 8px rgba(0,212,255,.4);}
+    .progress-fill.indeterminate{width:40%!important;animation:ind 1.2s ease-in-out infinite;}
+    @keyframes ind{0%{margin-left:-40%}100%{margin-left:100%}}
     @keyframes ind{0%{transform:translateX(-200%)}100%{transform:translateX(450%)}}
 
     /* MAIN */
@@ -241,8 +224,15 @@
     .filter-group{margin-bottom:8px;}
     .filter-label{font-size:.57rem;color:#6b7fa3;text-transform:uppercase;letter-spacing:.3px;margin-bottom:3px;display:flex;justify-content:space-between;}
     .filter-val{color:#a78bfa;font-weight:700;}
-    .filter-range{width:100%;accent-color:#a78bfa;cursor:pointer;}
+    .filter-range{flex:1;accent-color:#a78bfa;cursor:pointer;}
     .filter-row{display:flex;gap:4px;align-items:center;}
+    .slider-nudge{
+      flex-shrink:0;width:20px;height:20px;border-radius:4px;
+      border:1px solid #2a3a5a;background:#0f1729;color:#a0c4ff;
+      font-size:.65rem;cursor:pointer;display:flex;align-items:center;
+      justify-content:center;padding:0;transition:background .15s;
+    }
+    .slider-nudge:hover{background:#1e3a6a;color:#fff;}
     .filter-input{background:#0d1525;border:1px solid #1e2d4a;border-radius:4px;padding:3px 5px;color:#e0e6f0;font-size:.67rem;width:100%;outline:none;}
     .filter-input:focus{border-color:#a78bfa;}
     .filter-stat-grid{display:grid;grid-template-columns:1fr 1fr;gap:5px;margin-top:6px;}
@@ -496,50 +486,30 @@
 
 <!-- CONTROLS -->
 <div class="controls">
-  <button class="scan-start-btn" id="btn-morning_gap" onclick="startWithMode('morning_gap')">
-    <span class="scan-btn-icon">🌅</span>
-    <span class="scan-btn-label">MorningGap</span>
-    <span class="scan-btn-sub">$0.10–$50 · Gap 5%+ · Float ≤20M</span>
-    <div class="scan-tooltip">
-      <div class="tt-title">🌅 MorningGap Scanner</div>
-      <div class="tt-row"><span class="tt-key">Price</span><span class="tt-val">$0.10 – $50.00</span></div>
-      <div class="tt-row"><span class="tt-key">% Change</span><span class="tt-val">+5% or more</span></div>
-      <div class="tt-row"><span class="tt-key">Dollar Vol</span><span class="tt-val">$250,000+</span></div>
-      <div class="tt-row"><span class="tt-key">Float</span><span class="tt-val">Under 20M shares</span></div>
-      <hr class="tt-divider">
-      <div class="tt-desc">Finds stocks gapping up premarket with small float for explosive moves.</div>
-      <div class="tt-best">⏰ Best: 4:00am – 9:30am EST</div>
-    </div>
-  </button>
-  <button class="scan-start-btn" id="btn-scanopp" onclick="startWithMode('scanopp')">
-    <span class="scan-btn-icon">💡</span>
-    <span class="scan-btn-label">ScanOpp</span>
-    <span class="scan-btn-sub">$0.50–$15 · Gap 9%+ · $Vol $3M+</span>
-    <div class="scan-tooltip">
-      <div class="tt-title">💡 ScanOpp Scanner</div>
-      <div class="tt-row"><span class="tt-key">Price</span><span class="tt-val">$0.50 – $15.00</span></div>
-      <div class="tt-row"><span class="tt-key">% Change</span><span class="tt-val">+9% or more</span></div>
-      <div class="tt-row"><span class="tt-key">Dollar Vol</span><span class="tt-val">$3,000,000+</span></div>
-      <div class="tt-row"><span class="tt-key">Trades</span><span class="tt-val">3,000+</span></div>
-      <hr class="tt-divider">
-      <div class="tt-desc">High-liquidity momentum plays. Stricter criteria = higher quality setups.</div>
-      <div class="tt-best">⏰ Best: Market open 9:30am EST</div>
-    </div>
-  </button>
-  <button class="scan-start-btn" id="btn-afterhrs" onclick="startWithMode('afterhrs')">
-    <span class="scan-btn-icon">🌆</span>
-    <span class="scan-btn-label">AfterHrs</span>
-    <span class="scan-btn-sub">Under $50 · Within 10% of VWAP</span>
-    <div class="scan-tooltip">
-      <div class="tt-title">🌆 AfterHrs Scanner</div>
-      <div class="tt-row"><span class="tt-key">Price</span><span class="tt-val">Under $50.00</span></div>
-      <div class="tt-row"><span class="tt-key">VWAP Range</span><span class="tt-val">Within 10% above or below</span></div>
-      <div class="tt-row"><span class="tt-key">Dollar Vol</span><span class="tt-val">$100,000+</span></div>
-      <hr class="tt-divider">
-      <div class="tt-desc">Stocks hugging VWAP — coiled for a spike long or short in after hours.</div>
-      <div class="tt-best">⏰ Best: 4:00pm – 8:00pm EST</div>
-    </div>
-  </button>
+  <div class="scan-btn-wrap">
+    <button class="scan-start-btn" id="btn-morning_gap" onclick="startWithMode('morning_gap')">
+      <span class="scan-btn-icon">🌅</span>
+      <span class="scan-btn-label">MorningGap</span>
+      <span class="scan-btn-sub">$0.10–$50 · Gap 5%+ · Float ≤20M</span>
+    </button>
+    <span class="info-icon" onmouseenter="showTip(event,'morning_gap')" onmouseleave="hideTip()">ⓘ</span>
+  </div>
+  <div class="scan-btn-wrap">
+    <button class="scan-start-btn" id="btn-scanopp" onclick="startWithMode('scanopp')">
+      <span class="scan-btn-icon">💡</span>
+      <span class="scan-btn-label">ScanOpp</span>
+      <span class="scan-btn-sub">$0.50–$15 · Gap 9%+ · $Vol $3M+</span>
+    </button>
+    <span class="info-icon" onmouseenter="showTip(event,'scanopp')" onmouseleave="hideTip()">ⓘ</span>
+  </div>
+  <div class="scan-btn-wrap">
+    <button class="scan-start-btn" id="btn-afterhrs" onclick="startWithMode('afterhrs')">
+      <span class="scan-btn-icon">🌆</span>
+      <span class="scan-btn-label">AfterHrs</span>
+      <span class="scan-btn-sub">Under $50 · Within 10% of VWAP</span>
+    </button>
+    <span class="info-icon" onmouseenter="showTip(event,'afterhrs')" onmouseleave="hideTip()">ⓘ</span>
+  </div>
   <button class="btn btn-pause" id="pauseBtn" onclick="togglePause()" style="display:none">⏸ Pause</button>
   <button class="btn btn-clear" onclick="clearResults()">🗑 Clear</button>
   <div class="stats-bar">
@@ -548,9 +518,13 @@
     <div class="stat"><div class="stat-val" id="statTime">--:--</div><div class="stat-label">Last Scan</div></div>
   </div>
 </div>
+<div id="scanTooltipBox"></div>
 
 <div class="scan-progress-bar" id="progressBar">
-  <div class="progress-label"><span id="progressMsg">Scanning...</span><span id="progressCount"></span></div>
+  <div class="progress-label">
+    <span class="progress-msg-text" id="progressMsg">Scanning...</span>
+    <span class="progress-count-badge" id="progressCount"></span>
+  </div>
   <div class="progress-track"><div class="progress-fill indeterminate" id="progressFill"></div></div>
 </div>
 
@@ -597,7 +571,20 @@
 
     <!-- SCREENER -->
     <div class="tab-content active" id="tab-screener">
-      <div style="font-size:.56rem;color:#3a5a7a;margin-bottom:5px;text-align:center">Click ticker to view details</div>
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:5px;gap:4px;">
+        <span style="font-size:.56rem;color:#3a5a7a;">Click ticker to view details</span>
+        <div style="display:flex;gap:3px;">
+          <button onclick="sortScreener('grade')" id="sortGradeBtn"
+            style="font-size:.52rem;padding:2px 6px;border-radius:4px;border:1px solid #2a3a5a;background:#0f1729;color:#a0c4ff;cursor:pointer;"
+            title="Sort by Grade">⭐ Grade</button>
+          <button onclick="sortScreener('alpha')" id="sortAlphaBtn"
+            style="font-size:.52rem;padding:2px 6px;border-radius:4px;border:1px solid #2a3a5a;background:#0f1729;color:#a0c4ff;cursor:pointer;"
+            title="Sort A–Z">🔤 A–Z</button>
+          <button onclick="sortScreener('gap')" id="sortGapBtn"
+            style="font-size:.52rem;padding:2px 6px;border-radius:4px;border:1px solid #2a3a5a;background:#0f1729;color:#a0c4ff;cursor:pointer;"
+            title="Sort by % Change">📈 Gap%</button>
+        </div>
+      </div>
       <div id="screenerList"><div class="screener-empty">Press MorningGap or ScanOpp to start.</div></div>
     </div>
 
@@ -641,8 +628,12 @@
         </div>
         <div class="filter-group">
           <div class="filter-label">Min % Change <span class="filter-val" id="fGapLabel">5%</span></div>
-          <input class="filter-range" id="fMinGap" type="range" min="1" max="100" value="5"
-            oninput="document.getElementById('fGapLabel').textContent=this.value+'%'">
+          <div class="filter-row">
+            <button class="slider-nudge" onclick="nudge('fMinGap',-1,1,100,v=>v+'%','fGapLabel')">◀</button>
+            <input class="filter-range" id="fMinGap" type="range" min="1" max="100" value="5"
+              oninput="document.getElementById('fGapLabel').textContent=this.value+'%'">
+            <button class="slider-nudge" onclick="nudge('fMinGap',1,1,100,v=>v+'%','fGapLabel')">▶</button>
+          </div>
         </div>
       </div>
 
@@ -650,18 +641,30 @@
         <div class="filter-cat-title">💧 Liquidity</div>
         <div class="filter-group">
           <div class="filter-label">Min Dollar Volume <span class="filter-val" id="fDvolLabel">$250K</span></div>
-          <input class="filter-range" id="fMinDvol" type="range" min="0" max="20" value="5" step="1"
-            oninput="updateDvolLabel(this.value)">
+          <div class="filter-row">
+            <button class="slider-nudge" onclick="nudge('fMinDvol',-1,0,20,v=>{updateDvolLabel(v);},'')">◀</button>
+            <input class="filter-range" id="fMinDvol" type="range" min="0" max="20" value="5" step="1"
+              oninput="updateDvolLabel(this.value)">
+            <button class="slider-nudge" onclick="nudge('fMinDvol',1,0,20,v=>{updateDvolLabel(v);},'')">▶</button>
+          </div>
         </div>
         <div class="filter-group">
           <div class="filter-label">Min Raw Volume <span class="filter-val" id="fVolLabel">50K</span></div>
-          <input class="filter-range" id="fMinVol" type="range" min="0" max="10" value="1" step="1"
-            oninput="updateVolLabel(this.value)">
+          <div class="filter-row">
+            <button class="slider-nudge" onclick="nudge('fMinVol',-1,0,10,v=>{updateVolLabel(v);},'')">◀</button>
+            <input class="filter-range" id="fMinVol" type="range" min="0" max="10" value="1" step="1"
+              oninput="updateVolLabel(this.value)">
+            <button class="slider-nudge" onclick="nudge('fMinVol',1,0,10,v=>{updateVolLabel(v);},'')">▶</button>
+          </div>
         </div>
         <div class="filter-group">
           <div class="filter-label">Min RVOL <span class="filter-val" id="fRvolLabel">0x</span></div>
-          <input class="filter-range" id="fMinRvol" type="range" min="0" max="20" value="0" step="0.5"
-            oninput="document.getElementById('fRvolLabel').textContent=parseFloat(this.value).toFixed(1)+'x'">
+          <div class="filter-row">
+            <button class="slider-nudge" onclick="nudge('fMinRvol',-0.5,0,20,v=>parseFloat(v).toFixed(1)+'x','fRvolLabel')">◀</button>
+            <input class="filter-range" id="fMinRvol" type="range" min="0" max="20" value="0" step="0.5"
+              oninput="document.getElementById('fRvolLabel').textContent=parseFloat(this.value).toFixed(1)+'x'">
+            <button class="slider-nudge" onclick="nudge('fMinRvol',0.5,0,20,v=>parseFloat(v).toFixed(1)+'x','fRvolLabel')">▶</button>
+          </div>
         </div>
         <div class="filter-stat-grid">
           <div class="filter-stat"><div class="filter-stat-val" id="fStatSetups">0</div><div class="filter-stat-label">Setups Found</div></div>
@@ -673,13 +676,21 @@
         <div class="filter-cat-title">📋 Stock Characteristics</div>
         <div class="filter-group">
           <div class="filter-label">Max Float <span class="filter-val" id="fFloatLabel">20M</span></div>
-          <input class="filter-range" id="fMaxFloat" type="range" min="0" max="200" value="20" step="5"
-            oninput="document.getElementById('fFloatLabel').textContent=(this.value==0?'Any':this.value+'M')">
+          <div class="filter-row">
+            <button class="slider-nudge" onclick="nudge('fMaxFloat',-5,0,200,v=>v==0?'Any':v+'M','fFloatLabel')">◀</button>
+            <input class="filter-range" id="fMaxFloat" type="range" min="0" max="200" value="20" step="5"
+              oninput="document.getElementById('fFloatLabel').textContent=(this.value==0?'Any':this.value+'M')">
+            <button class="slider-nudge" onclick="nudge('fMaxFloat',5,0,200,v=>v==0?'Any':v+'M','fFloatLabel')">▶</button>
+          </div>
         </div>
         <div class="filter-group">
           <div class="filter-label">Max Market Cap <span class="filter-val" id="fMktCapLabel">Any</span></div>
-          <input class="filter-range" id="fMaxMktCap" type="range" min="0" max="2000" value="0" step="50"
-            oninput="document.getElementById('fMktCapLabel').textContent=(this.value==0?'Any':'$'+this.value+'M')">
+          <div class="filter-row">
+            <button class="slider-nudge" onclick="nudge('fMaxMktCap',-50,0,2000,v=>v==0?'Any':'$'+v+'M','fMktCapLabel')">◀</button>
+            <input class="filter-range" id="fMaxMktCap" type="range" min="0" max="2000" value="0" step="50"
+              oninput="document.getElementById('fMktCapLabel').textContent=(this.value==0?'Any':'$'+this.value+'M')">
+            <button class="slider-nudge" onclick="nudge('fMaxMktCap',50,0,2000,v=>v==0?'Any':'$'+v+'M','fMktCapLabel')">▶</button>
+          </div>
         </div>
         <div class="vwap-row" style="margin-top:4px">
           <span class="vwap-label">Require News Catalyst</span>
@@ -719,7 +730,6 @@
   const MODES = {
     morning_gap: { label:'🌅 MorningGap', desc:'Price $0.10–$50, Gap 5%+, $Vol $250K+, Float ≤20M' },
     scanopp:     { label:'💡 ScanOpp',    desc:'Price $0.50–$15, Gap 9%+, $Vol $3M+, Trades 3K+' },
-    afterhrs:    { label:'🌆 AfterHrs',   desc:'Under $50 · Within 10% of VWAP — coiled for a spike' },
     standard:    { label:'🔍 Standard',   desc:'Gap 10%+, $0.20–$20, $100K vol, RVOL 1.5x+' },
     supernova:   { label:'🚀 Supernovas', desc:'Gap 50%+ only — massive movers' },
     biotech:     { label:'🧬 Biotech',    desc:'Biotech/FDA, gap 15%+, catalyst required' },
@@ -749,12 +759,26 @@
     document.getElementById('fPriceLabel').textContent=
       `$${document.getElementById('fMinPrice').value||'0.10'}–$${document.getElementById('fMaxPrice').value||'50'}`;
   }
+
+  // ── SLIDER NUDGE — ◀ ▶ buttons ──
+  function nudge(id, delta, min, max, labelFn, labelId){
+    const el=document.getElementById(id); if(!el) return;
+    let v=parseFloat(el.value)+delta;
+    v=Math.min(max, Math.max(min, v));
+    el.value=v;
+    // Trigger oninput so label updates
+    el.dispatchEvent(new Event('input'));
+    // For dvol/vol which use custom label functions
+    if(id==='fMinDvol') updateDvolLabel(v);
+    if(id==='fMinVol')  updateVolLabel(v);
+  }
   let newsOn=false;
   function toggleNews(){newsOn=!newsOn;document.getElementById('newsToggle').classList.toggle('on',newsOn);}
 
   // ── STATE ──
   let currentUser=null,ws=null,isRunning=false,isPaused=false;
   let allResults=[],isLoading=false,pollTimer=null,quoteTimer=null,currentMode='morning_gap';
+  let screenerSort='grade'; // 'grade' | 'alpha' | 'gap'
 
   // ── USER ──
   function selectUser(id,name,initial){
@@ -913,13 +937,34 @@
     }catch(e){alert('Cannot connect to server.');}
   }
 
+  // ── TOOLTIP ──
+  const TOOLTIP_DATA={
+    morning_gap:{title:'🌅 MorningGap Scanner',rows:[['Price','$0.10 – $50.00'],['% Change','+5% or more'],['Dollar Vol','$250,000+'],['Float','Under 20M shares']],desc:'Finds stocks gapping up premarket with small float for explosive moves.',best:'⏰ Best: 4:00am – 9:30am EST'},
+    scanopp:    {title:'💡 ScanOpp Scanner',   rows:[['Price','$0.50 – $15.00'],['% Change','+9% or more'],['Dollar Vol','$3,000,000+'],['Trades','3,000+']],desc:'High-liquidity momentum plays. Stricter criteria = higher quality setups.',best:'⏰ Best: Market open 9:30am EST'},
+    afterhrs:   {title:'🌆 AfterHrs Scanner',  rows:[['Price','Under $50.00'],['VWAP Range','Within 10% above or below'],['Dollar Vol','$100,000+']],desc:'Stocks hugging VWAP — coiled for a spike long or short in after hours.',best:'⏰ Best: 4:00pm – 8:00pm EST'},
+  };
+  function showTip(e,mode){
+    const d=TOOLTIP_DATA[mode];if(!d)return;
+    const box=document.getElementById('scanTooltipBox');
+    box.innerHTML=`<div class="tt-title">${d.title}</div>`
+      +d.rows.map(r=>`<div class="tt-row"><span class="tt-key">${r[0]}</span><span class="tt-val">${r[1]}</span></div>`).join('')
+      +`<hr class="tt-divider"><div class="tt-desc">${d.desc}</div><div class="tt-best">${d.best}</div>`;
+    const rect=e.target.getBoundingClientRect(),tipW=230;
+    let left=rect.left-tipW/2+rect.width/2;
+    left=Math.max(8,Math.min(left,window.innerWidth-tipW-8));
+    box.style.left=left+'px';box.style.top=rect.top+'px';
+    box.style.transform='translateY(-100%) translateY(-10px)';
+    box.style.display='block';
+  }
+  function hideTip(){document.getElementById('scanTooltipBox').style.display='none';}
+
   function updateScanBtns(activeMode){
     ['morning_gap','scanopp','afterhrs'].forEach(m=>{
       const btn=document.getElementById(`btn-${m}`);if(!btn)return;
       const running=(m===activeMode)&&isRunning&&!isPaused;
       btn.classList.toggle('active',running);
       const icon=btn.querySelector('.scan-btn-icon');
-      const sub =btn.querySelector('.scan-btn-sub');
+      const sub=btn.querySelector('.scan-btn-sub');
       if(icon){
         if(running)icon.textContent='⏳';
         else if(m==='morning_gap')icon.textContent='🌅';
@@ -1023,13 +1068,28 @@
     ['statAplus','fStatAplus'].forEach(id=>document.getElementById(id).textContent=aplus);
   }
 
+  // ── SCREENER SORT ──
+  function sortScreener(mode){
+    screenerSort=mode;
+    // Highlight active sort button
+    ['grade','alpha','gap'].forEach(m=>{
+      const btn=document.getElementById(`sort${m.charAt(0).toUpperCase()+m.slice(1)}Btn`);
+      if(btn)btn.style.background=m===mode?'#1e3a6a':'#0f1729';
+    });
+    updateScreener();
+  }
+
   // ── SCREENER ──
   function updateScreener(){
     const c=document.getElementById('screenerList');
     if(!allResults.length){c.innerHTML='<div class="screener-empty">No stocks yet.</div>';return;}
+    const gradeVal={'A+':4,'A':3,'B':2,'C':1,'D':0};
     const sorted=[...allResults].sort((a,b)=>{
+      if(screenerSort==='alpha') return a.ticker.localeCompare(b.ticker);
+      if(screenerSort==='gap')   return (b.gap_pct||0)-(a.gap_pct||0);
+      // default: grade (warnings last)
       if(a.warning&&!b.warning)return 1;if(!a.warning&&b.warning)return -1;
-      return({'A+':4,'A':3,'B':2,'C':1,'D':0}[b.grade]||0)-({'A+':4,'A':3,'B':2,'C':1,'D':0}[a.grade]||0);
+      return(gradeVal[b.grade]||0)-(gradeVal[a.grade]||0);
     });
     c.innerHTML=sorted.map(s=>{
       const gc={'A+':'aplus','A':'a','B':'b','C':'c','D':'d'}[s.grade]||'b';
@@ -1168,63 +1228,14 @@
   }
 
   function buildTradingViewChart(ticker){
-    const container=document.getElementById('popupChartContainer');
-    container.innerHTML=`<div id="lw_chart_${ticker}" style="width:100%;height:340px;background:#080c18;border-radius:5px;display:flex;align-items:center;justify-content:center;"><span style="color:#4a6a8a;font-size:.8rem">⏳ Loading premarket chart for ${ticker}...</span></div>`;
-    // Load lightweight-charts then fetch real bars from our backend
-    if(!window.LightweightCharts){
-      const s=document.createElement('script');
-      s.src='https://unpkg.com/lightweight-charts/dist/lightweight-charts.standalone.production.js';
-      s.onload=()=>fetchAndRenderBars(ticker);
-      document.head.appendChild(s);
-    } else {
-      fetchAndRenderBars(ticker);
-    }
-  }
-
-  async function fetchAndRenderBars(ticker){
-    try{
-      const r=await fetch(`${API_URL}/api/stock/bars/${ticker}?timeframe=1Min`);
-      const data=await r.json();
-      const bars=data.bars||[];
-      const el=document.getElementById(`lw_chart_${ticker}`);
-      if(!el)return;
-      if(!bars.length){
-        el.innerHTML=`<span style="color:#4a6a8a;font-size:.8rem">No bar data for ${ticker} — market may be closed</span>`;
-        return;
-      }
-      el.innerHTML='';
-      const chart=LightweightCharts.createChart(el,{
-        width:el.offsetWidth||600, height:340,
-        layout:{background:{color:'#080c18'},textColor:'#a0b0c8'},
-        grid:{vertLines:{color:'#1a2035'},horzLines:{color:'#1a2035'}},
-        timeScale:{timeVisible:true,secondsVisible:false,borderColor:'#1a2035'},
-        rightPriceScale:{borderColor:'#1a2035'},
-        crosshair:{mode:1},
-      });
-      const candleSeries=chart.addCandlestickSeries({
-        upColor:'#00c853',downColor:'#ff1744',
-        borderUpColor:'#00c853',borderDownColor:'#ff1744',
-        wickUpColor:'#00c853',wickDownColor:'#ff1744',
-      });
-      // Convert ISO timestamps to unix seconds for lightweight-charts
-      const formatted=bars.map(b=>({
-        time: Math.floor(new Date(b.time).getTime()/1000),
-        open:b.open, high:b.high, low:b.low, close:b.close
-      })).sort((a,b)=>a.time-b.time);
-      candleSeries.setData(formatted);
-      // VWAP line
-      const vwapData=bars.filter(b=>b.vwap>0).map(b=>({
-        time:Math.floor(new Date(b.time).getTime()/1000),value:b.vwap
-      })).sort((a,b)=>a.time-b.time);
-      if(vwapData.length){
-        const vwapSeries=chart.addLineSeries({color:'#ffd700',lineWidth:1,title:'VWAP'});
-        vwapSeries.setData(vwapData);
-      }
-      chart.timeScale().fitContent();
-    }catch(e){
-      const el=document.getElementById(`lw_chart_${ticker}`);
-      if(el)el.innerHTML=`<span style="color:#ff4444;font-size:.75rem">Chart error: ${e.message}</span>`;
-    }
+    const container=document.getElementById('popupChartContainer');container.innerHTML='';
+    const iframe=document.createElement('iframe');
+    iframe.className='chart-frame';iframe.frameBorder='0';iframe.scrolling='no';
+    iframe.src=`https://s.tradingview.com/widgetembed/?frameElementId=tv_${ticker}`
+      +`&symbol=${encodeURIComponent(ticker)}&interval=5&hidesidetoolbar=0`
+      +`&saveimage=0&theme=dark&style=1&timezone=America%2FNew_York`
+      +`&studies=Volume%40tv-basicstudies&hideideas=1&withdateranges=1&locale=en`;
+    container.appendChild(iframe);
   }
 
   function closePopup(){
@@ -1374,15 +1385,28 @@
   }
 
   function updateProgress(status){
-    const bar=document.getElementById('progressBar'),msg=document.getElementById('progressMsg'),
-          cnt=document.getElementById('progressCount'),fill=document.getElementById('progressFill');
+    const bar=document.getElementById('progressBar'),
+          msg=document.getElementById('progressMsg'),
+          cnt=document.getElementById('progressCount'),
+          fill=document.getElementById('progressFill');
     if(!status||status.phase==='idle'){hideProgress();return;}
-    bar.classList.add('visible');msg.textContent=status.message||'Scanning...';
+    bar.classList.add('visible');
+    msg.textContent=status.message||'Scanning...';
     if(status.total>0&&status.progress>0){
-      cnt.textContent=`${status.progress}/${status.total}`;
-      fill.classList.remove('indeterminate');fill.style.width=Math.round((status.progress/status.total)*100)+'%';
-    }else{cnt.textContent='';fill.classList.add('indeterminate');fill.style.width='30%';}
-    if(status.phase==='done')setTimeout(hideProgress,3000);
+      cnt.textContent=`${status.progress} / ${status.total}`;
+      cnt.style.display='inline';
+      fill.classList.remove('indeterminate');
+      fill.style.width=Math.round((status.progress/status.total)*100)+'%';
+    }else{
+      cnt.style.display='none';
+      fill.classList.add('indeterminate');
+      fill.style.width='40%';
+    }
+    if(status.phase==='done'){
+      cnt.textContent=`✅ ${status.total||0} scanned`;
+      cnt.style.display='inline';
+      setTimeout(hideProgress,4000);
+    }
   }
   function hideProgress(){document.getElementById('progressBar').classList.remove('visible');}
 
@@ -1418,4 +1442,3 @@
 </script>
 </body>
 </html>
-
