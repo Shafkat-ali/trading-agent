@@ -556,6 +556,7 @@
       <div style="margin-bottom:10px">
         <div class="filter-tab-title">📡 Other Scan Modes</div>
         <div class="mode-grid">
+          <button class="mode-btn" id="mode-high_quality" onclick="setScanMode('high_quality')">⭐ High Quality</button>
           <button class="mode-btn" id="mode-standard"  onclick="setScanMode('standard')">🔍 Standard</button>
           <button class="mode-btn" id="mode-supernova" onclick="setScanMode('supernova')">🚀 Supernovas</button>
           <button class="mode-btn" id="mode-biotech"   onclick="setScanMode('biotech')">🧬 Biotech</button>
@@ -658,18 +659,19 @@
   setLogos();
 
   const MODES = {
-    morning_gap: { label:'🌅 MorningGap', desc:'Price $0.10–$50, Gap 5%+, $Vol $250K+, Float ≤20M' },
-    scanopp:     { label:'💡 ScanOpp',    desc:'Price $0.50–$15, Gap 9%+, $Vol $3M+, Trades 3K+' },
-    standard:    { label:'🔍 Standard',   desc:'Gap 10%+, $0.20–$20, $100K vol, RVOL 1.5x+' },
-    supernova:   { label:'🚀 Supernovas', desc:'Gap 50%+ only — massive movers' },
-    biotech:     { label:'🧬 Biotech',    desc:'Biotech/FDA, gap 15%+, catalyst required' },
-    low_float:   { label:'⚡ Low Float',  desc:'Float under 10M, gap 15%+' },
-    premarket:   { label:'🌄 Pre-Market', desc:'Gap 10%+, vol 100K+' },
-    squeeze:     { label:'💎 Squeeze',    desc:'High dollar vol $3M+, gap 9%+' },
-    small_cap:   { label:'📊 Small Cap',  desc:'$1–$20, gap 15%+' },
-    afternoon:   { label:'🌆 Afternoon',  desc:'HOD breakouts, gap 5%+' },
-    penny:       { label:'🪙 Penny',      desc:'Pure penny stocks under $1' },
-    custom:      { label:'⚙️ Custom',     desc:'Your custom filter settings' },
+    morning_gap:  { label:'🌅 MorningGap',    desc:'Price $0.50–$20, Gap 8%+, $Vol $500K+, Vol 100K+' },
+    scanopp:      { label:'💡 ScanOpp',        desc:'Price $0.30–$15, Gap 12%+, $Vol $1M+, Vol 500K+' },
+    high_quality: { label:'⭐ High Quality',   desc:'Price $1–$10, Gap 15%+, $Vol $2M+, RVOL 2x+, Float ≤50M' },
+    standard:     { label:'🔍 Standard',       desc:'Gap 10%+, $0.20–$20, $100K vol, RVOL 1.5x+' },
+    supernova:    { label:'🚀 Supernovas',     desc:'Gap 50%+ only — massive movers' },
+    biotech:      { label:'🧬 Biotech',        desc:'Biotech/FDA, gap 15%+, catalyst required' },
+    low_float:    { label:'⚡ Low Float',      desc:'Float under 10M, gap 15%+' },
+    premarket:    { label:'🌄 Pre-Market',     desc:'Gap 10%+, vol 100K+' },
+    squeeze:      { label:'💎 Squeeze',        desc:'High dollar vol $3M+, gap 9%+' },
+    small_cap:    { label:'📊 Small Cap',      desc:'$1–$20, gap 15%+' },
+    afternoon:    { label:'🌆 Afternoon',      desc:'HOD breakouts, gap 5%+' },
+    penny:        { label:'🪙 Penny',          desc:'Pure penny stocks under $1' },
+    custom:       { label:'⚙️ Custom',         desc:'Your custom filter settings' },
   };
 
   const DVOL_VALUES=[10000,25000,50000,75000,100000,150000,200000,250000,300000,500000,750000,
@@ -754,7 +756,7 @@
   function connectWS(userId){
     if(!userId)return;
     try{
-      ws=new WebSocket(`ws://${location.host}/ws?user=${userId}`);
+      ws=new WebSocket(`${location.protocol==='https:'?'wss':'ws'}://${location.host}/ws?user=${userId}`);
       ws.onopen=()=>console.log(`WS [${userId}]`);
       ws.onmessage=handleMessage;
       ws.onclose=()=>{if(currentUser&&currentUser.id===userId)setTimeout(()=>connectWS(userId),3000);};
@@ -867,8 +869,8 @@
       }
       if(sub){
         if(running)sub.textContent='Click to rescan';
-        else if(m==='morning_gap')sub.textContent='$0.10–$50 · Gap 5%+ · Float ≤20M';
-        else sub.textContent='$0.50–$15 · Gap 9%+ · $Vol $3M+';
+        else if(m==='morning_gap')sub.textContent='$0.50–$20 · Gap 8%+ · $Vol $500K+';
+        else sub.textContent='$0.30–$15 · Gap 12%+ · $Vol $1M+';
       }
     });
   }

@@ -38,13 +38,13 @@ ALPACA_PAPER_URL = 'https://paper-api.alpaca.markets/v2'
 # ── PER-USER STATE ──
 user_state = {
     'shafkat': {'scan_results':[], 'alerted':set(), 'mode':'morning_gap', 'running':False,
-                'filters':{'min_price':0.10,'max_price':50.00,'min_gap_pct':5.0,
-                           'min_dollar_vol':250000,'min_volume':50000,'min_rvol':0,
-                           'max_float_m':20.0,'max_market_cap_m':0,'require_news':False}},
+                'filters':{'min_price':0.50,'max_price':20.00,'min_gap_pct':8.0,
+                           'min_dollar_vol':500_000,'min_volume':100_000,'min_rvol':0,
+                           'max_float_m':0,'max_market_cap_m':0,'require_news':False}},
     'irfan':   {'scan_results':[], 'alerted':set(), 'mode':'morning_gap', 'running':False,
-                'filters':{'min_price':0.10,'max_price':50.00,'min_gap_pct':5.0,
-                           'min_dollar_vol':250000,'min_volume':50000,'min_rvol':0,
-                           'max_float_m':20.0,'max_market_cap_m':0,'require_news':False}},
+                'filters':{'min_price':0.50,'max_price':20.00,'min_gap_pct':8.0,
+                           'min_dollar_vol':500_000,'min_volume':100_000,'min_rvol':0,
+                           'max_float_m':0,'max_market_cap_m':0,'require_news':False}},
 }
 user_clients = {'shafkat':[], 'irfan':[]}
 alert_log    = []
@@ -58,14 +58,23 @@ _company_cache = {}
 
 SCAN_MODES = {
     'morning_gap': {
-        'label':'🌅 MorningGap', 'desc':'Price $0.10–$50, Gap 5%+, $Vol $250K+, Float ≤20M',
-        'min_price':0.10,'max_price':50.00,'min_gap':5.0,'min_dvol':250_000,
-        'min_volume':50_000,'min_rvol':0,'max_float_m':20.0,'max_mktcap_m':0,'require_news':False,
+        # FIXED: Loosened to match StockToTrade reference — catches real premarket movers
+        'label':'🌅 MorningGap', 'desc':'Price $0.50–$20, Gap 8%+, $Vol $500K+, Vol 100K+',
+        'min_price':0.50,'max_price':20.00,'min_gap':8.0,'min_dvol':500_000,
+        'min_volume':100_000,'min_rvol':0,'max_float_m':0,'max_mktcap_m':0,'require_news':False,
     },
     'scanopp': {
-        'label':'💡 ScanOpp', 'desc':'Price $0.50–$15, Gap 9%+, $Vol $3M+, Trades 3K+',
-        'min_price':0.50,'max_price':15.00,'min_gap':9.0,'min_dvol':3_000_000,
-        'min_volume':300_000,'min_rvol':0,'max_float_m':0,'max_mktcap_m':0,'require_news':False,
+        # FIXED: Was $3M dvol — too tight for Polygon free tier, returned 0 results
+        # Now $1M dvol, 500K vol, 12%+ gap — real momentum without being too restrictive
+        'label':'💡 ScanOpp', 'desc':'Price $0.30–$15, Gap 12%+, $Vol $1M+, Vol 500K+',
+        'min_price':0.30,'max_price':15.00,'min_gap':12.0,'min_dvol':1_000_000,
+        'min_volume':500_000,'min_rvol':0,'max_float_m':0,'max_mktcap_m':0,'require_news':False,
+    },
+    'high_quality': {
+        # NEW: Based on StockToTrade benchmark — best premarket momentum filter
+        'label':'⭐ High Quality', 'desc':'Price $1–$10, Gap 15%+, $Vol $2M+, Vol 1M+',
+        'min_price':1.00,'max_price':10.00,'min_gap':15.0,'min_dvol':2_000_000,
+        'min_volume':1_000_000,'min_rvol':2.0,'max_float_m':50.0,'max_mktcap_m':0,'require_news':False,
     },
     'standard': {
         'label':'🔍 Standard', 'desc':'Gap 10%+, $0.20–$20, $100K vol, RVOL 1.5x+',
@@ -373,6 +382,72 @@ async def debug():
         'halted_count':     len(halted_tickers),
         'users': {uid: {'mode':s['mode'],'running':s['running'],'results':len(s['scan_results'])}
                   for uid, s in user_state.items()}
+    }
+
+@app.get("/api/debug/scan/{mode}")
+async def debug_scan(mode: str = 'morning_gap'):
+    """
+    Test endpoint: runs one scan for the given mode and returns raw debug info.
+    Call: GET /api/debug/scan/morning_gap  or  /api/debug/scan/scanopp
+    """
+    if mode not in SCAN_MODES:
+        return {'error': f'Unknown mode: {mode}', 'valid_modes': list(SCAN_MODES.keys())}
+
+    m = SCAN_MODES[mode]
+    filters = {
+        'min_price':        m['min_price'],
+        'max_price':        m['max_price'],
+        'min_gap_pct':      m['min_gap'],
+        'min_dollar_vol':   m['min_dvol'],
+        'min_volume':       m['min_volume'],
+        'min_rvol':         m['min_rvol'],
+        'max_float_m':      m['max_float_m'],
+        'max_market_cap_m': m['max_mktcap_m'],
+        'require_news':     m['require_news'],
+    }
+
+    log_alert(f"🧪 DEBUG SCAN TEST: mode={mode}")
+
+    polygon_raw = []
+    polygon_error = None
+    try:
+        r = requests.get(
+            f"https://api.polygon.io/v2/snapshot/locale/us/markets/stocks/gainers"
+            f"?apiKey={POLYGON_API_KEY}&include_otc=false", timeout=15)
+        polygon_raw = r.json().get('tickers', []) if r.status_code == 200 else []
+        polygon_error = None if r.status_code == 200 else f"HTTP {r.status_code}: {r.text[:200]}"
+    except Exception as e:
+        polygon_error = str(e)
+
+    candidates = get_polygon_gainers(filters)
+    yahoo_candidates = []
+    if not candidates:
+        yahoo_candidates = get_yahoo_gainers(filters)
+
+    all_candidates = candidates or yahoo_candidates
+    source = 'polygon' if candidates else 'yahoo'
+
+    results = []
+    for stock_data in all_candidates[:5]:  # Only enrich first 5 for debug speed
+        setup = process_ticker(stock_data, mode, filters)
+        if setup:
+            results.append({'ticker': setup['ticker'], 'grade': setup['grade'],
+                            'gap_pct': setup['gap_pct'], 'price': setup['price'],
+                            'dollar_vol': setup['dollar_vol']})
+
+    return {
+        'mode':              mode,
+        'filters':           filters,
+        'polygon_raw_count': len(polygon_raw),
+        'polygon_error':     polygon_error,
+        'polygon_passed':    len(candidates),
+        'yahoo_passed':      len(yahoo_candidates),
+        'source_used':       source,
+        'total_candidates':  len(all_candidates),
+        'sample_tickers':    [c['ticker'] for c in all_candidates[:10]],
+        'enriched_results':  results,
+        'alert_log':         alert_log[:15],
+        'timestamp':         datetime.now().strftime('%H:%M:%S'),
     }
 
 @app.get("/api/scan_modes")
@@ -987,56 +1062,94 @@ def grade_setup(gap_pct, dollar_vol, vol_ratio=0):
 # ============================================================
 
 def get_polygon_gainers(filters):
+    """
+    Fetch top gainers from Polygon.io.
+    DEBUG LOGGING: logs every rejection reason so you know exactly why results are 0.
+    """
     try:
-        r = requests.get(
-            f"https://api.polygon.io/v2/snapshot/locale/us/markets/stocks/gainers"
-            f"?apiKey={POLYGON_API_KEY}&include_otc=false",
-            timeout=15
-        )
+        url = (f"https://api.polygon.io/v2/snapshot/locale/us/markets/stocks/gainers"
+               f"?apiKey={POLYGON_API_KEY}&include_otc=false")
+        log_alert(f"🔍 DEBUG Polygon: calling {url[:60]}...")
+        r = requests.get(url, timeout=15)
+        log_alert(f"🔍 DEBUG Polygon: HTTP {r.status_code}")
+
+        if r.status_code != 200:
+            log_alert(f"⚠️ Polygon HTTP error {r.status_code}: {r.text[:200]}")
+            return []
+
+        raw_tickers = r.json().get('tickers', [])
+        log_alert(f"🔍 DEBUG Polygon: raw tickers returned = {len(raw_tickers)}")
+
         candidates = []
-        if r.status_code == 200:
-            for t in r.json().get('tickers', []):
-                sym        = t.get('ticker', '')
-                day        = t.get('day', {})
-                prev       = t.get('prevDay', {})
-                last       = t.get('lastTrade', {})
-                price      = last.get('p') or day.get('c', 0)
-                prev_close = prev.get('c', 0)
-                volume     = day.get('v', 0)
-                prev_vol   = prev.get('v', 1) or 1
-                if not (price and prev_close and price > 0 and prev_close > 0): continue
-                pct        = ((price - prev_close) / prev_close) * 100
-                dollar_vol = price * volume
-                rvol       = round(volume / prev_vol, 1) if prev_vol > 0 else 0
+        rejected_price = rejected_gap = rejected_dvol = rejected_vol = rejected_rvol = 0
 
-                if not sym: continue
-                if not (filters['min_price'] <= price <= filters['max_price']): continue
-                if pct < filters['min_gap_pct']:                               continue
-                if dollar_vol < filters['min_dollar_vol']:                     continue
-                if volume < filters.get('min_volume', 0):                      continue
-                if rvol < filters.get('min_rvol', 0):                          continue
+        for t in raw_tickers:
+            sym        = t.get('ticker', '')
+            day        = t.get('day', {})
+            prev       = t.get('prevDay', {})
+            last       = t.get('lastTrade', {})
+            price      = last.get('p') or day.get('c', 0)
+            prev_close = prev.get('c', 0)
+            volume     = day.get('v', 0)
+            prev_vol   = prev.get('v', 1) or 1
 
-                candidates.append({
-                    'ticker':     sym,
-                    'price':      float(price),
-                    'prev_close': float(prev_close),
-                    'gap_pct':    round(float(pct), 1),
-                    'volume':     float(volume),
-                    'dollar_vol': float(dollar_vol),
-                    'rvol':       rvol,
-                    'source':     'polygon',
-                })
-            log_alert(f"📡 Polygon: {len(candidates)} candidates")
-            return candidates
-        log_alert(f"⚠️ Polygon error: {r.status_code}")
-        return []
+            if not sym or not (price and prev_close and price > 0 and prev_close > 0):
+                continue
+
+            pct        = ((price - prev_close) / prev_close) * 100
+            dollar_vol = price * volume
+            rvol       = round(volume / prev_vol, 1) if prev_vol > 0 else 0
+
+            # Filter with debug counting
+            if not (filters['min_price'] <= price <= filters['max_price']):
+                rejected_price += 1; continue
+            if pct < filters.get('min_gap_pct', 0):
+                rejected_gap += 1; continue
+            if dollar_vol < filters.get('min_dollar_vol', 0):
+                rejected_dvol += 1; continue
+            if volume < filters.get('min_volume', 0):
+                rejected_vol += 1; continue
+            if rvol < filters.get('min_rvol', 0):
+                rejected_rvol += 1; continue
+
+            candidates.append({
+                'ticker':     sym,
+                'price':      float(price),
+                'prev_close': float(prev_close),
+                'gap_pct':    round(float(pct), 1),
+                'volume':     float(volume),
+                'dollar_vol': float(dollar_vol),
+                'rvol':       rvol,
+                'source':     'polygon',
+            })
+
+        log_alert(
+            f"📡 Polygon: {len(candidates)} passed | "
+            f"❌ price={rejected_price} gap={rejected_gap} "
+            f"dvol={rejected_dvol} vol={rejected_vol} rvol={rejected_rvol} | "
+            f"filters: price ${filters['min_price']}–${filters['max_price']} "
+            f"gap {filters.get('min_gap_pct',0)}%+ "
+            f"dvol ${filters.get('min_dollar_vol',0):,} "
+            f"vol {filters.get('min_volume',0):,}"
+        )
+        return candidates
+
     except Exception as e:
-        log_alert(f"⚠️ Polygon error: {e}")
+        log_alert(f"⚠️ Polygon exception: {e}")
         return []
 
 def get_yahoo_gainers(filters):
+    """
+    Yahoo Finance fallback screener.
+    DEBUG LOGGING: logs every rejection so you can trace why 0 results occur.
+    """
     candidates = []
     headers    = {'User-Agent': 'Mozilla/5.0'}
+    log_alert(f"🔍 DEBUG Yahoo: starting fallback scan with filters: "
+              f"price ${filters['min_price']}–${filters['max_price']} "
+              f"gap {filters.get('min_gap_pct',0)}%+ "
+              f"dvol ${filters.get('min_dollar_vol',0):,}")
+
     for scrId in ['day_gainers', 'small_cap_gainers']:
         try:
             r = requests.get(
@@ -1044,8 +1157,15 @@ def get_yahoo_gainers(filters):
                 f"?formatted=false&scrIds={scrId}&count=50",
                 headers=headers, timeout=10
             )
+            log_alert(f"🔍 DEBUG Yahoo [{scrId}]: HTTP {r.status_code}")
             if r.status_code != 200: continue
+
             quotes = r.json().get('finance', {}).get('result', [{}])[0].get('quotes', [])
+            log_alert(f"🔍 DEBUG Yahoo [{scrId}]: {len(quotes)} raw quotes")
+
+            rejected_price = rejected_gap = rejected_dvol = rejected_vol = 0
+            passed = 0
+
             for q in quotes:
                 sym        = q.get('symbol', '')
                 price      = q.get('regularMarketPrice', 0)
@@ -1057,12 +1177,16 @@ def get_yahoo_gainers(filters):
                 rvol       = round(vol / avg_vol, 1) if avg_vol > 0 else 0
 
                 if not sym: continue
-                if not (filters['min_price'] <= price <= filters['max_price']): continue
-                if pct < filters['min_gap_pct']:                               continue
-                if dollar_vol < filters['min_dollar_vol']:                     continue
-                if vol < filters.get('min_volume', 0):                         continue
-                if rvol < filters.get('min_rvol', 0):                          continue
+                if not (filters['min_price'] <= price <= filters['max_price']):
+                    rejected_price += 1; continue
+                if pct < filters.get('min_gap_pct', 0):
+                    rejected_gap += 1; continue
+                if dollar_vol < filters.get('min_dollar_vol', 0):
+                    rejected_dvol += 1; continue
+                if vol < filters.get('min_volume', 0):
+                    rejected_vol += 1; continue
 
+                passed += 1
                 candidates.append({
                     'ticker':     sym,
                     'price':      float(price),
@@ -1073,9 +1197,14 @@ def get_yahoo_gainers(filters):
                     'rvol':       rvol,
                     'source':     'yahoo',
                 })
-        except:
-            pass
-    log_alert(f"📡 Yahoo: {len(candidates)} candidates")
+
+            log_alert(f"📡 Yahoo [{scrId}]: {passed} passed | "
+                      f"❌ price={rejected_price} gap={rejected_gap} "
+                      f"dvol={rejected_dvol} vol={rejected_vol}")
+        except Exception as e:
+            log_alert(f"⚠️ Yahoo [{scrId}] exception: {e}")
+
+    log_alert(f"📡 Yahoo total: {len(candidates)} candidates across all screeners")
     return candidates
 
 # ============================================================
@@ -1222,7 +1351,8 @@ def process_ticker(stock_data, mode='morning_gap', filters=None):
             'source':           'alpaca' if snap else stock_data.get('source','live'),
             'time':             datetime.now().strftime('%H:%M:%S'),
         }
-    except:
+    except Exception as e:
+        log_alert(f"⚠️ DEBUG process_ticker {stock_data.get('ticker','?')} exception: {e}")
         return None
 
 # ============================================================
@@ -1235,20 +1365,37 @@ async def do_scan(user_id):
     mode    = s['mode']
     label   = SCAN_MODES.get(mode, {}).get('label', mode)
 
+    # ── DEBUG: log scan start ──
+    log_alert(f"🔎 DEBUG [{user_id}] SCAN START | mode={mode} | "
+              f"price ${filters.get('min_price')}–${filters.get('max_price')} | "
+              f"gap {filters.get('min_gap_pct')}%+ | "
+              f"dvol ${filters.get('min_dollar_vol',0):,} | "
+              f"vol {filters.get('min_volume',0):,}")
+
     status = {'phase':'fetching','message':f'📡 Fetching [{label}]...','progress':0,'total':0}
     await broadcast_to_user(user_id, {'type':'scan_status','status':status})
     await asyncio.sleep(0)
 
     # Polygon primary, Yahoo fallback
     candidates = get_polygon_gainers(filters)
+    polygon_count = len(candidates)
+    log_alert(f"🔎 DEBUG [{user_id}] Polygon returned {polygon_count} candidates")
+
     if not candidates:
         status['message'] = '⚠️ Polygon empty, trying Yahoo...'
         await broadcast_to_user(user_id, {'type':'scan_status','status':status})
         await asyncio.sleep(0)
         candidates = get_yahoo_gainers(filters)
+        log_alert(f"🔎 DEBUG [{user_id}] Yahoo returned {len(candidates)} candidates")
+
+    if not candidates:
+        log_alert(f"🔎 DEBUG [{user_id}] ⚠️ ZERO candidates from all sources — "
+                  f"filters may be too tight OR market data unavailable at this time")
+        done_status = {'phase':'done','message':'⚠️ 0 candidates — try loosening filters or wait for market hours','progress':0,'total':0}
+        return [], done_status
 
     total = len(candidates)
-    log_alert(f"📊 [{user_id}] {total} candidates")
+    log_alert(f"📊 [{user_id}] {total} total candidates entering enrichment")
 
     status = {'phase':'analyzing','message':f'Enriching {total} with Alpaca data...','progress':0,'total':total}
     await broadcast_to_user(user_id, {'type':'scan_status','status':status})
@@ -1256,6 +1403,7 @@ async def do_scan(user_id):
 
     results = []
     count   = 0
+    failed  = 0
 
     for stock_data in candidates:
         if not s['running']: break
@@ -1268,6 +1416,7 @@ async def do_scan(user_id):
         setup = process_ticker(stock_data, mode, filters)
         if setup:
             results.append(setup)
+            log_alert(f"✅ DEBUG [{user_id}] {ticker} PASSED — grade={setup.get('grade')} gap={setup.get('gap_pct')}% dvol=${setup.get('dollar_vol',0):,.0f}")
             await broadcast_to_user(user_id, {'type':'new_ticker','setup':setup})
             await asyncio.sleep(0)
 
@@ -1286,6 +1435,13 @@ async def do_scan(user_id):
                         f"Stop: ${setup['stop_loss']}\nT1: ${setup['target1']}\n"
                     )
                 )
+        else:
+            failed += 1
+            log_alert(f"❌ DEBUG [{user_id}] {ticker} FILTERED OUT by process_ticker")
+
+    log_alert(f"🔎 DEBUG [{user_id}] SCAN DONE | {total} candidates → "
+              f"{len(results)} passed | {failed} filtered | "
+              f"tickers: {[r['ticker'] for r in results]}")
 
     results.sort(
         key=lambda x: (0 if x['warning'] else {'A+':4,'A':3,'B':2}.get(x['grade'],1)),
