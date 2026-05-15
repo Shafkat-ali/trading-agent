@@ -1508,22 +1508,6 @@ async def do_scan(user_id):
     log_alert(f"🔎 [{user_id}] DONE | {total} scanned → {passed} passed | {filtered} filtered | "
               f"tickers: {[r['ticker'] for r in results]}")
 
-            if setup['grade'] in ['A+','A'] and not setup['warning'] and ticker not in s['alerted']:
-                s['alerted'].add(ticker)
-                log_alert(f"🚀 [{user_id}] {setup['grade']}: {ticker} +{setup['gap_pct']}%")
-                send_email(
-                    subject=f"🚀 {setup['grade']} — {ticker} +{setup['gap_pct']}%",
-                    body=(
-                        f"Grade: {setup['grade']}\nPattern: {setup['pattern']}\n"
-                        f"Company: {setup.get('company_name','')} — {setup.get('exchange','')}\n"
-                        f"Gap: +{setup['gap_pct']}%  RVOL: {setup.get('rvol',0)}x\n"
-                        f"Price: ${setup['price']}  VWAP: ${setup.get('vwap',0)}\n"
-                        f"Float: {setup.get('float_m',0)}M\n\n"
-                        f"Entry: ${setup['entry_low']}–${setup['entry_high']}\n"
-                        f"Stop: ${setup['stop_loss']}\nT1: ${setup['target1']}\n"
-                    )
-                )
-
     results.sort(
         key=lambda x: (0 if x['warning'] else {'A+':4,'A':3,'B':2}.get(x['grade'],1)),
         reverse=True
