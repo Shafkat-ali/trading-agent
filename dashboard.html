@@ -6,7 +6,14 @@
   <title>Payda × UyghurKid — Capital Trading Agent</title>
   <style>
     *{margin:0;padding:0;box-sizing:border-box;}
-    body{background:#0a0e1a;color:#e0e6f0;font-family:'Segoe UI',sans-serif;min-height:100vh;}
+    body{background:#0a0e1a;color:#e0e6f0;font-family:'Segoe UI',sans-serif;min-height:100vh;cursor:crosshair;}
+    /* Restore pointer on all clickable elements */
+    button,a,select,.tab-btn,.scan-start-btn,.screener-item,.user-card,
+    .rng-sel,.exp-load,.ld,.ind-btn,.expand-btn,.charts-close-btn,.exp-close,
+    .slider-nudge,#panelRestoreBtn,.pw-btn,.pw-back,#agreeBtn,
+    [onclick]{cursor:pointer!important;}
+    input[type='text'],input[type='number'],input[type='password']{cursor:text!important;}
+    input[type='range']{cursor:ew-resize!important;}
 
     /* LOGIN */
     .login-screen{position:fixed;inset:0;background:#060a12;display:flex;align-items:center;justify-content:center;z-index:9999;flex-direction:column;}
@@ -1904,7 +1911,8 @@
     const days = RANGES_POP[range] || 1;
     const startDate = new Date(); startDate.setDate(startDate.getDate()-days);
     const startStr  = startDate.toISOString().split('T')[0];
-    const url = `${API_URL}/api/stock/bars/${ticker}?timeframe=${tf}&start=${startStr}`;
+    // Use days param so server includes pre/post market (same as 8-panel)
+    const url = `${API_URL}/api/stock/bars/${ticker}?timeframe=${tf}&days=${days}&start=${startStr}`;
 
     await popupRenderChart(ticker, url);
 
@@ -2317,7 +2325,7 @@
 <script src="https://unpkg.com/lightweight-charts@3.8.0/dist/lightweight-charts.standalone.production.js"><\/script>
 <style>
 *{margin:0;padding:0;box-sizing:border-box;}
-body{background:#060a12;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;height:100vh;display:flex;flex-direction:column;overflow:hidden;}
+body{background:#060a12;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;height:100vh;display:flex;flex-direction:column;overflow:hidden;cursor:crosshair;}
 .hdr{display:flex;align-items:center;gap:8px;padding:6px 14px;background:#080e1e;border-bottom:2px solid #1a2a4a;flex-shrink:0;}
 .hdr-title{font-size:.85rem;font-weight:800;color:#ffd700;white-space:nowrap;}
 .hdr-hint{font-size:.56rem;color:#4a6a8a;}
@@ -2714,6 +2722,7 @@ function render(i,bars){
   const candles=chart.addCandlestickSeries({upColor:'#00c853',downColor:'#ff1744',borderUpColor:'#00c853',borderDownColor:'#ff1744',wickUpColor:'#00c853',wickDownColor:'#ff1744'});
   candles.setData(sorted.map(b=>({time:b.t,open:b.o,high:b.h,low:b.l,close:b.c})));
   s._candles=candles; // store ref so poll can update last candle live
+  const vwpts=sorted.filter(b=>b.vw>0).map(b=>({time:b.t,value:b.vw}));
   if(vwpts.length){const vl=chart.addLineSeries({color:'#ffd700',lineWidth:1,priceLineVisible:false,title:'VWAP'});vl.setData(vwpts);}
 
   if(s.showEMA&&closes.length>=20){
