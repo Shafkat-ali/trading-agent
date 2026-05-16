@@ -2160,7 +2160,7 @@ button.ld:hover{background:#4a8aff;color:#fff;}
       <div style="display:flex;gap:3px;" id="expRanges">
         <!-- Range buttons built by JS to avoid template literal escaping issues -->
       </div>
-      <select class="exp-tf" id="expTf">
+      <select class="exp-tf" id="expTf" onchange="exp.tf=this.value;if(exp.bars.length)expLoad()">
         <option value="1Min">1m</option><option value="5Min" selected>5m</option><option value="15Min">15m</option><option value="1Hour">1h</option><option value="1Day">1D</option>
       </select>
       <button class="exp-load" onclick="expLoad()">⟳ Load</button>
@@ -2359,7 +2359,7 @@ function init(){
       <div class="cell-hdr">
         <input class="tk" id="tk\${i}" placeholder="AAPL" oninput="this.value=this.value.toUpperCase()" onkeydown="if(event.key==='Enter')load(\${i})">
         <div class="ranges">\${['1D','1W','1M','3M','1Y'].map(r=>\`<button class="rng\${r==='1D'?' active':''}" id="rng\${i}_\${r}" onclick="setRange(\${i},'\${r}')">\${r}<\/button>\`).join('')}<\/div>
-        <select class="tf" id="tf\${i}" onchange="state[\${i}].tf=this.value">
+        <select class="tf" id="tf\${i}" onchange="state[\${i}].tf=this.value;const _tk=(document.getElementById('tk'+\${i}).value||'').trim().toUpperCase();if(_tk&&state[\${i}].bars.length)load(\${i})">
           <option value="1Min">1m<\/option><option value="5Min" selected>5m<\/option><option value="15Min">15m<\/option><option value="1Hour">1h<\/option><option value="1Day">1D<\/option>
         <\/select>
         <button class="ld" onclick="load(\${i})">Load<\/button>
