@@ -1895,7 +1895,14 @@
       const bars=data.bars||[];
       body.innerHTML='';
       if(!bars.length){
-        body.innerHTML='<div class="chart-placeholder"><span style="color:#ff6666">No data for '+ticker+'</span><span style="font-size:.58rem">Market closed or invalid ticker</span></div>';return;
+        const src=data.source||'unknown';
+        const err=data.error||'';
+        body.innerHTML=`<div class="chart-placeholder">
+          <span style="color:#ff6666">No data for ${ticker}</span>
+          <span style="font-size:.58rem;color:#4a6a8a">${err||'Market closed or ticker invalid'}</span>
+          <span style="font-size:.52rem;color:#3a5a7a">Source tried: ${src}</span>
+        </div>`;
+        return;
       }
       if(chartInstances[idx]){try{chartInstances[idx].remove();}catch(e){} delete chartInstances[idx];}
       const w=body.clientWidth||400, h=body.clientHeight||220;
@@ -1910,26 +1917,35 @@
         handleScale:{mouseWheel:true,pinch:true},
       });
       chartInstances[idx]=chart;
-      // v3.8 API — addCandlestickSeries
       const candles=chart.addCandlestickSeries({
         upColor:'#00c853',downColor:'#ff1744',
         borderUpColor:'#00c853',borderDownColor:'#ff1744',
         wickUpColor:'#00c853',wickDownColor:'#ff1744',
       });
+
+      // Parse time — handles both Tradier "2026-05-16 09:30:00" and ISO "2026-05-16T09:30:00Z"
+      const parseT=t=>{
+        if(!t)return 0;
+        // Tradier returns "YYYY-MM-DD HH:MM:SS" — replace space with T for Date parsing
+        const fixed=t.includes('T')?t:t.replace(' ','T');
+        return Math.floor(new Date(fixed).getTime()/1000);
+      };
+
       const formatted=bars.map(b=>({
-        time:Math.floor(new Date(b.time).getTime()/1000),
+        time:parseT(b.time),
         open:b.open,high:b.high,low:b.low,close:b.close
-      })).sort((a,b)=>a.time-b.time);
+      })).filter(b=>b.time>0).sort((a,b)=>a.time-b.time);
       candles.setData(formatted);
+
       const vwapPts=bars.filter(b=>b.vwap>0).map(b=>({
-        time:Math.floor(new Date(b.time).getTime()/1000),value:b.vwap
-      })).sort((a,b)=>a.time-b.time);
+        time:parseT(b.time),value:b.vwap
+      })).filter(b=>b.time>0).sort((a,b)=>a.time-b.time);
       if(vwapPts.length){
         const vl=chart.addLineSeries({color:'#ffd700',lineWidth:1,title:'VWAP',priceLineVisible:false});
         vl.setData(vwapPts);
       }
       chart.timeScale().fitContent();
-      badge.textContent=ticker+' · '+tf+' · '+bars.length+' bars';
+      badge.textContent=ticker+' · '+tf+' · '+bars.length+' bars · '+( data.source||'');
       badge.style.color='#00c853';
       new ResizeObserver(()=>{if(chartInstances[idx])chartInstances[idx].resize(body.clientWidth,body.clientHeight);}).observe(body);
     }catch(err){

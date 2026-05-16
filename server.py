@@ -508,6 +508,108 @@ async def get_stock_snapshot(ticker: str):
     snap = alpaca_get_snapshot(ticker)
     return snap if snap else {'error': 'Snapshot unavailable'}
 
+@app.get("/api/stock/bars/{ticker}")
+async def get_stock_bars(ticker: str, timeframe: str = "5Min"):
+    """
+    OHLCV bars for charting — includes pre and post market.
+    Primary: Tradier timesales (session_filter=all = 4am–8pm)
+    Fallback: Alpaca 1Min bars
+    """
+    ticker = ticker.upper().strip()
+
+    # Map frontend timeframe names to Tradier intervals
+    tf_map = {
+        '1Min': '1min', '1m': '1min',
+        '5Min': '5min', '5m': '5min',
+        '15Min': '15min', '15m': '15min',
+        '1Hour': '60min', '1h': '60min', '1D': 'daily',
+    }
+    tradier_interval = tf_map.get(timeframe, '5min')
+
+    # ── Try Tradier first ──
+    try:
+        from datetime import datetime, timedelta
+        now   = datetime.now()
+        start = (now - timedelta(days=1)).strftime('%Y-%m-%d')
+        end   = now.strftime('%Y-%m-%d')
+
+        params = {
+            'symbol':         ticker,
+            'interval':       tradier_interval,
+            'start':          f'{start} 04:00',
+            'end':            f'{end} 20:00',
+            'session_filter': 'all',   # includes pre + post market
+        }
+        r = requests.get(
+            f"{TRADIER_API_URL}/markets/timesales",
+            headers=TRADIER_HEADERS,
+            params=params,
+            timeout=10
+        )
+        log_alert(f"📊 Tradier bars [{ticker}] HTTP {r.status_code}")
+
+        if r.status_code == 200:
+            data  = r.json()
+            series = data.get('series') or {}
+            raw   = series.get('data', []) if series else []
+            if isinstance(raw, dict): raw = [raw]  # single candle returns dict not list
+
+            if raw:
+                bars = []
+                for b in raw:
+                    bars.append({
+                        'time':   b.get('time', ''),
+                        'open':   float(b.get('open',  0)),
+                        'high':   float(b.get('high',  0)),
+                        'low':    float(b.get('low',   0)),
+                        'close':  float(b.get('close', 0)),
+                        'volume': int(b.get('volume',  0)),
+                        'vwap':   float(b.get('vwap',  0)) if b.get('vwap') else 0,
+                    })
+                log_alert(f"📊 Tradier bars [{ticker}]: {len(bars)} candles")
+                return {'ticker': ticker, 'timeframe': timeframe, 'bars': bars,
+                        'source': 'tradier', 'count': len(bars)}
+
+        log_alert(f"⚠️ Tradier bars empty for {ticker}, trying Alpaca...")
+    except Exception as e:
+        log_alert(f"⚠️ Tradier bars error [{ticker}]: {e}")
+
+    # ── Fallback: Alpaca ──
+    try:
+        from datetime import datetime, timedelta
+        now   = datetime.now()
+        start = now.replace(hour=4,  minute=0, second=0, microsecond=0)
+        end   = now.replace(hour=20, minute=0, second=0, microsecond=0)
+        if now.hour < 4:
+            start = (now - timedelta(days=1)).replace(hour=4,  minute=0, second=0, microsecond=0)
+            end   = (now - timedelta(days=1)).replace(hour=20, minute=0, second=0, microsecond=0)
+
+        alpaca_tf = {'1Min':'1Min','5Min':'5Min','15Min':'15Min','1Hour':'1Hour','1D':'1Day'}.get(timeframe,'5Min')
+        url = (f"{ALPACA_DATA_URL}/stocks/{ticker}/bars"
+               f"?timeframe={alpaca_tf}"
+               f"&start={start.strftime('%Y-%m-%dT%H:%M:%SZ')}"
+               f"&end={end.strftime('%Y-%m-%dT%H:%M:%SZ')}"
+               f"&feed=sip&limit=1000")
+        r = requests.get(url, headers=ALPACA_HEADERS, timeout=10)
+
+        if r.status_code == 200:
+            raw_bars = r.json().get('bars', [])
+            bars = [{'time': b.get('t',''), 'open': round(b.get('o',0),4),
+                     'high': round(b.get('h',0),4), 'low': round(b.get('l',0),4),
+                     'close': round(b.get('c',0),4), 'volume': b.get('v',0),
+                     'vwap': round(b.get('vw',0),4)} for b in raw_bars]
+            log_alert(f"📊 Alpaca bars [{ticker}]: {len(bars)} candles")
+            return {'ticker': ticker, 'timeframe': timeframe, 'bars': bars,
+                    'source': 'alpaca', 'count': len(bars)}
+
+        log_alert(f"⚠️ Alpaca bars HTTP {r.status_code} for {ticker}")
+    except Exception as e:
+        log_alert(f"⚠️ Alpaca bars error [{ticker}]: {e}")
+
+    return {'ticker': ticker, 'timeframe': timeframe, 'bars': [],
+            'source': 'none', 'count': 0,
+            'error': 'No data from Tradier or Alpaca — market may be closed or ticker invalid'}
+
 @app.get("/api/stock/profile/{ticker}")
 async def get_stock_profile(ticker: str):
     try:
