@@ -602,10 +602,32 @@
     <div class="stat"><div class="stat-val" id="statSetups">0</div><div class="stat-label">Setups</div></div>
     <div class="stat"><div class="stat-val" id="statAplus">0</div><div class="stat-label">A+ Grade</div></div>
     <div class="stat"><div class="stat-val" id="statTime">--:--</div><div class="stat-label">Last Scan</div></div>
+    <button onclick="openLogModal()" title="View scan log"
+      style="background:#0f1729;border:1px solid #1e2d4a;border-radius:5px;color:#4a6a8a;font-size:.52rem;padding:3px 8px;cursor:pointer;transition:all .2s;"
+      onmouseover="this.style.color='#a0c4ff'" onmouseout="this.style.color='#4a6a8a'">📝 Log</button>
+    <button id="panelToggleBtn" onclick="toggleRightPanel()" title="Hide right panel"
+      style="background:#0f1729;border:1px solid #1e2d4a;border-radius:5px;color:#4a6a8a;font-size:.52rem;padding:3px 8px;cursor:pointer;transition:all .2s;"
+      onmouseover="this.style.color='#a0c4ff'" onmouseout="this.style.color='#4a6a8a'">◀ Hide</button>
   </div>
 </div>
 <div id="scanTooltipBox"></div>
 <button id="panelRestoreBtn" onclick="toggleRightPanel()" title="Show panel">▶ Panel</button>
+
+<!-- LOG MODAL -->
+<div id="logModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.85);z-index:10000;align-items:center;justify-content:center;backdrop-filter:blur(4px);">
+  <div style="background:#0d1525;border:1px solid #1e2d4a;border-radius:12px;width:680px;max-width:95vw;max-height:80vh;display:flex;flex-direction:column;box-shadow:0 20px 60px rgba(0,0,0,.7);">
+    <div style="display:flex;align-items:center;justify-content:space-between;padding:12px 18px;border-bottom:1px solid #1e2d4a;flex-shrink:0;">
+      <span style="font-size:.8rem;font-weight:800;color:#ffd700;">📝 Scan Log</span>
+      <div style="display:flex;gap:8px;">
+        <button onclick="document.getElementById('alertLog2').innerHTML='<div class=alert-item><div class=alert-time>--:--</div><div class=alert-msg>Cleared</div></div>'"
+          style="background:#1e2d4a;border:1px solid #2a3a5a;border-radius:5px;color:#6a8aaa;font-size:.6rem;padding:3px 10px;cursor:pointer;">🗑 Clear</button>
+        <button onclick="closeLogModal()"
+          style="background:#1e2d4a;border:1px solid #2a3a5a;border-radius:5px;color:#a0b8d0;font-size:.6rem;padding:3px 10px;cursor:pointer;">✕ Close</button>
+      </div>
+    </div>
+    <div id="alertLog2" style="flex:1;overflow-y:auto;padding:10px 14px;font-size:.62rem;"></div>
+  </div>
+</div>
 
 <!-- ══════════════════════════════════════════
      CHARTS MODAL — 8-panel floating workspace
@@ -666,14 +688,9 @@
   <!-- RIGHT PANEL -->
   <div class="right-panel" id="rightPanel" style="width:270px;min-width:270px;">
     <div class="tab-header">
-      <div style="display:flex;align-items:center;justify-content:space-between;padding:3px 6px;border-bottom:1px solid #1a2035;background:#080e1e;">
-        <span style="font-size:.48rem;color:#2a4a6a;">PANEL</span>
-        <button class="panel-toggle-tab" id="panelToggleBtn" onclick="toggleRightPanel()">◀ Hide</button>
-      </div>
       <button class="tab-btn active" onclick="switchTab('screener')">📋 Screen</button>
       <button class="tab-btn"        onclick="switchTab('news')">🌍 News</button>
       <button class="tab-btn"        onclick="switchTab('filters')">🎛 Filter</button>
-      <button class="tab-btn"        onclick="switchTab('log')">📝 Log</button>
       <button class="tab-btn"        onclick="switchTab('paper')" style="color:#ffd700;">📄 Paper</button>
     </div>
 
@@ -1147,7 +1164,7 @@
 
   // ── TABS ──
   function switchTab(name){
-    const names=['screener','news','filters','log','paper'];
+    const names=['screener','news','filters','paper'];
     document.querySelectorAll('.tab-btn').forEach((b,i)=>b.classList.toggle('active',names[i]===name));
     names.forEach(n=>document.getElementById(`tab-${n}`).classList.toggle('active',n===name));
     if(name==='news')loadNewsTab();
@@ -1961,6 +1978,23 @@
   // TOOLTIP — fixed position, never inline
   // ══════════════════════════════════════════
   // ── RIGHT PANEL TOGGLE ──
+  // ── LOG MODAL ──
+  function openLogModal(){
+    const modal = document.getElementById('logModal');
+    const log2  = document.getElementById('alertLog2');
+    const log1  = document.getElementById('alertLog');
+    // Copy current log content
+    if(log1 && log2) log2.innerHTML = log1.innerHTML;
+    modal.style.display = 'flex';
+  }
+  function closeLogModal(){
+    document.getElementById('logModal').style.display = 'none';
+  }
+  // Close on outside click
+  document.getElementById('logModal')?.addEventListener('click', e=>{
+    if(e.target===document.getElementById('logModal')) closeLogModal();
+  });
+
   let panelOpen = true;
   function toggleRightPanel(){
     const panel   = document.getElementById('rightPanel');
@@ -1968,7 +2002,7 @@
     const restore = document.getElementById('panelRestoreBtn');
     panelOpen = !panelOpen;
     panel.classList.toggle('collapsed', !panelOpen);
-    if(btn){ btn.textContent = panelOpen ? '◀ Hide' : '▶ Show'; }
+    if(btn){ btn.textContent = panelOpen ? '◀ Hide' : '▶ Show'; btn.title = panelOpen ? 'Hide right panel' : 'Show right panel'; }
     if(restore){ restore.style.display = panelOpen ? 'none' : 'block'; }
   }
 
