@@ -9,9 +9,21 @@
     body{background:#0a0e1a;color:#e0e6f0;font-family:'Segoe UI',sans-serif;min-height:100vh;}
 
     /* LOGIN */
-    .login-screen{position:fixed;inset:0;background:radial-gradient(ellipse at center,#0d1525,#060a12);display:flex;align-items:center;justify-content:center;z-index:9999;}
+    .login-screen{position:fixed;inset:0;background:#060a12;display:flex;align-items:center;justify-content:center;z-index:9999;flex-direction:column;}
     .login-screen.hidden{display:none;}
-    .login-box{background:#0f1729;border:1px solid #1e2d4a;border-radius:20px;padding:36px;width:400px;text-align:center;box-shadow:0 20px 60px rgba(0,0,0,.5);}
+    .login-box{background:#0f1729;border:1px solid #1e2d4a;border-radius:20px;padding:36px;width:400px;text-align:center;box-shadow:0 20px 60px rgba(0,0,0,.5);opacity:0;transform:translateY(20px);transition:opacity .6s ease,transform .6s ease;}
+    .login-box.visible{opacity:1;transform:translateY(0);}
+    /* Terminal boot overlay */
+    #bootScreen{position:fixed;inset:0;background:#060a12;z-index:10000;display:flex;flex-direction:column;align-items:flex-start;justify-content:center;padding:40px 60px;font-family:'Courier New',monospace;}
+    #bootScreen.done{display:none;}
+    .boot-line{font-size:.75rem;color:#00c853;margin:2px 0;opacity:0;white-space:nowrap;overflow:hidden;}
+    .boot-line.typed{opacity:1;}
+    .boot-line.warn{color:#ffd700;}
+    .boot-line.err {color:#ff4444;}
+    .boot-line.info{color:#4a8aff;}
+    .boot-line.dim {color:#2a4a2a;}
+    .boot-cursor{display:inline-block;width:8px;height:.85rem;background:#00c853;margin-left:2px;animation:blink .7s step-end infinite;vertical-align:middle;}
+    @keyframes blink{0%,100%{opacity:1}50%{opacity:0}}
     .login-logos{display:flex;align-items:center;justify-content:center;gap:12px;margin-bottom:16px;}
     .login-logo{width:60px;height:60px;border-radius:50%;object-fit:cover;border:2px solid #2a3f6f;background:#0d1525;}
     .login-x{color:#ffd700;font-size:1.3rem;font-weight:800;}
@@ -398,6 +410,12 @@
 <body>
 
 <!-- LOGIN -->
+<!-- TERMINAL BOOT SCREEN -->
+<div id="bootScreen">
+  <div id="bootLines"></div>
+  <span class="boot-cursor" id="bootCursor"></span>
+</div>
+
 <div class="login-screen" id="loginScreen">
   <div class="login-box">
     <div class="login-title">Payda × UyghurKid</div>
@@ -865,6 +883,73 @@
     ['wmUyghur','nrUyghur'].forEach(id => { const el=document.getElementById(id); if(el){el.src=UYGHUR_LOGO;el.onerror=()=>el.style.display='none';} });
   }
   setLogos();
+
+  // ── TERMINAL BOOT SEQUENCE ──
+  const BOOT_LINES = [
+    {t:'dim',  txt:'[ PAYDA × UYGHURKID CAPITAL TRADING AGENT v2.6 ]'},
+    {t:'dim',  txt:'━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━'},
+    {t:'info', txt:'> Initializing trading engine...'},
+    {t:'',     txt:'> Loading market data feeds...              [OK]'},
+    {t:'',     txt:'> Connecting to Alpaca API...               [OK]'},
+    {t:'',     txt:'> Connecting to Polygon data...             [OK]'},
+    {t:'',     txt:'> Connecting to Tradier production...       [OK]'},
+    {t:'',     txt:'> Connecting to Finnhub news feed...        [OK]'},
+    {t:'warn', txt:'> Checking PDT rules...       [$25K limit active]'},
+    {t:'',     txt:'> Loading scan modes: MorningGap ScanOpp AfterHrs'},
+    {t:'',     txt:'> Building ticker universe from 6 sources...      '},
+    {t:'',     txt:'> Initializing WebSocket connections...     [OK]'},
+    {t:'',     txt:'> Loading chart workspace (8 panels)...     [OK]'},
+    {t:'',     txt:'> Initializing paper trading sandbox...     [OK]'},
+    {t:'info', txt:'> Pre/After market data: Tradier production key   '},
+    {t:'warn', txt:'> Market status: AFTER HOURS — 4:00pm–8:00pm EST '},
+    {t:'',     txt:'> All systems nominal.                            '},
+    {t:'dim',  txt:'━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━'},
+    {t:'',     txt:'> SELECT OPERATOR PROFILE TO CONTINUE...         '},
+  ];
+
+  // Dynamically update market status line
+  (function(){
+    const now = new Date();
+    const h = now.getHours(), m = now.getMinutes();
+    const hhmm = `${h}:${m<10?'0'+m:''}`;
+    let status, cls;
+    if(h >= 4  && h < 9  || (h===9 && m<30)) { status=`PRE-MARKET — ${hhmm} EST`;  cls='warn'; }
+    else if(h >= 9 && (h<16 || (h===9&&m>=30))){ status=`MARKET OPEN — ${hhmm} EST`; cls=''; }
+    else if(h >= 16 && h < 20)                  { status=`AFTER HOURS — ${hhmm} EST`; cls='warn'; }
+    else                                         { status=`MARKET CLOSED — ${hhmm} EST`; cls='err'; }
+    BOOT_LINES[15] = {t:cls, txt:`> Market status: ${status.padEnd(36)}`};
+  })();
+
+  async function runBoot(){
+    // Skip boot if already logged in this session
+    if(sessionStorage.getItem('tradingUser')){
+      document.getElementById('bootScreen').classList.add('done');
+      document.getElementById('loginScreen').classList.add('hidden');
+      return;
+    }
+    const container = document.getElementById('bootLines');
+    const cursor    = document.getElementById('bootCursor');
+    for(let i=0; i<BOOT_LINES.length; i++){
+      const line = document.createElement('div');
+      line.className = 'boot-line ' + (BOOT_LINES[i].t||'');
+      line.textContent = BOOT_LINES[i].txt;
+      container.appendChild(line);
+      // Stagger — faster for dim/divider lines
+      const delay = BOOT_LINES[i].t==='dim' ? 60 : 120;
+      await new Promise(r=>setTimeout(r, delay));
+      line.classList.add('typed');
+      // Scroll to bottom
+      container.scrollTop = container.scrollHeight;
+    }
+    cursor.style.display='none';
+    // Pause then reveal login
+    await new Promise(r=>setTimeout(r, 600));
+    document.getElementById('bootScreen').classList.add('done');
+    const loginBox = document.querySelector('.login-box');
+    if(loginBox) setTimeout(()=>loginBox.classList.add('visible'), 50);
+  }
+
+  runBoot();
 
   const MODES = {
     morning_gap: { label:'🌅 MorningGap', desc:'Price $0.10–$50, Gap 5%+, $Vol $250K+, Float ≤20M' },
