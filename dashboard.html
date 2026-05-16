@@ -1872,9 +1872,27 @@
     ctrl.innerHTML = `
       <span style="font-size:.65rem;font-weight:700;color:#ffd700;">${ticker}</span>
       <select id="popupRange" style="background:#060a12;border:1px solid #2a3a5a;border-radius:4px;color:#ffd700;font-size:.6rem;padding:2px 4px;font-weight:700;">
-        <option value="1D" selected>1D</option><option value="2D">2D</option><option value="5D">5D</option>
-        <option value="1W">1W</option><option value="1M">1M</option>
-        <option value="3M">3M</option><option value="1Y">1Y</option>
+        <option value="30min">30 min</option>
+        <option value="1hr">1 hour</option>
+        <option value="2hr">2 hours</option>
+        <option value="4hr">4 hours</option>
+        <option value="1D" selected>1 day</option>
+        <option value="2D">2 days</option>
+        <option value="5D">5 days</option>
+        <option value="10D">10 days</option>
+        <option value="15D">15 days</option>
+        <option value="1M">1 month</option>
+        <option value="2M">2 months</option>
+        <option value="3M">3 months</option>
+        <option value="6M">6 months</option>
+        <option value="YTD">YTD</option>
+        <option value="1Y">1 year</option>
+        <option value="2Y">2 years</option>
+        <option value="3Y">3 years</option>
+        <option value="4Y">4 years</option>
+        <option value="5Y">5 years</option>
+        <option value="10Y">10 years</option>
+        <option value="20Y">20 years</option>
       </select>
       <select id="popupTf" style="background:#060a12;border:1px solid #2a3a5a;border-radius:4px;color:#a0b8d0;font-size:.6rem;padding:2px 4px;">
         <option value="1Min">1m</option><option value="2Min">2m</option><option value="3Min">3m</option>
@@ -1908,12 +1926,23 @@
     const range = document.getElementById('popupRange')?.value || '1D';
     popupCurrentTf = tf;
 
-    const RANGES_POP = {'1D':1,'2D':2,'5D':5,'1W':7,'1M':30,'3M':90,'1Y':365};
-    const days = RANGES_POP[range] || 1;
-    const startDate = new Date(); startDate.setDate(startDate.getDate()-days);
-    const startStr  = startDate.toISOString().split('T')[0];
-    // Use days param so server includes pre/post market (same as 8-panel)
-    const url = `${API_URL}/api/stock/bars/${ticker}?timeframe=${tf}&days=${days}&start=${startStr}`;
+    const RANGES_POP = {
+      '30min':0.021,'1hr':0.042,'2hr':0.083,'4hr':0.167,
+      '1D':1,'2D':2,'5D':5,'10D':10,'15D':15,
+      '1M':30,'2M':60,'3M':90,'6M':180,
+      'YTD':null,
+      '1Y':365,'2Y':730,'3Y':1095,'4Y':1460,'5Y':1825,'10Y':3650,'20Y':7300
+    };
+    let days = RANGES_POP[range] ?? 1;
+    let startStr;
+    if(range==='YTD'){
+      startStr = new Date(new Date().getFullYear(),0,1).toISOString().split('T')[0];
+      days=Math.ceil((new Date()-new Date(new Date().getFullYear(),0,1))/86400000);
+    } else {
+      const startDate = new Date(); startDate.setDate(startDate.getDate()-Math.ceil(days));
+      startStr = startDate.toISOString().split('T')[0];
+    }
+    const url = `${API_URL}/api/stock/bars/${ticker}?timeframe=${tf}&days=${Math.ceil(days)}&start=${startStr}`;
 
     await popupRenderChart(ticker, url);
 
@@ -2403,17 +2432,16 @@ button.ld:hover{background:#4a8aff;color:#fff;}
     <div class="exp-controls">
       <input class="exp-ticker" id="expTicker" placeholder="AAPL" oninput="this.value=this.value.toUpperCase()" onkeydown="if(event.key==='Enter')expLoad()">
       <select class="exp-range" id="expRange" onchange="expSetRange(this.value)">
-        <option value="1D">1 Day</option>
-        <option value="2D">2 Days</option>
-        <option value="5D">5 Days</option>
-        <option value="1W" selected>1 Week</option>
-        <option value="1M">1 Month</option>
-        <option value="3M">3 Months</option>
-        <option value="6M">6 Months</option>
-        <option value="YTD">YTD</option>
-        <option value="1Y">1 Year</option>
-        <option value="2Y">2 Years</option>
-        <option value="5Y">5 Years</option>
+        <option value="30min">30 min</option><option value="1hr">1 hour</option>
+        <option value="2hr">2 hours</option><option value="4hr">4 hours</option>
+        <option value="1D" selected>1 day</option><option value="2D">2 days</option>
+        <option value="5D">5 days</option><option value="10D">10 days</option>
+        <option value="15D">15 days</option><option value="1M">1 month</option>
+        <option value="2M">2 months</option><option value="3M">3 months</option>
+        <option value="6M">6 months</option><option value="YTD">YTD</option>
+        <option value="1Y">1 year</option><option value="2Y">2 years</option>
+        <option value="3Y">3 years</option><option value="5Y">5 years</option>
+        <option value="10Y">10 years</option><option value="20Y">20 years</option>
       </select>
       <select class="exp-tf" id="expTf" onchange="exp.tf=this.value;if(document.getElementById('expTicker').value)expLoad()">
         <option value="1Min">1m</option>
@@ -2455,17 +2483,27 @@ function calcMACD(c,f=12,s2=26,sg=9){const eF=calcEMA(c,f),eS=calcEMA(c,s2);cons
 function parseT(t){if(!t)return 0;return Math.floor(new Date(t.includes('T')?t:t.replace(' ','T')).getTime()/1000);}
 
 const RANGES={
-  '1D': {days:1,   tf:'5Min'},
-  '2D': {days:2,   tf:'5Min'},
-  '5D': {days:5,   tf:'15Min'},
-  '1W': {days:7,   tf:'15Min'},
-  '1M': {days:30,  tf:'30Min'},
-  '3M': {days:90,  tf:'1Day'},
-  '6M': {days:180, tf:'1Day'},
-  'YTD':{days:null,ytd:true,tf:'1Day'},
-  '1Y': {days:365, tf:'1Day'},
-  '2Y': {days:730, tf:'1Day'},
-  '5Y': {days:1825,tf:'1Day'},
+  '30min':{days:0.021,tf:'1Min'},
+  '1hr':  {days:0.042,tf:'1Min'},
+  '2hr':  {days:0.083,tf:'1Min'},
+  '4hr':  {days:0.167,tf:'5Min'},
+  '1D':   {days:1,    tf:'5Min'},
+  '2D':   {days:2,    tf:'5Min'},
+  '5D':   {days:5,    tf:'15Min'},
+  '10D':  {days:10,   tf:'15Min'},
+  '15D':  {days:15,   tf:'30Min'},
+  '1M':   {days:30,   tf:'30Min'},
+  '2M':   {days:60,   tf:'1Hour'},
+  '3M':   {days:90,   tf:'1Day'},
+  '6M':   {days:180,  tf:'1Day'},
+  'YTD':  {days:null, ytd:true, tf:'1Day'},
+  '1Y':   {days:365,  tf:'1Day'},
+  '2Y':   {days:730,  tf:'1Day'},
+  '3Y':   {days:1095, tf:'1Day'},
+  '4Y':   {days:1460, tf:'1Day'},
+  '5Y':   {days:1825, tf:'1Day'},
+  '10Y':  {days:3650, tf:'1Day'},
+  '20Y':  {days:7300, tf:'1Day'},
 };
 
 function buildUrl(ticker,range,tf){
@@ -2476,8 +2514,14 @@ function buildUrl(ticker,range,tf){
       const s=new Date(new Date().getFullYear(),0,1);
       extra='&start='+s.toISOString().split('T')[0];
     } else if(r.days){
-      const s=new Date();s.setDate(s.getDate()-r.days);
-      extra='&start='+s.toISOString().split('T')[0];
+      const s=new Date();
+      // For sub-day ranges use hours offset, for multi-day use date
+      if(r.days<1){
+        s.setTime(s.getTime()-r.days*24*60*60*1000);
+      } else {
+        s.setDate(s.getDate()-Math.ceil(r.days));
+      }
+      extra='&start='+s.toISOString().split('T')[0]+'&days='+Math.ceil(r.days||1);
     }
   }
   return API+'/api/stock/bars/'+ticker+'?timeframe='+t+extra;
@@ -2636,11 +2680,16 @@ function init(){
       <div class="cell-hdr">
         <input class="tk" id="tk\${i}" placeholder="AAPL" oninput="this.value=this.value.toUpperCase()" onkeydown="if(event.key==='Enter')load(\${i})">
         <select class="rng-sel" id="rngSel\${i}" onchange="setRange(\${i},this.value)">
-          <option value="1D">1D<\/option><option value="2D">2D<\/option><option value="5D">5D<\/option>
-          <option value="1W" selected>1W<\/option><option value="1M">1M<\/option>
-          <option value="3M">3M<\/option><option value="6M">6M<\/option>
-          <option value="YTD">YTD<\/option><option value="1Y">1Y<\/option>
-          <option value="2Y">2Y<\/option><option value="5Y">5Y<\/option>
+          <option value="30min">30min<\/option><option value="1hr">1hr<\/option>
+          <option value="2hr">2hr<\/option><option value="4hr">4hr<\/option>
+          <option value="1D" selected>1D<\/option><option value="2D">2D<\/option>
+          <option value="5D">5D<\/option><option value="10D">10D<\/option>
+          <option value="15D">15D<\/option><option value="1M">1M<\/option>
+          <option value="2M">2M<\/option><option value="3M">3M<\/option>
+          <option value="6M">6M<\/option><option value="YTD">YTD<\/option>
+          <option value="1Y">1Y<\/option><option value="2Y">2Y<\/option>
+          <option value="3Y">3Y<\/option><option value="5Y">5Y<\/option>
+          <option value="10Y">10Y<\/option><option value="20Y">20Y<\/option>
         <\/select>
         <select class="tf" id="tf\${i}" onchange="state[\${i}].tf=this.value;const _tk=(document.getElementById('tk'+\${i}).value||'').trim().toUpperCase();if(_tk&&state[\${i}].bars.length)load(\${i})">
           <option value="1Min">1m<\/option><option value="2Min">2m<\/option><option value="3Min">3m<\/option>
