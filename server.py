@@ -699,6 +699,8 @@ async def auth_login(req: LoginRequest):
         log_alert(f"🔐 Login: {uid}")
         return {'success': True, 'user_id': uid}
     return {'success': False, 'error': 'Incorrect password'}
+
+class PaperOrderRequest(BaseModel):
     ticker:   str
     side:     str   # 'buy' or 'sell'
     qty:      float
