@@ -2158,29 +2158,42 @@ button.ld:hover{background:#4a8aff;color:#fff;}
     <div class="exp-controls">
       <input class="exp-ticker" id="expTicker" placeholder="AAPL" oninput="this.value=this.value.toUpperCase()" onkeydown="if(event.key==='Enter')expLoad()">
       <div style="display:flex;gap:3px;" id="expRanges">
-        \${['1D','1W','1M','3M','1Y'].map(r=>\`<button class="exp-rng\${r==='1D'?' active':''}" id="expR_\${r}" onclick="expSetRange('\${r}')">\${r}<\/button>\`).join('')}
+        <!-- Range buttons built by JS to avoid template literal escaping issues -->
       </div>
       <select class="exp-tf" id="expTf">
-        <option value="1Min">1m<\/option><option value="5Min" selected>5m<\/option><option value="15Min">15m<\/option><option value="1Hour">1h<\/option><option value="1Day">1D<\/option>
-      <\/select>
-      <button class="exp-load" onclick="expLoad()">⟳ Load<\/button>
-      <button class="exp-ind on" id="expVol" style="--c:#4a8aff" onclick="expToggle('Vol')">Vol<\/button>
-      <button class="exp-ind on" id="expEMA" style="--c:#ff9100" onclick="expToggle('EMA')">EMA<\/button>
-      <button class="exp-ind"   id="expRSI" style="--c:#a78bfa" onclick="expToggle('RSI')">RSI<\/button>
-      <button class="exp-ind"   id="expMACD" style="--c:#00d4ff" onclick="expToggle('MACD')">MACD<\/button>
-      <span class="exp-badge" id="expBadge"><\/span>
-    <\/div>
-    <button class="exp-close" onclick="closeExpand()">✕ Back to 8 Panels<\/button>
-  <\/div>
+        <option value="1Min">1m</option><option value="5Min" selected>5m</option><option value="15Min">15m</option><option value="1Hour">1h</option><option value="1Day">1D</option>
+      </select>
+      <button class="exp-load" onclick="expLoad()">⟳ Load</button>
+      <button class="exp-ind on" id="expVol"  style="--c:#4a8aff" onclick="expToggle('Vol')">Vol</button>
+      <button class="exp-ind on" id="expEMA"  style="--c:#ff9100" onclick="expToggle('EMA')">EMA</button>
+      <button class="exp-ind"   id="expRSI"  style="--c:#a78bfa" onclick="expToggle('RSI')">RSI</button>
+      <button class="exp-ind"   id="expMACD" style="--c:#00d4ff" onclick="expToggle('MACD')">MACD</button>
+      <span class="exp-badge" id="expBadge"></span>
+    </div>
+    <button class="exp-close" onclick="closeExpand()">✕ Back to 8 Panels</button>
+  </div>
   <div class="exp-body">
-    <div class="exp-chart" id="expChart"><\/div>
-    <div class="exp-sub hidden" id="expRsiWrap"><div class="exp-sub-label">RSI(14)<\/div><div id="expRsiChart" style="width:100%;height:100%"><\/div><\/div>
-    <div class="exp-sub hidden" id="expMacdWrap"><div class="exp-sub-label">MACD(12,26,9)<\/div><div id="expMacdChart" style="width:100%;height:100%"><\/div><\/div>
-  <\/div>
-<\/div>
+    <div class="exp-chart" id="expChart"></div>
+    <div class="exp-sub hidden" id="expRsiWrap"><div class="exp-sub-label">RSI(14)</div><div id="expRsiChart" style="width:100%;height:100%"></div></div>
+    <div class="exp-sub hidden" id="expMacdWrap"><div class="exp-sub-label">MACD(12,26,9)</div><div id="expMacdChart" style="width:100%;height:100%"></div></div>
+  </div>
+</div>
 <script>
 const API='${apiUrl}';
 const state={};
+
+// Build expand overlay range buttons via JS (avoids template literal escaping issues)
+(function(){
+  const rng=document.getElementById('expRanges');
+  if(!rng)return;
+  ['1D','1W','1M','3M','1Y'].forEach(r=>{
+    const b=document.createElement('button');
+    b.className='exp-rng'+(r==='1D'?' active':'');
+    b.id='expR_'+r; b.textContent=r;
+    b.onclick=()=>expSetRange(r);
+    rng.appendChild(b);
+  });
+})();
 
 function calcEMA(data,p){const k=2/(p+1);let e=null;return data.map(v=>{if(e===null)e=v;else e=v*k+e*(1-k);return e;});}
 function calcRSI(c,p=14){return c.map((_,i)=>{if(i<p)return null;let g=0,l=0;for(let j=i-p+1;j<=i;j++){const d=c[j]-c[j-1];if(d>0)g+=d;else l-=d;}const rs=(g/p)/((l/p)||0.0001);return 100-100/(1+rs);});}
