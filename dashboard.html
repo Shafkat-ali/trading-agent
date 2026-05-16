@@ -14,7 +14,9 @@
     .login-box{background:#0f1729;border:1px solid #1e2d4a;border-radius:20px;padding:36px;width:400px;text-align:center;box-shadow:0 20px 60px rgba(0,0,0,.5);opacity:0;transform:translateY(20px);transition:opacity .6s ease,transform .6s ease;}
     .login-box.visible{opacity:1;transform:translateY(0);}
     /* Terminal boot overlay */
-    #bootScreen{position:fixed;inset:0;background:#060a12;z-index:10000;display:flex;flex-direction:column;align-items:flex-start;justify-content:center;padding:40px 60px;font-family:'Courier New',monospace;}
+    #bootScreen{position:fixed;inset:0;background:#060a12;z-index:10000;display:flex;flex-direction:row;align-items:center;justify-content:center;gap:60px;padding:40px 60px;font-family:'Courier New',monospace;}
+    #bootLeft{display:flex;flex-direction:column;flex:1;max-width:520px;}
+    #bootRight{display:flex;flex-direction:column;flex:1;max-width:480px;border-left:1px solid #1a2a3a;padding-left:40px;}
     #bootScreen.done{display:none;}
     .boot-line{font-size:.75rem;color:#00c853;margin:2px 0;opacity:0;white-space:nowrap;overflow:hidden;}
     .boot-line.typed{opacity:1;}
@@ -91,7 +93,9 @@
     .controls{padding:7px 14px;display:flex;gap:8px;flex-wrap:wrap;background:#0d1220;border-bottom:1px solid #1a2035;align-items:center;}
 
     /* DUAL SCAN BUTTONS */
-    .scan-start-btn{display:flex;flex-direction:column;align-items:center;justify-content:center;padding:6px 16px;border:2px solid #1e2d4a;border-radius:8px;background:#0d1525;cursor:pointer;transition:all .25s;gap:1px;min-width:120px;}
+    .scan-start-btn{display:flex;flex-direction:column;align-items:center;justify-content:center;padding:6px 16px;border:2px solid #1e2d4a;border-radius:8px;background:#0d1525;cursor:pointer;transition:all .25s;gap:1px;min-width:120px;position:relative;}
+    .tip-badge{position:absolute;top:4px;left:5px;font-size:.45rem;color:#3a5a8a;opacity:.6;line-height:1;cursor:default;z-index:2;transition:opacity .15s;}
+    .scan-start-btn:hover .tip-badge{opacity:1;color:#a0c4ff;}
     .scan-start-btn:hover{transform:translateY(-2px);}
     .scan-btn-icon{font-size:1rem;line-height:1;}
     .scan-btn-label{font-size:.76rem;font-weight:800;color:#e0e6f0;line-height:1.3;}
@@ -448,8 +452,13 @@
 
 <!-- TERMINAL BOOT SCREEN -->
 <div id="bootScreen">
-  <div id="bootLines"></div>
-  <span class="boot-cursor" id="bootCursor"></span>
+  <div id="bootLeft">
+    <div id="bootLines"></div>
+    <span class="boot-cursor" id="bootCursor"></span>
+  </div>
+  <div id="bootRight">
+    <div id="disclaimerLines"></div>
+  </div>
 </div>
 
 <div class="login-screen" id="loginScreen">
@@ -573,27 +582,27 @@
 <div class="controls">
   <div class="scan-btn-wrap">
     <button class="scan-start-btn" id="btn-morning_gap" onclick="startWithMode('morning_gap')">
+      <span class="tip-badge" onmouseenter="showTip(event,'morning_gap')" onmouseleave="hideTip()" onclick="event.stopPropagation()">ⓘ</span>
       <span class="scan-btn-icon">🌅</span>
       <span class="scan-btn-label">MorningGap</span>
       <span class="scan-btn-sub">$0.10–$50 · Gap 5%+ · Float ≤20M</span>
     </button>
-    <span class="info-icon" onmouseenter="showTip(event,'morning_gap')" onmouseleave="hideTip()">ⓘ</span>
   </div>
   <div class="scan-btn-wrap">
     <button class="scan-start-btn" id="btn-scanopp" onclick="startWithMode('scanopp')">
+      <span class="tip-badge" onmouseenter="showTip(event,'scanopp')" onmouseleave="hideTip()" onclick="event.stopPropagation()">ⓘ</span>
       <span class="scan-btn-icon">💡</span>
       <span class="scan-btn-label">ScanOpp</span>
       <span class="scan-btn-sub">$0.50–$15 · Gap 9%+ · $Vol $3M+</span>
     </button>
-    <span class="info-icon" onmouseenter="showTip(event,'scanopp')" onmouseleave="hideTip()">ⓘ</span>
   </div>
   <div class="scan-btn-wrap">
     <button class="scan-start-btn" id="btn-afterhrs" onclick="startWithMode('afterhrs')">
+      <span class="tip-badge" onmouseenter="showTip(event,'afterhrs')" onmouseleave="hideTip()" onclick="event.stopPropagation()">ⓘ</span>
       <span class="scan-btn-icon">🌆</span>
       <span class="scan-btn-label">AfterHrs</span>
       <span class="scan-btn-sub">Under $50 · Within 10% of VWAP</span>
     </button>
-    <span class="info-icon" onmouseenter="showTip(event,'afterhrs')" onmouseleave="hideTip()">ⓘ</span>
   </div>
   <button class="btn btn-pause" id="pauseBtn" onclick="togglePause()" style="display:none">⏸ Pause</button>
   <button class="btn btn-clear" onclick="clearResults()">🗑 Clear</button>
@@ -965,6 +974,43 @@
     {t:'',     txt:'> SELECT OPERATOR PROFILE TO CONTINUE...         '},
   ];
 
+  const DISCLAIMER_LINES = [
+    {t:'warn', txt:'⚠  IMPORTANT LEGAL DISCLAIMER'},
+    {t:'dim',  txt:'─────────────────────────────────────────────────'},
+    {t:'',     txt:' FOR EDUCATIONAL & INFORMATIONAL PURPOSES ONLY.  '},
+    {t:'',     txt:' Payda × UyghurKid Capital Trading Agent does NOT '},
+    {t:'',     txt:' constitute financial, investment, legal or tax    '},
+    {t:'',     txt:' advice of any kind.                               '},
+    {t:'dim',  txt:'─────────────────────────────────────────────────'},
+    {t:'warn', txt:' NOT A FINANCIAL ADVISOR                           '},
+    {t:'',     txt:' Neither Payda Capital nor UyghurKid Capital, nor  '},
+    {t:'',     txt:' any of their personnel, are registered investment  '},
+    {t:'',     txt:' advisors, brokers, or licensed financial planners. '},
+    {t:'',     txt:' Nothing shown here is a solicitation or           '},
+    {t:'',     txt:' recommendation to buy or sell any security.        '},
+    {t:'dim',  txt:'─────────────────────────────────────────────────'},
+    {t:'warn', txt:' TRADING INVOLVES SUBSTANTIAL RISK                 '},
+    {t:'',     txt:' Stock trading, day trading, and short-term trading '},
+    {t:'',     txt:' carry a HIGH level of risk and may not be suitable '},
+    {t:'',     txt:' for all investors. You may lose some or ALL of     '},
+    {t:'',     txt:' your invested capital. Only trade with money you   '},
+    {t:'',     txt:' can afford to lose entirely.                       '},
+    {t:'dim',  txt:'─────────────────────────────────────────────────'},
+    {t:'warn', txt:' NO LIABILITY                                       '},
+    {t:'',     txt:' Payda × UyghurKid shall not be held liable for     '},
+    {t:'',     txt:' any losses, damages, or adverse outcomes resulting  '},
+    {t:'',     txt:' from use of this platform or reliance on any data, '},
+    {t:'',     txt:' scan results, alerts, or chart analysis shown.     '},
+    {t:'',     txt:' Past performance is NOT indicative of future       '},
+    {t:'',     txt:' results.                                           '},
+    {t:'dim',  txt:'─────────────────────────────────────────────────'},
+    {t:'info', txt:' Always consult a qualified financial professional   '},
+    {t:'info', txt:' before making any investment decisions.             '},
+    {t:'dim',  txt:'─────────────────────────────────────────────────'},
+    {t:'',     txt:' By continuing, you acknowledge and accept          '},
+    {t:'',     txt:' these terms in full.                               '},
+  ];
+
   // Dynamically update market status line
   (function(){
     const now = new Date();
@@ -979,28 +1025,35 @@
   })();
 
   async function runBoot(){
-    // Skip boot if already logged in this session
     if(sessionStorage.getItem('tradingUser')){
       document.getElementById('bootScreen').classList.add('done');
       document.getElementById('loginScreen').classList.add('hidden');
       return;
     }
-    const container = document.getElementById('bootLines');
-    const cursor    = document.getElementById('bootCursor');
-    for(let i=0; i<BOOT_LINES.length; i++){
-      const line = document.createElement('div');
-      line.className = 'boot-line ' + (BOOT_LINES[i].t||'');
-      line.textContent = BOOT_LINES[i].txt;
-      container.appendChild(line);
-      // Stagger — faster for dim/divider lines
-      const delay = BOOT_LINES[i].t==='dim' ? 60 : 120;
-      await new Promise(r=>setTimeout(r, delay));
-      line.classList.add('typed');
-      // Scroll to bottom
-      container.scrollTop = container.scrollHeight;
+    const container  = document.getElementById('bootLines');
+    const discContainer = document.getElementById('disclaimerLines');
+    const cursor     = document.getElementById('bootCursor');
+
+    // Animate both columns simultaneously
+    async function animateLines(lines, el, fastDelay=50, slowDelay=100){
+      for(let i=0; i<lines.length; i++){
+        const line = document.createElement('div');
+        line.className = 'boot-line ' + (lines[i].t||'');
+        line.textContent = lines[i].txt;
+        el.appendChild(line);
+        const delay = lines[i].t==='dim' ? fastDelay : slowDelay;
+        await new Promise(r=>setTimeout(r, delay));
+        line.classList.add('typed');
+        el.scrollTop = el.scrollHeight;
+      }
     }
+
+    await Promise.all([
+      animateLines(BOOT_LINES, container, 60, 110),
+      animateLines(DISCLAIMER_LINES, discContainer, 40, 80),
+    ]);
+
     cursor.style.display='none';
-    // Pause then reveal login
     await new Promise(r=>setTimeout(r, 600));
     document.getElementById('bootScreen').classList.add('done');
     const loginBox = document.querySelector('.login-box');
