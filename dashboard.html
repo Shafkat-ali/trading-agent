@@ -134,7 +134,8 @@
     @keyframes ind{0%{transform:translateX(-200%)}100%{transform:translateX(450%)}}
 
     /* MAIN */
-    .main{display:grid;grid-template-columns:1fr 270px;height:calc(100vh - 115px);}
+    .main{display:flex;height:calc(100vh - 115px);}
+    .main .results-panel{flex:1;min-width:0;overflow:hidden;display:flex;flex-direction:column;}
 
     /* RESULTS PANEL — logos watermark */
     .results-panel{overflow-y:auto;padding:9px;position:relative;}
@@ -214,7 +215,10 @@
     .skip-banner{background:rgba(255,23,68,.09);border:1px solid #ff1744;border-radius:3px;padding:2px 4px;font-size:.58rem;color:#ff5252;margin-top:3px;text-align:center;}
 
     /* RIGHT PANEL */
-    .right-panel{background:#0d1220;border-left:1px solid #1a2035;display:flex;flex-direction:column;overflow:hidden;}
+    .right-panel{background:#0d1220;border-left:1px solid #1a2035;display:flex;flex-direction:column;overflow:hidden;position:relative;transition:width .25s ease,min-width .25s ease;}
+    .right-panel.collapsed{width:0!important;min-width:0!important;border-left:none;overflow:hidden;}
+    .panel-toggle-btn{position:absolute;left:-14px;top:50%;transform:translateY(-50%);width:14px;height:48px;background:#0d1220;border:1px solid #1a2035;border-right:none;border-radius:6px 0 0 6px;cursor:pointer;display:flex;align-items:center;justify-content:center;color:#4a6a8a;font-size:.65rem;z-index:100;transition:all .2s;}
+    .panel-toggle-btn:hover{background:#1a2a4a;color:#a0c4ff;}
     .tab-header{display:flex;border-bottom:1px solid #1a2035;}
     .tab-btn{flex:1;padding:6px 2px;background:transparent;border:none;color:#4a6a8a;font-size:.5rem;font-weight:600;cursor:pointer;transition:all .2s;text-transform:uppercase;}
     .tab-btn.active{color:#00d4ff;border-bottom:2px solid #00d4ff;background:rgba(0,212,255,.04);}
@@ -590,7 +594,7 @@
   </div>
   <button class="btn btn-pause" id="pauseBtn" onclick="togglePause()" style="display:none">⏸ Pause</button>
   <button class="btn btn-clear" onclick="clearResults()">🗑 Clear</button>
-  <button class="btn" onclick="openChartsModal()" style="background:linear-gradient(135deg,#1a3a6a,#2a5a9a);color:#a0d4ff;">📊 Charts</button>
+  <button class="btn" onclick="openCharts()" style="background:linear-gradient(135deg,#1a3a6a,#2a5a9a);color:#a0d4ff;">📊 Charts</button>
   <div class="stats-bar">
     <div class="stat"><div class="stat-val" id="statSetups">0</div><div class="stat-label">Setups</div></div>
     <div class="stat"><div class="stat-val" id="statAplus">0</div><div class="stat-label">A+ Grade</div></div>
@@ -656,7 +660,8 @@
   </div>
 
   <!-- RIGHT PANEL -->
-  <div class="right-panel">
+  <div class="right-panel" id="rightPanel" style="width:270px;min-width:270px;">
+    <button class="panel-toggle-btn" id="panelToggleBtn" onclick="toggleRightPanel()" title="Hide/Show panel">◀</button>
     <div class="tab-header">
       <button class="tab-btn active" onclick="switchTab('screener')">📋 Screen</button>
       <button class="tab-btn"        onclick="switchTab('news')">🌍 News</button>
@@ -1948,6 +1953,17 @@
   // ══════════════════════════════════════════
   // TOOLTIP — fixed position, never inline
   // ══════════════════════════════════════════
+  // ── RIGHT PANEL TOGGLE ──
+  let panelOpen = true;
+  function toggleRightPanel(){
+    const panel = document.getElementById('rightPanel');
+    const btn   = document.getElementById('panelToggleBtn');
+    panelOpen   = !panelOpen;
+    panel.classList.toggle('collapsed', !panelOpen);
+    btn.textContent = panelOpen ? '◀' : '▶';
+    btn.title       = panelOpen ? 'Hide panel' : 'Show panel';
+  }
+
   const TOOLTIP_DATA={
     morning_gap:{title:'🌅 MorningGap Scanner',rows:[['Price','$0.10 – $50.00'],['% Change','+5% or more'],['Dollar Vol','$250,000+'],['Float','Under 20M shares']],desc:'Finds stocks gapping up premarket with small float for explosive moves.',best:'⏰ Best: 4:00am – 9:30am EST'},
     scanopp:    {title:'💡 ScanOpp Scanner',   rows:[['Price','$0.50 – $15.00'],['% Change','+9% or more'],['Dollar Vol','$3,000,000+'],['Trades','3,000+']],desc:'High-liquidity momentum plays. Stricter criteria = higher quality setups.',best:'⏰ Best: Market open 9:30am EST'},
@@ -2012,6 +2028,117 @@
     }
   }
 
+  // ── CHARTS — open in new tab ──
+  function openCharts(){
+    // Build self-contained chart page URL
+    const w = window.open('', '_blank');
+    if(!w){ openChartsModal(); return; } // fallback if popup blocked
+    w.document.write(buildChartsPage());
+    w.document.close();
+  }
+
+  function buildChartsPage(){
+    const apiUrl = typeof API_URL !== 'undefined' ? API_URL : window.location.origin;
+    return `<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<title>Chart Workspace — Payda × UyghurKid</title>
+<script src="https://unpkg.com/lightweight-charts@3.8.0/dist/lightweight-charts.standalone.production.js"><\/script>
+<style>
+*{margin:0;padding:0;box-sizing:border-box;}
+body{background:#060a12;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;height:100vh;display:flex;flex-direction:column;overflow:hidden;}
+.hdr{display:flex;align-items:center;justify-content:space-between;padding:8px 16px;background:#080e1e;border-bottom:2px solid #1a2a4a;flex-shrink:0;}
+.hdr-title{font-size:.9rem;font-weight:800;color:#ffd700;}
+.hdr-hint{font-size:.6rem;color:#4a6a8a;}
+.grid{display:grid;grid-template-columns:repeat(4,1fr);grid-template-rows:repeat(2,1fr);gap:6px;padding:8px;flex:1;min-height:0;}
+.cell{background:#080e1e;border:1px solid #1a2a4a;border-radius:8px;display:flex;flex-direction:column;overflow:hidden;min-height:0;}
+.cell-hdr{display:flex;align-items:center;gap:5px;padding:4px 7px;background:#0d1525;border-bottom:1px solid #1a2a4a;flex-shrink:0;}
+input.tk{background:#060a12;border:1px solid #2a3a5a;border-radius:5px;color:#e0e6f0;font-size:.72rem;font-weight:700;padding:3px 7px;width:80px;text-transform:uppercase;}
+input.tk:focus{outline:none;border-color:#4a8aff;}
+select.tf{background:#060a12;border:1px solid #2a3a5a;border-radius:5px;color:#a0b8d0;font-size:.62rem;padding:3px 4px;}
+button.ld{background:#1a3a6a;border:1px solid #2a4a8a;border-radius:5px;color:#a0c4ff;font-size:.6rem;padding:3px 8px;cursor:pointer;}
+button.ld:hover{background:#4a8aff;color:#fff;}
+.badge{font-size:.56rem;color:#3a5a7a;margin-left:auto;}
+.body{flex:1;min-height:0;position:relative;overflow:hidden;}
+.ph{display:flex;flex-direction:column;align-items:center;justify-content:center;height:100%;color:#2a3a5a;font-size:.7rem;gap:4px;}
+</style>
+</head>
+<body>
+<div class="hdr">
+  <span class="hdr-title">📊 Chart Workspace — 8 Panels</span>
+  <span class="hdr-hint">Type a ticker + press Load or Enter</span>
+</div>
+<div class="grid" id="grid"></div>
+<script>
+const API='${apiUrl}';
+const charts={};
+function init(){
+  const g=document.getElementById('grid');
+  for(let i=0;i<8;i++){
+    g.innerHTML+=\`<div class="cell" id="cell\${i}">
+      <div class="cell-hdr">
+        <input class="tk" id="tk\${i}" placeholder="AAPL"
+          oninput="this.value=this.value.toUpperCase()"
+          onkeydown="if(event.key==='Enter')load(\${i})">
+        <select class="tf" id="tf\${i}">
+          <option value="1Min">1m</option>
+          <option value="5Min" selected>5m</option>
+          <option value="15Min">15m</option>
+          <option value="1Hour">1h</option>
+          <option value="1Day">1D</option>
+        </select>
+        <button class="ld" onclick="load(\${i})">Load</button>
+        <span class="badge" id="bg\${i}"></span>
+      </div>
+      <div class="body" id="bd\${i}">
+        <div class="ph"><span style="font-size:1.4rem">📊</span><span>Panel \${i+1}</span><span style="font-size:.58rem;color:#1e2d4a">Enter ticker + Load</span></div>
+      </div>
+    </div>\`; 
+  }
+}
+function parseT(t){if(!t)return 0;return Math.floor(new Date(t.includes('T')?t:t.replace(' ','T')).getTime()/1000);}
+async function load(idx){
+  const tk=(document.getElementById('tk'+idx).value||'').trim().toUpperCase();
+  const tf=document.getElementById('tf'+idx).value||'5Min';
+  const bd=document.getElementById('bd'+idx);
+  const bg=document.getElementById('bg'+idx);
+  if(!tk){bd.innerHTML='<div class="ph"><span>⚠️ Enter a ticker</span></div>';return;}
+  bd.innerHTML='<div class="ph"><span style="color:#ffd700">⏳ Loading '+tk+'...</span></div>';
+  try{
+    const r=await fetch(API+'/api/stock/bars/'+tk+'?timeframe='+tf);
+    const d=await r.json();
+    const bars=d.bars||[];
+    bd.innerHTML='';
+    if(!bars.length){bd.innerHTML='<div class="ph"><span style="color:#ff6666">No data — '+tk+'</span><span style="font-size:.56rem;color:#3a5a7a">Market closed or invalid</span></div>';return;}
+    if(charts[idx]){try{charts[idx].remove();}catch(e){}delete charts[idx];}
+    const chart=LightweightCharts.createChart(bd,{
+      width:bd.clientWidth,height:bd.clientHeight,
+      layout:{backgroundColor:'#060a12',textColor:'#8aa0c0'},
+      grid:{vertLines:{color:'#0f1a2e'},horzLines:{color:'#0f1a2e'}},
+      timeScale:{timeVisible:true,secondsVisible:false,borderColor:'#1a2a4a'},
+      rightPriceScale:{borderColor:'#1a2a4a'},crosshair:{mode:1},
+      handleScroll:{mouseWheel:true,pressedMouseMove:true},
+      handleScale:{mouseWheel:true,pinch:true},
+    });
+    charts[idx]=chart;
+    const c=chart.addCandlestickSeries({upColor:'#00c853',downColor:'#ff1744',borderUpColor:'#00c853',borderDownColor:'#ff1744',wickUpColor:'#00c853',wickDownColor:'#ff1744'});
+    c.setData(bars.map(b=>({time:parseT(b.time),open:b.open,high:b.high,low:b.low,close:b.close})).filter(b=>b.time>0).sort((a,b)=>a.time-b.time));
+    const vw=bars.filter(b=>b.vwap>0).map(b=>({time:parseT(b.time),value:b.vwap})).filter(b=>b.time>0).sort((a,b)=>a.time-b.time);
+    if(vw.length){const vl=chart.addLineSeries({color:'#ffd700',lineWidth:1,priceLineVisible:false});vl.setData(vw);}
+    chart.timeScale().fitContent();
+    bg.textContent=tk+' · '+tf+' · '+bars.length+' bars · '+(d.source||'');
+    bg.style.color='#00c853';
+    new ResizeObserver(()=>{if(charts[idx])charts[idx].resize(bd.clientWidth,bd.clientHeight);}).observe(bd);
+  }catch(e){bd.innerHTML='<div class="ph"><span style="color:#ff4444">Error: '+e.message+'</span></div>';}
+}
+init();
+<\/script>
+</body>
+</html>`;
+  }
+
+  // Keep modal as fallback (popup blocked scenario)
   function openChartsModal(){
     const modal=document.getElementById('chartsModal');
     modal.classList.add('open');
