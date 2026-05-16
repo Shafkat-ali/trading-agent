@@ -73,9 +73,10 @@
     .header-right{display:flex;align-items:center;gap:7px;}
     .active-user-badge{display:flex;align-items:center;gap:6px;padding:3px 9px;border-radius:20px;background:#0f1729;border:1px solid #1e2d4a;cursor:pointer;transition:all .2s;}
     .active-user-badge:hover{border-color:#ffd700;}
-    .user-mini-avatar{width:19px;height:19px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:.58rem;font-weight:800;}
-    .user-mini-avatar.shafkat{background:linear-gradient(135deg,#00d4ff,#7b61ff);color:#fff;}
-    .user-mini-avatar.irfan  {background:linear-gradient(135deg,#ffd700,#ff6d00);color:#000;}
+    .user-mini-avatar{width:22px;height:22px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:.58rem;font-weight:800;overflow:hidden;border:1px solid #2a3a5a;}
+    .user-mini-avatar img{width:100%;height:100%;object-fit:cover;border-radius:50%;}
+    .user-mini-avatar.shafkat{background:#ffffff;}
+    .user-mini-avatar.irfan  {background:#0d1525;}
     .active-user-name{font-size:.66rem;font-weight:600;color:#a0b0d0;}
     .switch-btn{font-size:.52rem;color:#4a6a8a;}
     .status-pill{display:flex;align-items:center;gap:5px;padding:3px 8px;border-radius:20px;background:#0f1729;border:1px solid #1e2d4a;}
@@ -458,6 +459,18 @@
   </div>
   <div id="bootRight">
     <div id="disclaimerLines"></div>
+    <!-- Agree checkbox — shown after animation completes -->
+    <div id="bootAgree" style="display:none;margin-top:20px;flex-direction:column;gap:10px;border-top:1px solid #1a3a2a;padding-top:14px;">
+      <label style="display:flex;align-items:flex-start;gap:10px;cursor:pointer;font-size:.65rem;color:#a0c4ff;line-height:1.5;">
+        <input type="checkbox" id="agreeCheck" onchange="checkAgree()"
+          style="width:14px;height:14px;margin-top:2px;accent-color:#00c853;cursor:pointer;flex-shrink:0;">
+        <span>I have read and understood the disclaimer above. I acknowledge that Payda × UyghurKid Capital is not a financial advisor, and I accept full responsibility for any trading decisions I make using this platform.</span>
+      </label>
+      <button id="agreeBtn" onclick="proceedFromBoot()" disabled
+        style="background:#1a3a1a;border:1px solid #2a5a2a;border-radius:7px;color:#4a8a4a;font-size:.72rem;font-weight:700;padding:8px 20px;cursor:not-allowed;opacity:.4;transition:all .2s;font-family:'Courier New',monospace;align-self:flex-start;">
+        ✅ I AGREE — CONTINUE TO LOGIN
+      </button>
+    </div>
   </div>
 </div>
 
@@ -614,13 +627,13 @@
     <button onclick="openLogModal()" title="View scan log"
       style="background:#0f1729;border:1px solid #1e2d4a;border-radius:5px;color:#4a6a8a;font-size:.52rem;padding:3px 8px;cursor:pointer;transition:all .2s;"
       onmouseover="this.style.color='#a0c4ff'" onmouseout="this.style.color='#4a6a8a'">📝 Log</button>
-    <button id="panelToggleBtn" onclick="toggleRightPanel()" title="Hide right panel"
+    <button id="panelToggleBtn" onclick="toggleRightPanel()" title="Show right panel"
       style="background:#0f1729;border:1px solid #1e2d4a;border-radius:5px;color:#4a6a8a;font-size:.52rem;padding:3px 8px;cursor:pointer;transition:all .2s;"
-      onmouseover="this.style.color='#a0c4ff'" onmouseout="this.style.color='#4a6a8a'">◀ Hide</button>
+      onmouseover="this.style.color='#a0c4ff'" onmouseout="this.style.color='#4a6a8a'">▶ Show</button>
   </div>
 </div>
 <div id="scanTooltipBox"></div>
-<button id="panelRestoreBtn" onclick="toggleRightPanel()" title="Show panel">▶ Panel</button>
+<button id="panelRestoreBtn" onclick="toggleRightPanel()" title="Show panel" style="display:block;">▶ Panel</button>
 
 <!-- LOG MODAL -->
 <div id="logModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.85);z-index:10000;align-items:center;justify-content:center;backdrop-filter:blur(4px);">
@@ -695,7 +708,7 @@
   </div>
 
   <!-- RIGHT PANEL -->
-  <div class="right-panel" id="rightPanel" style="width:270px;min-width:270px;">
+  <div class="right-panel collapsed" id="rightPanel" style="width:0;min-width:0;">
     <div class="tab-header">
       <button class="tab-btn active" onclick="switchTab('screener')">📋 Screen</button>
       <button class="tab-btn"        onclick="switchTab('news')">🌍 News</button>
@@ -1027,7 +1040,7 @@
   async function runBoot(){
     if(sessionStorage.getItem('tradingUser')){
       document.getElementById('bootScreen').classList.add('done');
-      document.getElementById('loginScreen').classList.add('hidden');
+      // Already authenticated — skip boot and disclaimer
       return;
     }
     const container  = document.getElementById('bootLines');
@@ -1054,7 +1067,19 @@
     ]);
 
     cursor.style.display='none';
-    await new Promise(r=>setTimeout(r, 600));
+    // Show agree checkbox — don't reveal login until checked
+    document.getElementById('bootAgree').style.display='flex';
+  }
+
+  function checkAgree(){
+    const cb = document.getElementById('agreeCheck');
+    const btn = document.getElementById('agreeBtn');
+    btn.disabled = !cb.checked;
+    btn.style.opacity = cb.checked ? '1' : '0.4';
+    btn.style.cursor  = cb.checked ? 'pointer' : 'not-allowed';
+  }
+
+  function proceedFromBoot(){
     document.getElementById('bootScreen').classList.add('done');
     const loginBox = document.querySelector('.login-box');
     if(loginBox) setTimeout(()=>loginBox.classList.add('visible'), 50);
@@ -2048,7 +2073,7 @@
     if(e.target===document.getElementById('logModal')) closeLogModal();
   });
 
-  let panelOpen = true;
+  let panelOpen = false;
   function toggleRightPanel(){
     const panel   = document.getElementById('rightPanel');
     const btn     = document.getElementById('panelToggleBtn');
