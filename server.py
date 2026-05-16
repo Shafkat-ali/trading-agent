@@ -596,23 +596,49 @@ async def paper_order(req: PaperOrderRequest):
         if req.qty <= 0:
             return {'error': 'Quantity must be positive'}
 
+        # Tradier extended hours rules:
+        # pre/post duration MUST use limit orders only
+        duration = req.duration
+        order_type = req.order_type
+
+        if duration in ('pre', 'post') and order_type != 'limit':
+            return {'error': f'Pre/Post market orders must be Limit orders — market orders are not allowed in extended hours'}
+
+        if duration in ('pre', 'post') and req.limit_price <= 0:
+            return {'error': f'Pre/Post market orders require a limit price'}
+
         payload = {
             'class':    'equity',
             'symbol':   ticker,
             'side':     req.side,
             'quantity': str(int(req.qty)),
-            'type':     req.order_type,
-            'duration': req.duration,
+            'type':     order_type,
+            'duration': duration,
         }
-        if req.order_type == 'limit' and req.limit_price > 0:
+        if order_type in ('limit', 'stop_limit') and req.limit_price > 0:
             payload['price'] = str(req.limit_price)
+        if order_type in ('stop', 'stop_limit') and req.limit_price > 0:
+            payload['stop'] = str(req.limit_price)
 
         r = requests.post(
             f"{TRADIER_SANDBOX_URL}/accounts/{TRADIER_SANDBOX_ACCT}/orders",
             headers={**TRADIER_SANDBOX_HDR, 'Content-Type':'application/x-www-form-urlencoded'},
             data=payload, timeout=10
         )
-        log_alert(f"📝 Paper {req.side.upper()} {int(req.qty)}x {ticker} — HTTP {r.status_code}")
+
+        # Log full response so we can debug any 403/400
+        log_alert(f"📝 Paper {req.side.upper()} {int(req.qty)}x {ticker} [{order_type}/{duration}] — HTTP {r.status_code} — {r.text[:300]}")
+
+        if r.status_code == 403:
+            return {'error': f'Tradier rejected order (403) — Note: Tradier Sandbox does NOT support pre/post market extended hours orders. Use a funded live account for extended hours trading. Response: {r.text[:200]}'}
+
+        if r.status_code in (200, 201):
+            return r.json()
+
+        return {'error': f'HTTP {r.status_code}: {r.text[:300]}'}
+
+    except Exception as e:
+        return {'error': str(e)}
         return r.json() if r.status_code in (200,201) else {'error': f'HTTP {r.status_code}: {r.text[:200]}'}
     except Exception as e:
         return {'error': str(e)}

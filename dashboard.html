@@ -804,10 +804,11 @@
         <!-- Session / Duration row -->
         <div style="display:flex;gap:4px;margin-bottom:4px;">
           <select id="paperDuration"
-            style="flex:1;background:#060a12;border:1px solid #2a3a5a;border-radius:4px;color:#a0b8d0;font-size:.62rem;padding:4px;cursor:pointer;">
+            style="flex:1;background:#060a12;border:1px solid #2a3a5a;border-radius:4px;color:#a0b8d0;font-size:.62rem;padding:4px;cursor:pointer;"
+            onchange="showDurationWarning(this.value)">
             <option value="day">🕙 Market Hours (Day)</option>
-            <option value="pre">🌅 Pre-Market</option>
-            <option value="post">🌆 After-Hours</option>
+            <option value="pre">🌅 Pre-Market (Live acct only)</option>
+            <option value="post">🌆 After-Hours (Live acct only)</option>
             <option value="gtc">♾ GTC (Good Till Cancel)</option>
           </select>
         </div>
@@ -842,6 +843,7 @@
           <button onclick="loadPaperOrders()" style="background:#1a3a6a;border:1px solid #2a4a8a;border-radius:4px;color:#a0c4ff;font-size:.55rem;padding:2px 6px;cursor:pointer;">↻ Refresh</button>
         </div>
         <div id="paperOrders" style="font-size:.58rem;color:#4a6a8a;">Click Refresh to load</div>
+        <div id="paperCancelResult" style="margin-top:4px;font-size:.58rem;min-height:14px;text-align:center;"></div>
       </div>
     </div>
   </div>
@@ -1021,6 +1023,17 @@
     }
   }
 
+  function showDurationWarning(val){
+    const res=document.getElementById('paperOrderResult');
+    if(!res)return;
+    if(val==='pre'||val==='post'){
+      res.textContent='⚠️ Tradier Sandbox does not support extended hours — works on funded live account only. Must use Limit order.';
+      res.style.color='#ff9100';
+    }else{
+      res.textContent='';
+    }
+  }
+
   function toggleLimitPrice(){
     const show=document.getElementById('paperOrderType').value==='limit';
     document.getElementById('paperLimitPrice').style.display=show?'block':'none';
@@ -1089,40 +1102,59 @@
       const arr=(Array.isArray(orders)?orders:[orders]).slice(0,15);
       const statusColor={'filled':'#00c853','pending':'#ffd700','cancelled':'#ff4444','open':'#4a8aff','partially_filled':'#ff9100'};
       const cancellable=['pending','open','partially_filled'];
-      el.innerHTML=arr.map(o=>`
-        <div style="padding:5px 0;border-bottom:1px solid #0f1a2e;">
-          <div style="display:flex;justify-content:space-between;align-items:center;">
-            <div>
-              <span style="color:#e0e6f0;font-size:.63rem;font-weight:700;">${o.symbol}</span>
-              <span style="color:${o.side==='buy'?'#00c853':'#ff1744'};font-size:.56rem;margin-left:4px;">${(o.side||'').toUpperCase()}</span>
-              <span style="color:#6a8aaa;font-size:.54rem;margin-left:3px;">${o.quantity}sh ${o.type||''}</span>
-            </div>
-            <div style="display:flex;align-items:center;gap:5px;">
-              <span style="color:${statusColor[o.status]||'#6a8aaa'};font-size:.56rem;font-weight:700;">${o.status}</span>
-              ${cancellable.includes(o.status)?`<button onclick="cancelPaperOrder('${o.id}')" style="background:#7b0000;border:1px solid #ff1744;border-radius:4px;color:#ff6666;font-size:.52rem;padding:2px 6px;cursor:pointer;">✕ Cancel</button>`:''}
-            </div>
-          </div>
-          ${o.price?`<div style="font-size:.52rem;color:#4a6a8a;margin-top:1px;">Price: $${o.price}</div>`:''}
-        </div>`).join('');
+      // Clear and build with real DOM nodes (not innerHTML) so onclick works reliably
+      el.innerHTML='';
+      arr.forEach(o=>{
+        const row=document.createElement('div');
+        row.style.cssText='padding:5px 0;border-bottom:1px solid #0f1a2e;';
+        const top=document.createElement('div');
+        top.style.cssText='display:flex;justify-content:space-between;align-items:center;';
+        top.innerHTML=`<div>
+          <span style="color:#e0e6f0;font-size:.63rem;font-weight:700;">${o.symbol}</span>
+          <span style="color:${o.side==='buy'?'#00c853':'#ff1744'};font-size:.56rem;margin-left:4px;">${(o.side||'').toUpperCase()}</span>
+          <span style="color:#6a8aaa;font-size:.54rem;margin-left:3px;">${o.quantity}sh ${o.type||''}</span>
+        </div>`;
+        const right=document.createElement('div');
+        right.style.cssText='display:flex;align-items:center;gap:5px;';
+        const badge=document.createElement('span');
+        badge.style.cssText=`color:${statusColor[o.status]||'#6a8aaa'};font-size:.56rem;font-weight:700;`;
+        badge.textContent=o.status;
+        right.appendChild(badge);
+        if(cancellable.includes(o.status)){
+          const btn=document.createElement('button');
+          btn.textContent='✕ Cancel';
+          btn.style.cssText='background:#7b0000;border:1px solid #ff1744;border-radius:4px;color:#ff6666;font-size:.52rem;padding:2px 6px;cursor:pointer;';
+          btn.addEventListener('click',()=>cancelPaperOrder(String(o.id)));
+          right.appendChild(btn);
+        }
+        top.appendChild(right);
+        row.appendChild(top);
+        if(o.price){
+          const pr=document.createElement('div');
+          pr.style.cssText='font-size:.52rem;color:#4a6a8a;margin-top:1px;';
+          pr.textContent=`Price: $${o.price}`;
+          row.appendChild(pr);
+        }
+        el.appendChild(row);
+      });
     }catch(e){el.innerHTML=`<span style="color:#ff6666;">Error: ${e.message}</span>`;}
   }
 
   async function cancelPaperOrder(orderId){
     if(!confirm(`Cancel order ${orderId}?`))return;
+    const res=document.getElementById('paperCancelResult');
+    if(res){res.textContent='⏳ Cancelling...';res.style.color='#ffd700';}
     try{
       const r=await fetch(`${API_URL}/api/paper/order/${orderId}`,{method:'DELETE'});
       const d=await r.json();
-      if(d?.order?.status==='canceled'||d?.order?.id){
-        document.getElementById('paperOrderResult').textContent='✅ Order cancelled';
-        document.getElementById('paperOrderResult').style.color='#00c853';
+      if(d?.order?.status==='canceled'||d?.order?.id||r.ok){
+        if(res){res.textContent='✅ Order cancelled';res.style.color='#00c853';}
       }else{
-        document.getElementById('paperOrderResult').textContent=`❌ ${d?.error||'Cancel failed'}`;
-        document.getElementById('paperOrderResult').style.color='#ff4444';
+        if(res){res.textContent=`❌ ${d?.error||'Cancel failed — may already be filled'}`;res.style.color='#ff4444';}
       }
-      setTimeout(()=>loadPaperOrders(),800);
+      setTimeout(()=>{loadPaperOrders();loadPaperPositions();},1000);
     }catch(e){
-      document.getElementById('paperOrderResult').textContent=`❌ ${e.message}`;
-      document.getElementById('paperOrderResult').style.color='#ff4444';
+      if(res){res.textContent=`❌ ${e.message}`;res.style.color='#ff4444';}
     }
   }
 
