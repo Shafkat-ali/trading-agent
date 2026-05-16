@@ -2237,7 +2237,16 @@
     const btn     = document.getElementById('panelToggleBtn');
     const restore = document.getElementById('panelRestoreBtn');
     panelOpen = !panelOpen;
-    panel.classList.toggle('collapsed', !panelOpen);
+    // Must set inline style directly — CSS class alone can't override inline style
+    if(panelOpen){
+      panel.style.width    = '270px';
+      panel.style.minWidth = '270px';
+      panel.classList.remove('collapsed');
+    } else {
+      panel.style.width    = '0';
+      panel.style.minWidth = '0';
+      panel.classList.add('collapsed');
+    }
     if(btn){ btn.textContent = panelOpen ? '◀ Hide' : '▶ Show'; btn.title = panelOpen ? 'Hide right panel' : 'Show right panel'; }
     if(restore){ restore.style.display = panelOpen ? 'none' : 'block'; }
   }
