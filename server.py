@@ -518,20 +518,151 @@ async def get_stock_snapshot(ticker: str):
 @app.get("/api/stock/bars/{ticker}")
 async def get_stock_bars(ticker: str, timeframe: str = "5Min", days: int = 1, start: str = "", range: str = "1D"):
     """
-    OHLCV bars for charting — includes pre and post market.
-    Primary: Tradier timesales (session_filter=all = 4am–8pm)
-    Fallback: Alpaca 1Min bars
+    OHLCV bars — Tradier primary with full interval aggregation.
+    Tradier native: 1min, 5min, 15min, 30min, daily
+    Aggregated:     2min, 3min, 10min, 1h, 2h, 4h (built from 1min or 5min base)
     """
+    from datetime import datetime, timedelta
+    import math
+
     ticker = ticker.upper().strip()
 
-    # Map frontend timeframe names to Tradier intervals
-    tf_map = {
+    # ── Aggregation map: what to fetch from Tradier → aggregate into target ──
+    AGGREGATE_MAP = {
+        '2Min':  {'base': '1min',  'n': 2},
+        '3Min':  {'base': '1min',  'n': 3},
+        '10Min': {'base': '5min',  'n': 2},   # 2x5=10
+        '30Min': {'base': '15min', 'n': 2},   # 2x15=30 (Tradier has 30min native too)
+        '1Hour': {'base': '15min', 'n': 4},   # 4x15=60
+        '2Hour': {'base': '15min', 'n': 8},   # 8x15=120
+        '4Hour': {'base': '15min', 'n': 16},  # 16x15=240
+    }
+
+    # ── Tradier native intervals ──
+    NATIVE_MAP = {
         '1Min': '1min', '1m': '1min',
         '5Min': '5min', '5m': '5min',
         '15Min': '15min', '15m': '15min',
-        '1Hour': '60min', '1h': '60min', '1D': 'daily',
+        '30Min': '30min', '30m': '30min',
+        '1Day': 'daily', '1D': 'daily',
     }
-    tradier_interval = tf_map.get(timeframe, '5min')
+
+    needs_aggregation = timeframe in AGGREGATE_MAP
+    agg_cfg           = AGGREGATE_MAP.get(timeframe, {})
+    tradier_interval  = agg_cfg.get('base', NATIVE_MAP.get(timeframe, '5min'))
+    agg_n             = agg_cfg.get('n', 1)
+
+    # ── Date range ──
+    now = datetime.now()
+    if start:
+        start_str = start + ' 04:00'
+    elif days > 1:
+        start_dt  = now - timedelta(days=days)
+        start_str = start_dt.strftime('%Y-%m-%d') + ' 04:00'
+    else:
+        start_str = now.strftime('%Y-%m-%d') + ' 04:00'
+    end_str = now.strftime('%Y-%m-%d') + ' 20:00'
+
+    def aggregate_bars(raw_bars, n):
+        """Aggregate n consecutive 1/5/15min bars into one candle."""
+        result = []
+        for i in range(0, len(raw_bars), n):
+            chunk = raw_bars[i:i+n]
+            if not chunk: continue
+            result.append({
+                'time':   chunk[0]['time'],
+                'open':   chunk[0]['open'],
+                'high':   max(b['high'] for b in chunk),
+                'low':    min(b['low']  for b in chunk),
+                'close':  chunk[-1]['close'],
+                'volume': sum(b['volume'] for b in chunk),
+                'vwap':   round(sum(b['vwap']*b['volume'] for b in chunk if b['vwap']>0)
+                                / max(sum(b['volume'] for b in chunk if b['vwap']>0), 1), 4),
+            })
+        return result
+
+    # ── Try Tradier ──
+    try:
+        params = {
+            'symbol':         ticker,
+            'interval':       tradier_interval,
+            'start':          start_str,
+            'end':            end_str,
+            'session_filter': 'all',
+        }
+        # Daily bars use /markets/history not /markets/timesales
+        if tradier_interval == 'daily':
+            params = {'symbol': ticker, 'start': start_str[:10], 'end': end_str[:10], 'interval': 'daily'}
+            r = requests.get(f"{TRADIER_API_URL}/markets/history", headers=TRADIER_HEADERS, params=params, timeout=12)
+        else:
+            r = requests.get(f"{TRADIER_API_URL}/markets/timesales", headers=TRADIER_HEADERS, params=params, timeout=12)
+
+        log_alert(f"📊 Tradier [{ticker}] {tradier_interval} agg={agg_n} HTTP {r.status_code}")
+
+        if r.status_code == 200:
+            data = r.json()
+            if tradier_interval == 'daily':
+                raw = data.get('history', {}).get('day', []) or []
+                if isinstance(raw, dict): raw = [raw]
+                bars_raw = [{'time': b.get('date',''), 'open': float(b.get('open',0)),
+                             'high': float(b.get('high',0)), 'low': float(b.get('low',0)),
+                             'close': float(b.get('close',0)), 'volume': int(b.get('volume',0)), 'vwap': 0}
+                            for b in raw]
+            else:
+                series = data.get('series') or {}
+                raw    = series.get('data', []) if series else []
+                if isinstance(raw, dict): raw = [raw]
+                bars_raw = [{'time': b.get('time',''), 'open': float(b.get('open',0)),
+                             'high': float(b.get('high',0)), 'low': float(b.get('low',0)),
+                             'close': float(b.get('close',0)), 'volume': int(b.get('volume',0)),
+                             'vwap': float(b.get('vwap',0)) if b.get('vwap') else 0}
+                            for b in raw]
+
+            if bars_raw:
+                bars = aggregate_bars(bars_raw, agg_n) if needs_aggregation else bars_raw
+                log_alert(f"📊 Tradier [{ticker}]: {len(bars_raw)} raw → {len(bars)} {timeframe} bars")
+                return {'ticker': ticker, 'timeframe': timeframe, 'bars': bars,
+                        'source': f'tradier({tradier_interval}{"→agg×"+str(agg_n) if needs_aggregation else ""})',
+                        'count': len(bars)}
+
+        log_alert(f"⚠️ Tradier empty for {ticker}, trying Alpaca...")
+    except Exception as e:
+        log_alert(f"⚠️ Tradier error [{ticker}]: {e}")
+
+    # ── Fallback: Alpaca ──
+    try:
+        now   = datetime.now()
+        s_dt  = now.replace(hour=4, minute=0, second=0, microsecond=0)
+        e_dt  = now.replace(hour=20, minute=0, second=0, microsecond=0)
+        if now.hour < 4:
+            s_dt = (now - timedelta(days=1)).replace(hour=4, minute=0, second=0, microsecond=0)
+            e_dt = (now - timedelta(days=1)).replace(hour=20, minute=0, second=0, microsecond=0)
+
+        alpaca_tf = {'1Min':'1Min','5Min':'5Min','15Min':'15Min','30Min':'30Min',
+                     '1Hour':'1Hour','1Day':'1Day'}.get(timeframe, '5Min')
+        url = (f"{ALPACA_DATA_URL}/stocks/{ticker}/bars"
+               f"?timeframe={alpaca_tf}"
+               f"&start={s_dt.strftime('%Y-%m-%dT%H:%M:%SZ')}"
+               f"&end={e_dt.strftime('%Y-%m-%dT%H:%M:%SZ')}"
+               f"&feed=sip&limit=2000")
+        r = requests.get(url, headers=ALPACA_HEADERS, timeout=10)
+        if r.status_code == 200:
+            raw_bars = r.json().get('bars', [])
+            bars_raw = [{'time': b.get('t',''), 'open': round(b.get('o',0),4),
+                         'high': round(b.get('h',0),4), 'low': round(b.get('l',0),4),
+                         'close': round(b.get('c',0),4), 'volume': b.get('v',0),
+                         'vwap': round(b.get('vw',0),4)} for b in raw_bars]
+            bars = aggregate_bars(bars_raw, agg_n) if needs_aggregation else bars_raw
+            log_alert(f"📊 Alpaca [{ticker}]: {len(bars)} {timeframe} bars")
+            return {'ticker': ticker, 'timeframe': timeframe, 'bars': bars,
+                    'source': 'alpaca', 'count': len(bars)}
+        log_alert(f"⚠️ Alpaca HTTP {r.status_code} for {ticker}")
+    except Exception as e:
+        log_alert(f"⚠️ Alpaca error [{ticker}]: {e}")
+
+    return {'ticker': ticker, 'timeframe': timeframe, 'bars': [],
+            'source': 'none', 'count': 0,
+            'error': 'No data from Tradier or Alpaca'}
 
     # ── Try Tradier first ──
     try:

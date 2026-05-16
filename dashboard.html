@@ -2099,9 +2099,7 @@ body{background:#060a12;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',
 input.tk{background:#060a12;border:1px solid #2a3a5a;border-radius:4px;color:#e0e6f0;font-size:.7rem;font-weight:700;padding:2px 5px;width:68px;text-transform:uppercase;}
 input.tk:focus{outline:none;border-color:#4a8aff;}
 .ranges{display:flex;gap:2px;}
-.rng{background:#0f1a2e;border:1px solid #1a2a4a;border-radius:3px;color:#4a6a8a;font-size:.5rem;padding:1px 4px;cursor:pointer;}
-.rng:hover{background:#1a2a4a;color:#a0c4ff;}
-.rng.active{background:#1a3a6a;border-color:#4a8aff;color:#4a8aff;font-weight:700;}
+.rng-sel{background:#060a12;border:1px solid #2a3a5a;border-radius:4px;color:#ffd700;font-size:.58rem;padding:2px 4px;font-weight:700;cursor:pointer;}
 select.tf{background:#060a12;border:1px solid #2a3a5a;border-radius:4px;color:#a0b8d0;font-size:.58rem;padding:2px 3px;}
 button.ld{background:#1a3a6a;border:1px solid #2a4a8a;border-radius:4px;color:#a0c4ff;font-size:.56rem;padding:2px 6px;cursor:pointer;}
 button.ld:hover{background:#4a8aff;color:#fff;}
@@ -2136,6 +2134,7 @@ button.ld:hover{background:#4a8aff;color:#fff;}
 .exp-rng.active{background:#1a3a6a;border-color:#4a8aff;color:#4a8aff;font-weight:700;}
 .exp-ind{background:#0f1a2e;border:1px solid #1a2a4a;border-radius:4px;font-size:.6rem;padding:3px 8px;cursor:pointer;color:#4a6a8a;}
 .exp-ind.on{border-color:var(--c);color:var(--c);}
+.exp-range{background:#060a12;border:1px solid #2a3a5a;border-radius:4px;color:#ffd700;font-size:.65rem;padding:3px 6px;font-weight:700;cursor:pointer;}
 .exp-tf{background:#060a12;border:1px solid #2a3a5a;border-radius:4px;color:#a0b8d0;font-size:.65rem;padding:3px 5px;}
 .exp-load{background:#1a3a6a;border:1px solid #2a4a8a;border-radius:5px;color:#a0c4ff;font-size:.65rem;padding:3px 12px;cursor:pointer;}
 .exp-load:hover{background:#4a8aff;color:#fff;}
@@ -2157,11 +2156,31 @@ button.ld:hover{background:#4a8aff;color:#fff;}
     <span class="exp-title" id="expTitle">📊 —</span>
     <div class="exp-controls">
       <input class="exp-ticker" id="expTicker" placeholder="AAPL" oninput="this.value=this.value.toUpperCase()" onkeydown="if(event.key==='Enter')expLoad()">
-      <div style="display:flex;gap:3px;" id="expRanges">
-        <!-- Range buttons built by JS to avoid template literal escaping issues -->
-      </div>
-      <select class="exp-tf" id="expTf" onchange="exp.tf=this.value;if(exp.bars.length)expLoad()">
-        <option value="1Min">1m</option><option value="5Min" selected>5m</option><option value="15Min">15m</option><option value="1Hour">1h</option><option value="1Day">1D</option>
+      <select class="exp-range" id="expRange" onchange="expSetRange(this.value)">
+        <option value="1D">1 Day</option>
+        <option value="2D">2 Days</option>
+        <option value="5D">5 Days</option>
+        <option value="1W" selected>1 Week</option>
+        <option value="1M">1 Month</option>
+        <option value="3M">3 Months</option>
+        <option value="6M">6 Months</option>
+        <option value="YTD">YTD</option>
+        <option value="1Y">1 Year</option>
+        <option value="2Y">2 Years</option>
+        <option value="5Y">5 Years</option>
+      </select>
+      <select class="exp-tf" id="expTf" onchange="exp.tf=this.value;if(document.getElementById('expTicker').value)expLoad()">
+        <option value="1Min">1m</option>
+        <option value="2Min">2m</option>
+        <option value="3Min">3m</option>
+        <option value="5Min" selected>5m</option>
+        <option value="10Min">10m</option>
+        <option value="15Min">15m</option>
+        <option value="30Min">30m</option>
+        <option value="1Hour">1h</option>
+        <option value="2Hour">2h</option>
+        <option value="4Hour">4h</option>
+        <option value="1Day">1D</option>
       </select>
       <button class="exp-load" onclick="expLoad()">⟳ Load</button>
       <button class="exp-ind on" id="expVol"  style="--c:#4a8aff" onclick="expToggle('Vol')">Vol</button>
@@ -2182,35 +2201,35 @@ button.ld:hover{background:#4a8aff;color:#fff;}
 const API='${apiUrl}';
 const state={};
 
-// Build expand overlay range buttons via JS (avoids template literal escaping issues)
-(function(){
-  const rng=document.getElementById('expRanges');
-  if(!rng)return;
-  ['1D','1W','1M','3M','1Y'].forEach(r=>{
-    const b=document.createElement('button');
-    b.className='exp-rng'+(r==='1D'?' active':'');
-    b.id='expR_'+r; b.textContent=r;
-    b.onclick=()=>expSetRange(r);
-    rng.appendChild(b);
-  });
-})();
+// Range dropdown replaces old button builder
 
 function calcEMA(data,p){const k=2/(p+1);let e=null;return data.map(v=>{if(e===null)e=v;else e=v*k+e*(1-k);return e;});}
 function calcRSI(c,p=14){return c.map((_,i)=>{if(i<p)return null;let g=0,l=0;for(let j=i-p+1;j<=i;j++){const d=c[j]-c[j-1];if(d>0)g+=d;else l-=d;}const rs=(g/p)/((l/p)||0.0001);return 100-100/(1+rs);});}
 function calcMACD(c,f=12,s2=26,sg=9){const eF=calcEMA(c,f),eS=calcEMA(c,s2);const ml=eF.map((v,i)=>v-eS[i]);const sig=calcEMA(ml,sg);const h=ml.map((v,i)=>v-sig[i]);return{ml,sig,h};}
 function parseT(t){if(!t)return 0;return Math.floor(new Date(t.includes('T')?t:t.replace(' ','T')).getTime()/1000);}
 
-const RANGES={'1D':{days:1,tf:'5Min'},'1W':{days:7,tf:'15Min'},'1M':{days:30,tf:'1Hour'},'3M':{days:90,tf:'1Day'},'1Y':{days:365,tf:'1Day'}};
+const RANGES={
+  '1D': {days:1,   tf:'5Min'},
+  '2D': {days:2,   tf:'5Min'},
+  '5D': {days:5,   tf:'15Min'},
+  '1W': {days:7,   tf:'15Min'},
+  '1M': {days:30,  tf:'30Min'},
+  '3M': {days:90,  tf:'1Day'},
+  '6M': {days:180, tf:'1Day'},
+  'YTD':{days:null,ytd:true,tf:'1Day'},
+  '1Y': {days:365, tf:'1Day'},
+  '2Y': {days:730, tf:'1Day'},
+  '5Y': {days:1825,tf:'1Day'},
+};
 
 function buildUrl(ticker,range,tf){
-  // tf parameter is the USER's chosen interval — respect it always
-  // Only use range's default tf if no tf was explicitly set
   let t=tf||'5Min', extra='';
   if(range&&RANGES[range]){
     const r=RANGES[range];
-    // Only override tf with range default if tf wasn't manually changed
-    // (detected by tf matching the previous range default — but safer to just use tf always)
-    if(r.days){
+    if(r.ytd){
+      const s=new Date(new Date().getFullYear(),0,1);
+      extra='&start='+s.toISOString().split('T')[0];
+    } else if(r.days){
       const s=new Date();s.setDate(s.getDate()-r.days);
       extra='&start='+s.toISOString().split('T')[0];
     }
@@ -2257,10 +2276,12 @@ function closeExpand(){
 
 function expSetRange(r){
   exp.range=r;
-  ['1D','1W','1M','3M','1Y'].forEach(x=>{const b=document.getElementById('expR_'+x);if(b)b.classList.toggle('active',x===r);});
-  const tf=RANGES[r]?.tf||'5Min';exp.tf=tf;
-  document.getElementById('expTf').value=tf;
-  expLoad();
+  // Auto-set sensible interval for this range
+  const autoTf=RANGES[r]?.tf||'5Min';
+  exp.tf=autoTf;
+  document.getElementById('expTf').value=autoTf;
+  const tk=(document.getElementById('expTicker').value||'').trim().toUpperCase();
+  if(tk)expLoad();
 }
 
 function expToggle(ind){
@@ -2368,9 +2389,19 @@ function init(){
     d.innerHTML=\`
       <div class="cell-hdr">
         <input class="tk" id="tk\${i}" placeholder="AAPL" oninput="this.value=this.value.toUpperCase()" onkeydown="if(event.key==='Enter')load(\${i})">
-        <div class="ranges">\${['1D','1W','1M','3M','1Y'].map(r=>\`<button class="rng\${r==='1D'?' active':''}" id="rng\${i}_\${r}" onclick="setRange(\${i},'\${r}')">\${r}<\/button>\`).join('')}<\/div>
+        <select class="rng-sel" id="rngSel\${i}" onchange="setRange(\${i},this.value)">
+          <option value="1D">1D<\/option><option value="2D">2D<\/option><option value="5D">5D<\/option>
+          <option value="1W" selected>1W<\/option><option value="1M">1M<\/option>
+          <option value="3M">3M<\/option><option value="6M">6M<\/option>
+          <option value="YTD">YTD<\/option><option value="1Y">1Y<\/option>
+          <option value="2Y">2Y<\/option><option value="5Y">5Y<\/option>
+        <\/select>
         <select class="tf" id="tf\${i}" onchange="state[\${i}].tf=this.value;const _tk=(document.getElementById('tk'+\${i}).value||'').trim().toUpperCase();if(_tk&&state[\${i}].bars.length)load(\${i})">
-          <option value="1Min">1m<\/option><option value="5Min" selected>5m<\/option><option value="15Min">15m<\/option><option value="1Hour">1h<\/option><option value="1Day">1D<\/option>
+          <option value="1Min">1m<\/option><option value="2Min">2m<\/option><option value="3Min">3m<\/option>
+          <option value="5Min" selected>5m<\/option><option value="10Min">10m<\/option>
+          <option value="15Min">15m<\/option><option value="30Min">30m<\/option>
+          <option value="1Hour">1h<\/option><option value="2Hour">2h<\/option><option value="4Hour">4h<\/option>
+          <option value="1Day">1D<\/option>
         <\/select>
         <button class="ld" onclick="load(\${i})">Load<\/button>
         <button class="expand-btn" onclick="expandCell(\${i})" title="Expand to full screen">⤢<\/button>
@@ -2393,9 +2424,9 @@ function init(){
 
 function setRange(i,r){
   state[i].range=r;
-  ['1D','1W','1M','3M','1Y'].forEach(x=>{const b=document.getElementById('rng'+i+'_'+x);if(b)b.classList.toggle('active',x===r);});
   const tf=RANGES[r]?.tf||'5Min';state[i].tf=tf;
   const sel=document.getElementById('tf'+i);if(sel)sel.value=tf;
+  const rsel=document.getElementById('rngSel'+i);if(rsel)rsel.value=r;
   const tk=(document.getElementById('tk'+i).value||'').trim().toUpperCase();
   if(tk)load(i);
 }
