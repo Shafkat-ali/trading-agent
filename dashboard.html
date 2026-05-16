@@ -1871,16 +1871,16 @@
     ctrl.style.cssText = 'display:flex;align-items:center;gap:5px;padding:4px 6px;background:#0d1525;border-bottom:1px solid #1a2a4a;flex-wrap:wrap;';
     ctrl.innerHTML = `
       <span style="font-size:.65rem;font-weight:700;color:#ffd700;">${ticker}</span>
+      <select id="popupRange" style="background:#060a12;border:1px solid #2a3a5a;border-radius:4px;color:#ffd700;font-size:.6rem;padding:2px 4px;font-weight:700;">
+        <option value="1D" selected>1D</option><option value="2D">2D</option><option value="5D">5D</option>
+        <option value="1W">1W</option><option value="1M">1M</option>
+        <option value="3M">3M</option><option value="1Y">1Y</option>
+      </select>
       <select id="popupTf" style="background:#060a12;border:1px solid #2a3a5a;border-radius:4px;color:#a0b8d0;font-size:.6rem;padding:2px 4px;">
         <option value="1Min">1m</option><option value="2Min">2m</option><option value="3Min">3m</option>
         <option value="5Min" selected>5m</option><option value="10Min">10m</option>
         <option value="15Min">15m</option><option value="30Min">30m</option>
         <option value="1Hour">1h</option><option value="1Day">1D</option>
-      </select>
-      <select id="popupRange" style="background:#060a12;border:1px solid #2a3a5a;border-radius:4px;color:#ffd700;font-size:.6rem;padding:2px 4px;font-weight:700;">
-        <option value="1D" selected>1D</option><option value="2D">2D</option><option value="5D">5D</option>
-        <option value="1W">1W</option><option value="1M">1M</option>
-        <option value="3M">3M</option><option value="1Y">1Y</option>
       </select>
       <span id="popupPollBadge" style="font-size:.52rem;color:#00c853;margin-left:2px;">⟳ live</span>
       <span id="popupLastUpdate" style="font-size:.5rem;color:#3a5a7a;margin-left:4px;"></span>
