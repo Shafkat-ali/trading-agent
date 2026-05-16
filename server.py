@@ -516,7 +516,7 @@ async def get_stock_snapshot(ticker: str):
     return snap if snap else {'error': 'Snapshot unavailable'}
 
 @app.get("/api/stock/bars/{ticker}")
-async def get_stock_bars(ticker: str, timeframe: str = "5Min"):
+async def get_stock_bars(ticker: str, timeframe: str = "5Min", days: int = 1, start: str = "", range: str = "1D"):
     """
     OHLCV bars for charting — includes pre and post market.
     Primary: Tradier timesales (session_filter=all = 4am–8pm)
@@ -536,16 +536,25 @@ async def get_stock_bars(ticker: str, timeframe: str = "5Min"):
     # ── Try Tradier first ──
     try:
         from datetime import datetime, timedelta
-        now   = datetime.now()
-        start = (now - timedelta(days=1)).strftime('%Y-%m-%d')
-        end   = now.strftime('%Y-%m-%d')
+        now = datetime.now()
+
+        # Determine date range from query params
+        if start:  # explicit start date passed from frontend
+            start_str = start + ' 04:00'
+        elif days > 1:
+            start_dt = now - timedelta(days=days)
+            start_str = start_dt.strftime('%Y-%m-%d') + ' 04:00'
+        else:  # default: today from 4am
+            start_str = now.strftime('%Y-%m-%d') + ' 04:00'
+
+        end_str = now.strftime('%Y-%m-%d') + ' 20:00'
 
         params = {
             'symbol':         ticker,
             'interval':       tradier_interval,
-            'start':          f'{start} 04:00',
-            'end':            f'{end} 20:00',
-            'session_filter': 'all',   # includes pre + post market
+            'start':          start_str,
+            'end':            end_str,
+            'session_filter': 'all',
         }
         r = requests.get(
             f"{TRADIER_API_URL}/markets/timesales",
