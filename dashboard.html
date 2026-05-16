@@ -21,7 +21,8 @@
     .user-cards{display:flex;flex-direction:column;gap:10px;}
     .user-card{background:#080c18;border:2px solid #1e2d4a;border-radius:10px;padding:14px 18px;cursor:pointer;transition:all .2s;display:flex;align-items:center;gap:12px;text-align:left;}
     .user-card:hover{border-color:#ffd700;transform:translateY(-2px);box-shadow:0 6px 20px rgba(255,215,0,.12);}
-    .user-avatar{width:44px;height:44px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:1.3rem;font-weight:800;flex-shrink:0;}
+    .user-avatar{width:56px;height:56px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:1.4rem;font-weight:800;flex-shrink:0;overflow:hidden;border:2px solid #2a3f6f;}
+    .user-avatar img{width:100%;height:100%;object-fit:cover;border-radius:50%;}
     .user-avatar.shafkat{background:linear-gradient(135deg,#00d4ff,#7b61ff);color:#fff;}
     .user-avatar.irfan  {background:linear-gradient(135deg,#ffd700,#ff6d00);color:#000;}
     .user-name{font-size:.9rem;font-weight:700;color:#fff;}
@@ -399,22 +400,17 @@
 <!-- LOGIN -->
 <div class="login-screen" id="loginScreen">
   <div class="login-box">
-    <div class="login-logos">
-      <img class="login-logo" id="loginPaydaLogo"  src="" alt="Payda">
-      <span class="login-x">×</span>
-      <img class="login-logo" id="loginUyghurLogo" src="" alt="UyghurKid">
-    </div>
     <div class="login-title">Payda × UyghurKid</div>
     <div class="login-sub">Capital Trading Agent</div>
     <div class="login-label">Select your profile to continue</div>
     <div class="user-cards">
       <div class="user-card" onclick="selectUser('shafkat','Shafkat Uyghurkid','S')">
-        <div class="user-avatar shafkat">S</div>
+        <div class="user-avatar shafkat" id="loginAvatarShafkat">S</div>
         <div><div class="user-name">Shafkat Uyghurkid</div><div class="user-role">UyghurKid Capital</div></div>
         <div class="user-arrow">→</div>
       </div>
       <div class="user-card" onclick="selectUser('irfan','Irfan Payda','I')">
-        <div class="user-avatar irfan">I</div>
+        <div class="user-avatar irfan" id="loginAvatarIrfan">I</div>
         <div><div class="user-name">Irfan Payda</div><div class="user-role">Payda Capital</div></div>
         <div class="user-arrow">→</div>
       </div>
@@ -845,9 +841,11 @@
   const UYGHUR_LOGO = 'https://raw.githubusercontent.com/Shafkat-ali/trading-agent/main/UYGHURKID.png';
 
   function setLogos() {
-    // Login screen
-    ['loginPaydaLogo'].forEach(id => { const el=document.getElementById(id); if(el){el.src=PAYDA_LOGO;el.onerror=()=>el.style.display='none';} });
-    ['loginUyghurLogo'].forEach(id => { const el=document.getElementById(id); if(el){el.src=UYGHUR_LOGO;el.onerror=()=>el.style.display='none';} });
+    // Login avatar — Shafkat gets UyghurKid logo, Irfan gets Payda logo
+    const as=document.getElementById('loginAvatarShafkat');
+    const ai=document.getElementById('loginAvatarIrfan');
+    if(as){as.innerHTML=`<img src="${UYGHUR_LOGO}" onerror="this.parentNode.textContent='S'" alt="S">`;}
+    if(ai){ai.innerHTML=`<img src="${PAYDA_LOGO}"  onerror="this.parentNode.textContent='I'" alt="I">`;}
     // Watermarks in results panel
     ['wmPayda','nrPayda'].forEach(id => { const el=document.getElementById(id); if(el){el.src=PAYDA_LOGO;el.onerror=()=>el.style.display='none';} });
     ['wmUyghur','nrUyghur'].forEach(id => { const el=document.getElementById(id); if(el){el.src=UYGHUR_LOGO;el.onerror=()=>el.style.display='none';} });
