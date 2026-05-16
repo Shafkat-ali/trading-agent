@@ -1839,20 +1839,170 @@
     quoteTimer=setInterval(()=>fetchQuote(setup.ticker),5000);
   }
 
+  // ── TICKER POPUP CHART — Tradier + live polling ──
+  let popupChartInstance = null;
+  let popupPollTimer     = null;
+  let popupCurrentTicker = null;
+  let popupCurrentTf     = '5Min';
+
+  // Poll interval by timeframe (ms) — aggressive for small caps
+  function getPollInterval(tf){
+    // 2 seconds for all intervals — maximum aggression for small cap momentum
+    return 2000;
+  }
+
   function buildTradingViewChart(ticker){
-    const container=document.getElementById('popupChartContainer');container.innerHTML='';
-    const iframe=document.createElement('iframe');
-    iframe.className='chart-frame';iframe.frameBorder='0';iframe.scrolling='no';
-    iframe.src=`https://s.tradingview.com/widgetembed/?frameElementId=tv_${ticker}`
-      +`&symbol=${encodeURIComponent(ticker)}&interval=5&hidesidetoolbar=0`
-      +`&saveimage=0&theme=dark&style=1&timezone=America%2FNew_York`
-      +`&studies=Volume%40tv-basicstudies&hideideas=1&withdateranges=1&locale=en`;
-    container.appendChild(iframe);
+    popupCurrentTicker = ticker;
+    popupCurrentTf     = '5Min';
+    const container = document.getElementById('popupChartContainer');
+    container.innerHTML = '';
+    container.style.cssText = 'position:relative;height:340px;';
+
+    // Controls bar
+    const ctrl = document.createElement('div');
+    ctrl.style.cssText = 'display:flex;align-items:center;gap:5px;padding:4px 6px;background:#0d1525;border-bottom:1px solid #1a2a4a;flex-wrap:wrap;';
+    ctrl.innerHTML = `
+      <span style="font-size:.65rem;font-weight:700;color:#ffd700;">${ticker}</span>
+      <select id="popupTf" style="background:#060a12;border:1px solid #2a3a5a;border-radius:4px;color:#a0b8d0;font-size:.6rem;padding:2px 4px;">
+        <option value="1Min">1m</option><option value="2Min">2m</option><option value="3Min">3m</option>
+        <option value="5Min" selected>5m</option><option value="10Min">10m</option>
+        <option value="15Min">15m</option><option value="30Min">30m</option>
+        <option value="1Hour">1h</option><option value="1Day">1D</option>
+      </select>
+      <select id="popupRange" style="background:#060a12;border:1px solid #2a3a5a;border-radius:4px;color:#ffd700;font-size:.6rem;padding:2px 4px;font-weight:700;">
+        <option value="1D" selected>1D</option><option value="2D">2D</option><option value="5D">5D</option>
+        <option value="1W">1W</option><option value="1M">1M</option>
+        <option value="3M">3M</option><option value="1Y">1Y</option>
+      </select>
+      <span id="popupPollBadge" style="font-size:.52rem;color:#00c853;margin-left:2px;">⟳ live</span>
+      <span id="popupLastUpdate" style="font-size:.5rem;color:#3a5a7a;margin-left:4px;"></span>
+    `;
+    container.appendChild(ctrl);
+
+    const chartDiv = document.createElement('div');
+    chartDiv.id = 'popupChartDiv';
+    chartDiv.style.cssText = 'height:300px;position:relative;';
+    container.appendChild(chartDiv);
+
+    // Change handlers
+    ctrl.querySelector('#popupTf').onchange    = e => { popupCurrentTf=e.target.value; popupLoadChart(ticker); };
+    ctrl.querySelector('#popupRange').onchange = e => { popupLoadChart(ticker); };
+
+    // Initial load
+    popupLoadChart(ticker);
+  }
+
+  async function popupLoadChart(ticker){
+    // Clear existing poll
+    if(popupPollTimer){ clearInterval(popupPollTimer); popupPollTimer=null; }
+
+    const tf    = document.getElementById('popupTf')?.value    || '5Min';
+    const range = document.getElementById('popupRange')?.value || '1D';
+    popupCurrentTf = tf;
+
+    const RANGES_POP = {'1D':1,'2D':2,'5D':5,'1W':7,'1M':30,'3M':90,'1Y':365};
+    const days = RANGES_POP[range] || 1;
+    const startDate = new Date(); startDate.setDate(startDate.getDate()-days);
+    const startStr  = startDate.toISOString().split('T')[0];
+    const url = `${API_URL}/api/stock/bars/${ticker}?timeframe=${tf}&start=${startStr}`;
+
+    await popupRenderChart(ticker, url);
+
+    // Start polling
+    const interval = getPollInterval(tf);
+    document.getElementById('popupPollBadge').textContent = `⟳ ${interval/1000}s`;
+    popupPollTimer = setInterval(async()=>{
+      await popupRenderChart(ticker, url, true);
+    }, interval);
+  }
+
+  async function popupRenderChart(ticker, url, isUpdate=false){
+    const chartDiv = document.getElementById('popupChartDiv');
+    if(!chartDiv) return;
+
+    try{
+      const r = await fetch(url);
+      const d = await r.json();
+      const bars = d.bars || [];
+      if(!bars.length && !isUpdate){
+        chartDiv.innerHTML = '<div style="display:flex;align-items:center;justify-content:center;height:100%;color:#4a6a8a;font-size:.7rem;">No data — market may be closed</div>';
+        return;
+      }
+      if(!bars.length) return; // silent on empty poll update
+
+      // Wait for lib
+      let waited=0;
+      while(!window.LightweightCharts && waited<50){ await new Promise(r=>setTimeout(r,100)); waited++; }
+      if(!window.LightweightCharts) return;
+
+      const parseT = t => Math.floor(new Date(t.includes('T')?t:t.replace(' ','T')).getTime()/1000);
+      const sorted = bars.map(b=>({t:parseT(b.time),o:b.open,h:b.high,l:b.low,c:b.close,v:b.volume||0,vw:b.vwap||0}))
+                         .filter(b=>b.t>0).sort((a,b)=>a.t-b.t);
+      const closes = sorted.map(b=>b.c), times = sorted.map(b=>b.t);
+
+      if(isUpdate && popupChartInstance){
+        // Just update last candle data — no full redraw
+        try{
+          popupChartInstance._candles?.update(sorted[sorted.length-1]);
+        }catch(e){}
+        // Update timestamp
+        const lu = document.getElementById('popupLastUpdate');
+        if(lu) lu.textContent = new Date().toLocaleTimeString('en-US',{hour12:true,hour:'numeric',minute:'2-digit',second:'2-digit'});
+        return;
+      }
+
+      // Full render
+      if(popupChartInstance){ try{popupChartInstance.remove();}catch(e){} popupChartInstance=null; }
+      chartDiv.innerHTML='';
+
+      const chart = LightweightCharts.createChart(chartDiv,{
+        width: chartDiv.clientWidth, height: chartDiv.clientHeight||300,
+        layout:{backgroundColor:'#060a12',textColor:'#8aa0c0'},
+        grid:{vertLines:{color:'#0f1a2e'},horzLines:{color:'#0f1a2e'}},
+        timeScale:{timeVisible:true,secondsVisible:false,borderColor:'#1a2a4a'},
+        rightPriceScale:{borderColor:'#1a2a4a',scaleMarginTop:0.08,scaleMarginBottom:0.2},
+        crosshair:{mode:1},
+        handleScroll:{mouseWheel:true,pressedMouseMove:true},
+        handleScale:{mouseWheel:true,pinch:true},
+      });
+      popupChartInstance = chart;
+
+      const candles = chart.addCandlestickSeries({upColor:'#00c853',downColor:'#ff1744',borderUpColor:'#00c853',borderDownColor:'#ff1744',wickUpColor:'#00c853',wickDownColor:'#ff1744'});
+      candles.setData(sorted.map(b=>({time:b.t,open:b.o,high:b.h,low:b.l,close:b.c})));
+      chart._candles = candles;
+
+      // VWAP
+      const vwpts = sorted.filter(b=>b.vw>0).map(b=>({time:b.t,value:b.vw}));
+      if(vwpts.length){ const vl=chart.addLineSeries({color:'#ffd700',lineWidth:2,priceLineVisible:false,title:'VWAP'}); vl.setData(vwpts); }
+
+      // EMA 9 + 20
+      if(closes.length>=20){
+        const calcEMA=(d,p)=>{const k=2/(p+1);let e=null;return d.map(v=>{if(e===null)e=v;else e=v*k+e*(1-k);return e;});};
+        const e9=calcEMA(closes,9), e20=calcEMA(closes,20);
+        chart.addLineSeries({color:'#ff9100',lineWidth:1,priceLineVisible:false,title:'EMA9'}).setData(times.map((t,i)=>({time:t,value:e9[i]})));
+        chart.addLineSeries({color:'#ff4a4a',lineWidth:1,priceLineVisible:false,title:'EMA20'}).setData(times.map((t,i)=>({time:t,value:e20[i]})));
+      }
+
+      // Volume
+      const vs=chart.addHistogramSeries({color:'#1a3a6a',priceFormat:{type:'volume'},priceScaleId:'vol'});
+      chart.priceScale('vol').applyOptions({scaleMarginTop:0.8,scaleMarginBottom:0,borderColor:'#1a2a4a'});
+      vs.setData(sorted.map(b=>({time:b.t,value:b.v,color:b.c>=b.o?'rgba(0,200,83,.35)':'rgba(255,23,68,.35)'})));
+
+      chart.timeScale().fitContent();
+
+      const lu = document.getElementById('popupLastUpdate');
+      if(lu) lu.textContent = new Date().toLocaleTimeString('en-US',{hour12:true,hour:'numeric',minute:'2-digit',second:'2-digit'});
+
+      new ResizeObserver(()=>{ if(popupChartInstance) popupChartInstance.resize(chartDiv.clientWidth,chartDiv.clientHeight); }).observe(chartDiv);
+
+    }catch(e){ console.error('Popup chart error:', e); }
   }
 
   function closePopup(){
     document.getElementById('stockPopup').classList.add('hidden');
     if(quoteTimer){clearInterval(quoteTimer);quoteTimer=null;}
+    if(popupPollTimer){clearInterval(popupPollTimer);popupPollTimer=null;}
+    if(popupChartInstance){try{popupChartInstance.remove();}catch(e){} popupChartInstance=null;}
     document.getElementById('popupChartContainer').innerHTML='';
   }
   document.getElementById('stockPopup').addEventListener('click',e=>{
@@ -2462,7 +2612,7 @@ function expRender(){
 function init(){
   const g=document.getElementById('grid');
   for(let i=0;i<8;i++){
-    state[i]={chart:null,rsiChart:null,macdChart:null,showVol:true,showEMA:true,showRSI:false,showMACD:false,bars:[],range:'1D',tf:'5Min'};
+    state[i]={chart:null,rsiChart:null,macdChart:null,_candles:null,pollTimer:null,showVol:true,showEMA:true,showRSI:false,showMACD:false,bars:[],range:'1D',tf:'5Min'};
     const d=document.createElement('div');d.className='cell';d.id='cell'+i;
     d.innerHTML=\`
       <div class="cell-hdr">
@@ -2563,8 +2713,7 @@ function render(i,bars){
 
   const candles=chart.addCandlestickSeries({upColor:'#00c853',downColor:'#ff1744',borderUpColor:'#00c853',borderDownColor:'#ff1744',wickUpColor:'#00c853',wickDownColor:'#ff1744'});
   candles.setData(sorted.map(b=>({time:b.t,open:b.o,high:b.h,low:b.l,close:b.c})));
-
-  const vwpts=sorted.filter(b=>b.vw>0).map(b=>({time:b.t,value:b.vw}));
+  s._candles=candles; // store ref so poll can update last candle live
   if(vwpts.length){const vl=chart.addLineSeries({color:'#ffd700',lineWidth:1,priceLineVisible:false,title:'VWAP'});vl.setData(vwpts);}
 
   if(s.showEMA&&closes.length>=20){
@@ -2611,7 +2760,55 @@ function render(i,bars){
     if(s.rsiChart){const el=document.getElementById('rsiC'+i);s.rsiChart.resize(el.clientWidth,el.clientHeight);}
     if(s.macdChart){const el=document.getElementById('macdC'+i);s.macdChart.resize(el.clientWidth,el.clientHeight);}
   }).observe(document.getElementById('cell'+i));
+
+  // ── START POLLING for this cell ──
+  // 2 seconds for all intervals — maximum aggression for small cap momentum
+  const pInterval = 2000;
+  if(s.pollTimer){ clearInterval(s.pollTimer); s.pollTimer=null; }
+  // Only poll for intraday ranges (not multi-month)
+  // Poll all ranges — even daily charts need live updates for small cap movers
+  if(true){
+    s.pollTimer = setInterval(async()=>{
+      const tk=(document.getElementById('tk'+i)?.value||'').trim().toUpperCase();
+      if(!tk||!s.bars.length)return;
+      try{
+        const r=await fetch(buildUrl(tk,s.range,s.tf));
+        const d=await r.json(); const newBars=d.bars||[];
+        if(!newBars.length)return;
+        // Update last candle only if we have new data
+        const lastOld=s.bars[s.bars.length-1]?.time;
+        const lastNew=newBars[newBars.length-1]?.time;
+        if(lastNew===lastOld && newBars.length===s.bars.length){
+          // Same bar count — just update last candle price
+          const lb=newBars[newBars.length-1];
+          const t=Math.floor(new Date(lb.time.includes('T')?lb.time:lb.time.replace(' ','T')).getTime()/1000);
+          if(s.chart&&s.chart._candles)
+            s.chart._candles.update({time:t,open:lb.open,high:lb.high,low:lb.low,close:lb.close});
+        } else {
+          // New bar appeared — full re-render
+          s.bars=newBars;
+          render(i,newBars);
+        }
+        // Update badge
+        const bg=document.getElementById('bg'+i);
+        if(bg)bg.textContent=tk+' · '+s.range+' · '+newBars.length+'bars · live · '
+          +new Date().toLocaleTimeString('en-US',{hour12:true,hour:'numeric',minute:'2-digit',second:'2-digit'});
+      }catch(e){}
+    }, pInterval);
+  }
 }
+
+// Store candle series ref for update
+function stopAllPolls(){
+  for(let i=0;i<8;i++){
+    if(state[i]?.pollTimer){clearInterval(state[i].pollTimer);state[i].pollTimer=null;}
+  }
+}
+
+// Stop polls when tab hidden (save Tradier API calls)
+document.addEventListener('visibilitychange',()=>{
+  if(document.hidden) stopAllPolls();
+});
 
 init();
 <\/script>
