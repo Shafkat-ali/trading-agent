@@ -794,9 +794,21 @@
           <input id="paperQty" type="number" placeholder="Shares" min="1" value="100"
             style="flex:1;background:#060a12;border:1px solid #2a3a5a;border-radius:4px;color:#e0e6f0;font-size:.65rem;padding:4px 5px;">
           <select id="paperOrderType" onchange="toggleLimitPrice()"
-            style="flex:1;background:#060a12;border:1px solid #2a3a5a;border-radius:4px;color:#a0b8d0;font-size:.62rem;padding:4px;">
+            style="flex:1;background:#060a12;border:1px solid #2a3a5a;border-radius:4px;color:#a0b8d0;font-size:.62rem;padding:4px;cursor:pointer;">
             <option value="market">Market</option>
             <option value="limit">Limit</option>
+            <option value="stop">Stop</option>
+            <option value="stop_limit">Stop Limit</option>
+          </select>
+        </div>
+        <!-- Session / Duration row -->
+        <div style="display:flex;gap:4px;margin-bottom:4px;">
+          <select id="paperDuration"
+            style="flex:1;background:#060a12;border:1px solid #2a3a5a;border-radius:4px;color:#a0b8d0;font-size:.62rem;padding:4px;cursor:pointer;">
+            <option value="day">🕙 Market Hours (Day)</option>
+            <option value="pre">🌅 Pre-Market</option>
+            <option value="post">🌆 After-Hours</option>
+            <option value="gtc">♾ GTC (Good Till Cancel)</option>
           </select>
         </div>
         <input id="paperLimitPrice" type="number" placeholder="Limit Price" step="0.01"
@@ -1119,19 +1131,21 @@
     const qty=parseFloat(document.getElementById('paperQty').value||'0');
     const orderType=document.getElementById('paperOrderType').value;
     const limitPrice=parseFloat(document.getElementById('paperLimitPrice').value||'0');
+    const duration=document.getElementById('paperDuration').value||'day';
     const result=document.getElementById('paperOrderResult');
 
     if(!ticker){result.textContent='⚠️ Enter a ticker';result.style.color='#ff9100';return;}
     if(!qty||qty<1){result.textContent='⚠️ Enter quantity';result.style.color='#ff9100';return;}
 
-    result.textContent=`⏳ Placing ${side.toUpperCase()} order for ${qty}x ${ticker}...`;
+    const sessionLabel={'day':'Market Hrs','pre':'Pre-Market','post':'After-Hrs','gtc':'GTC'}[duration]||duration;
+    result.textContent=`⏳ Placing ${side.toUpperCase()} ${qty}x ${ticker} — ${orderType} — ${sessionLabel}...`;
     result.style.color='#ffd700';
 
     try{
       const r=await fetch(`${API_URL}/api/paper/order`,{
         method:'POST',
         headers:{'Content-Type':'application/json'},
-        body:JSON.stringify({ticker,side,qty,order_type:orderType,limit_price:limitPrice,duration:'day'})
+        body:JSON.stringify({ticker,side,qty,order_type:orderType,limit_price:limitPrice,duration})
       });
       const d=await r.json();
       if(d?.order?.id||d?.id){
