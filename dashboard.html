@@ -781,7 +781,19 @@
         <div style="font-size:.6rem;color:#a0b8d0;font-weight:700;margin-bottom:5px;">Place Order</div>
         <input id="paperTicker" type="text" placeholder="Ticker e.g. AAPL"
           style="width:100%;background:#060a12;border:1px solid #2a3a5a;border-radius:4px;color:#e0e6f0;font-size:.68rem;padding:4px 6px;margin-bottom:4px;box-sizing:border-box;text-transform:uppercase;"
-          oninput="this.value=this.value.toUpperCase()">
+          oninput="this.value=this.value.toUpperCase();debouncedQuote(this.value)"
+          onblur="fetchPaperQuote(this.value)">
+        <!-- Live quote display -->
+        <div id="paperQuoteBar" style="display:none;background:#0a1a2e;border:1px solid #1a3a5a;border-radius:4px;padding:5px 8px;margin-bottom:5px;display:flex;justify-content:space-between;align-items:center;">
+          <div>
+            <span id="paperQuoteTicker" style="color:#e0e6f0;font-size:.68rem;font-weight:800;"></span>
+            <span id="paperQuoteCompany" style="color:#4a6a8a;font-size:.55rem;margin-left:5px;"></span>
+          </div>
+          <div style="text-align:right;">
+            <div id="paperQuotePrice" style="color:#ffd700;font-size:.78rem;font-weight:800;"></div>
+            <div id="paperQuoteChange" style="font-size:.58rem;"></div>
+          </div>
+        </div>
         <div style="display:flex;gap:4px;margin-bottom:4px;">
           <input id="paperQty" type="number" placeholder="Shares" min="1" value="100"
             style="flex:1;background:#060a12;border:1px solid #2a3a5a;border-radius:4px;color:#e0e6f0;font-size:.65rem;padding:4px 5px;">
@@ -953,6 +965,52 @@
   }
 
   // ── PAPER TRADING ──
+  // ── LIVE QUOTE on ticker input ──
+  let quoteDebounceTimer=null;
+  function debouncedQuote(val){
+    clearTimeout(quoteDebounceTimer);
+    const bar=document.getElementById('paperQuoteBar');
+    if(!val||val.length<1){bar.style.display='none';return;}
+    quoteDebounceTimer=setTimeout(()=>fetchPaperQuote(val),600);
+  }
+
+  async function fetchPaperQuote(val){
+    const ticker=(val||'').trim().toUpperCase();
+    const bar=document.getElementById('paperQuoteBar');
+    if(!ticker||ticker.length<1){bar.style.display='none';return;}
+    bar.style.display='flex';
+    document.getElementById('paperQuoteTicker').textContent=ticker;
+    document.getElementById('paperQuotePrice').textContent='⏳';
+    document.getElementById('paperQuoteChange').textContent='';
+    document.getElementById('paperQuoteCompany').textContent='';
+    try{
+      const r=await fetch(`${API_URL}/api/paper/quote/${ticker}`);
+      const d=await r.json();
+      const q=d?.quotes?.quote;
+      if(!q||q.symbol===undefined){
+        document.getElementById('paperQuotePrice').textContent='No data';
+        document.getElementById('paperQuotePrice').style.color='#ff6666';
+        return;
+      }
+      const price=q.last||q.bid||q.ask||0;
+      const chg=q.change||0;
+      const chgPct=q.change_percentage||0;
+      const up=chg>=0;
+      document.getElementById('paperQuotePrice').textContent=`$${parseFloat(price).toFixed(2)}`;
+      document.getElementById('paperQuotePrice').style.color='#ffd700';
+      document.getElementById('paperQuoteChange').textContent=`${up?'+':''}${parseFloat(chg).toFixed(2)} (${up?'+':''}${parseFloat(chgPct).toFixed(2)}%)`;
+      document.getElementById('paperQuoteChange').style.color=up?'#00c853':'#ff1744';
+      document.getElementById('paperQuoteCompany').textContent=q.description?q.description.substring(0,25):'';
+      // Auto-fill limit price if limit order selected
+      if(document.getElementById('paperOrderType').value==='limit'&&price>0){
+        document.getElementById('paperLimitPrice').value=parseFloat(price).toFixed(2);
+      }
+    }catch(e){
+      document.getElementById('paperQuotePrice').textContent='Error';
+      document.getElementById('paperQuotePrice').style.color='#ff6666';
+    }
+  }
+
   function toggleLimitPrice(){
     const show=document.getElementById('paperOrderType').value==='limit';
     document.getElementById('paperLimitPrice').style.display=show?'block':'none';
@@ -965,22 +1023,24 @@
       const r=await fetch(`${API_URL}/api/paper/account`);
       const d=await r.json();
       const b=d?.balances;
-      if(!b){el.innerHTML=`<div style="color:#ff6666;font-size:.58rem;">Error: ${d?.error||'Unknown'}</div>`;return;}
-      const tb=b.total_balance||b.total_equity||'--';
-      const cash=b.cash?.cash_available||b.cash||'--';
-      const bp=b.buying_power||'--';
+      if(!b){el.innerHTML=`<div style="color:#ff6666;font-size:.58rem;">Error: ${d?.error||JSON.stringify(d).substring(0,100)}</div>`;return;}
+      // Tradier actual fields
+      const tb  = b.total_equity   ?? b.total_balance ?? b.equity ?? 100000;
+      const cash= b.cash?.cash_available ?? b.cash?.sweep ?? b.total_cash ?? 0;
+      const bp  = b.buying_power   ?? b.cash?.buying_power ?? cash;
+      const fmt = v => isNaN(parseFloat(v)) ? '$--' : '$'+parseFloat(v).toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2});
       el.innerHTML=`
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:4px;">
           <div style="text-align:center;background:#0f1a30;border-radius:4px;padding:5px;">
-            <div style="font-size:.65rem;color:#00c853;font-weight:800;">$${parseFloat(tb).toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2})}</div>
+            <div style="font-size:.65rem;color:#00c853;font-weight:800;">${fmt(tb)}</div>
             <div style="font-size:.52rem;color:#4a6a8a;">Total Value</div>
           </div>
           <div style="text-align:center;background:#0f1a30;border-radius:4px;padding:5px;">
-            <div style="font-size:.65rem;color:#a0c4ff;font-weight:800;">$${parseFloat(cash).toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2})}</div>
+            <div style="font-size:.65rem;color:#a0c4ff;font-weight:800;">${fmt(cash)}</div>
             <div style="font-size:.52rem;color:#4a6a8a;">Cash Available</div>
           </div>
         </div>
-        <div style="text-align:center;margin-top:4px;font-size:.52rem;color:#3a5a7a;">Buying Power: $${parseFloat(bp).toLocaleString()}</div>`;
+        <div style="text-align:center;margin-top:4px;font-size:.52rem;color:#3a5a7a;">Buying Power: ${fmt(bp)}</div>`;
     }catch(e){el.innerHTML=`<div style="color:#ff6666;font-size:.58rem;">Error: ${e.message}</div>`;}
   }
 
@@ -1016,20 +1076,44 @@
       const d=await r.json();
       const orders=d?.orders?.order;
       if(!orders){el.innerHTML='<span style="color:#4a6a8a;">No orders yet</span>';return;}
-      const arr=(Array.isArray(orders)?orders:[orders]).slice(0,10);
-      const statusColor={'filled':'#00c853','pending':'#ffd700','cancelled':'#ff1744','open':'#4a8aff'};
+      const arr=(Array.isArray(orders)?orders:[orders]).slice(0,15);
+      const statusColor={'filled':'#00c853','pending':'#ffd700','cancelled':'#ff4444','open':'#4a8aff','partially_filled':'#ff9100'};
+      const cancellable=['pending','open','partially_filled'];
       el.innerHTML=arr.map(o=>`
-        <div style="display:flex;justify-content:space-between;padding:3px 0;border-bottom:1px solid #0f1a2e;">
-          <div>
-            <span style="color:#e0e6f0;font-size:.62rem;font-weight:700;">${o.symbol}</span>
-            <span style="color:${o.side==='buy'?'#00c853':'#ff1744'};font-size:.55rem;margin-left:3px;">${(o.side||'').toUpperCase()}</span>
+        <div style="padding:5px 0;border-bottom:1px solid #0f1a2e;">
+          <div style="display:flex;justify-content:space-between;align-items:center;">
+            <div>
+              <span style="color:#e0e6f0;font-size:.63rem;font-weight:700;">${o.symbol}</span>
+              <span style="color:${o.side==='buy'?'#00c853':'#ff1744'};font-size:.56rem;margin-left:4px;">${(o.side||'').toUpperCase()}</span>
+              <span style="color:#6a8aaa;font-size:.54rem;margin-left:3px;">${o.quantity}sh ${o.type||''}</span>
+            </div>
+            <div style="display:flex;align-items:center;gap:5px;">
+              <span style="color:${statusColor[o.status]||'#6a8aaa'};font-size:.56rem;font-weight:700;">${o.status}</span>
+              ${cancellable.includes(o.status)?`<button onclick="cancelPaperOrder('${o.id}')" style="background:#7b0000;border:1px solid #ff1744;border-radius:4px;color:#ff6666;font-size:.52rem;padding:2px 6px;cursor:pointer;">✕ Cancel</button>`:''}
+            </div>
           </div>
-          <div style="text-align:right;">
-            <span style="color:${statusColor[o.status]||'#6a8aaa'};font-size:.55rem;">${o.status}</span>
-            <span style="color:#6a8aaa;font-size:.55rem;margin-left:4px;">${o.quantity}sh</span>
-          </div>
+          ${o.price?`<div style="font-size:.52rem;color:#4a6a8a;margin-top:1px;">Price: $${o.price}</div>`:''}
         </div>`).join('');
     }catch(e){el.innerHTML=`<span style="color:#ff6666;">Error: ${e.message}</span>`;}
+  }
+
+  async function cancelPaperOrder(orderId){
+    if(!confirm(`Cancel order ${orderId}?`))return;
+    try{
+      const r=await fetch(`${API_URL}/api/paper/order/${orderId}`,{method:'DELETE'});
+      const d=await r.json();
+      if(d?.order?.status==='canceled'||d?.order?.id){
+        document.getElementById('paperOrderResult').textContent='✅ Order cancelled';
+        document.getElementById('paperOrderResult').style.color='#00c853';
+      }else{
+        document.getElementById('paperOrderResult').textContent=`❌ ${d?.error||'Cancel failed'}`;
+        document.getElementById('paperOrderResult').style.color='#ff4444';
+      }
+      setTimeout(()=>loadPaperOrders(),800);
+    }catch(e){
+      document.getElementById('paperOrderResult').textContent=`❌ ${e.message}`;
+      document.getElementById('paperOrderResult').style.color='#ff4444';
+    }
   }
 
   async function placePaperOrder(side){

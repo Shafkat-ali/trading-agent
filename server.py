@@ -561,6 +561,21 @@ async def paper_orders():
     except Exception as e:
         return {'error': str(e)}
 
+@app.delete("/api/paper/order/{order_id}")
+async def cancel_paper_order(order_id: str):
+    """Cancel a pending paper trading order"""
+    try:
+        r = requests.delete(
+            f"{TRADIER_SANDBOX_URL}/accounts/{TRADIER_SANDBOX_ACCT}/orders/{order_id}",
+            headers=TRADIER_SANDBOX_HDR, timeout=8
+        )
+        log_alert(f"🗑 Cancel order {order_id} — HTTP {r.status_code}")
+        if r.status_code == 200:
+            return r.json()
+        return {'error': f'HTTP {r.status_code}: {r.text[:200]}'}
+    except Exception as e:
+        return {'error': str(e)}
+
 class PaperOrderRequest(BaseModel):
     ticker:   str
     side:     str   # 'buy' or 'sell'
