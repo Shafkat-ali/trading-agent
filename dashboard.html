@@ -2203,8 +2203,18 @@ function parseT(t){if(!t)return 0;return Math.floor(new Date(t.includes('T')?t:t
 const RANGES={'1D':{days:1,tf:'5Min'},'1W':{days:7,tf:'15Min'},'1M':{days:30,tf:'1Hour'},'3M':{days:90,tf:'1Day'},'1Y':{days:365,tf:'1Day'}};
 
 function buildUrl(ticker,range,tf){
-  let t=tf,extra='';
-  if(range&&RANGES[range]){const r=RANGES[range];t=r.tf;if(r.days){const s=new Date();s.setDate(s.getDate()-r.days);extra='&start='+s.toISOString().split('T')[0];}}
+  // tf parameter is the USER's chosen interval — respect it always
+  // Only use range's default tf if no tf was explicitly set
+  let t=tf||'5Min', extra='';
+  if(range&&RANGES[range]){
+    const r=RANGES[range];
+    // Only override tf with range default if tf wasn't manually changed
+    // (detected by tf matching the previous range default — but safer to just use tf always)
+    if(r.days){
+      const s=new Date();s.setDate(s.getDate()-r.days);
+      extra='&start='+s.toISOString().split('T')[0];
+    }
+  }
   return API+'/api/stock/bars/'+ticker+'?timeframe='+t+extra;
 }
 
@@ -2263,7 +2273,7 @@ function expToggle(ind){
 
 async function expLoad(){
   const tk=(document.getElementById('expTicker').value||'').trim().toUpperCase();
-  exp.tf=document.getElementById('expTf').value||'5Min';
+  exp.tf=document.getElementById('expTf').value||'5Min';  // always read fresh
   if(!tk)return;
   document.getElementById('expTitle').textContent='📊 '+tk;
   document.getElementById('expChart').innerHTML='<div class="ph"><span style="color:#ffd700">⏳ Loading '+tk+'...</span></div>';
@@ -2403,6 +2413,9 @@ function toggle(i,ind){
 async function load(i){
   const tk=(document.getElementById('tk'+i).value||'').trim().toUpperCase();
   const s=state[i];
+  // Always read dropdown fresh so manual interval changes are respected
+  const freshTf=document.getElementById('tf'+i)?.value||s.tf||'5Min';
+  s.tf=freshTf;
   if(!tk){document.getElementById('cw'+i).innerHTML='<div class="ph"><span>⚠️ Enter ticker<\/span><\/div>';return;}
   document.getElementById('cw'+i).innerHTML='<div class="ph"><span style="color:#ffd700">⏳ '+tk+'...<\/span><\/div>';
   try{
