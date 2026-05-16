@@ -216,10 +216,12 @@
 
     /* RIGHT PANEL */
     .right-panel{background:#0d1220;border-left:1px solid #1a2035;display:flex;flex-direction:column;overflow:hidden;position:relative;transition:width .25s ease,min-width .25s ease;}
-    .right-panel{background:#0d1220;border-left:1px solid #1a2035;display:flex;flex-direction:column;overflow:hidden;position:relative;transition:width .25s ease,min-width .25s ease;}
     .right-panel.collapsed{width:0!important;min-width:0!important;border-left:none;overflow:hidden;}
-    .panel-toggle-btn{position:absolute;left:-16px;top:50%;transform:translateY(-50%);width:16px;height:52px;background:#0d1220;border:1px solid #1a2035;border-right:none;border-radius:6px 0 0 6px;cursor:pointer;display:flex;align-items:center;justify-content:center;color:#a0c4ff;font-size:.7rem;z-index:200;transition:all .2s;}
-    .panel-toggle-btn:hover{background:#1a2a4a;color:#fff;}
+    .panel-toggle-tab{background:#0d1220;border:1px solid #1a2035;border-radius:4px 4px 0 0;padding:3px 8px;cursor:pointer;font-size:.5rem;color:#4a6a8a;display:flex;align-items:center;gap:3px;transition:all .2s;white-space:nowrap;align-self:flex-start;}
+    .panel-toggle-tab:hover{background:#1a2a4a;color:#a0c4ff;}
+    /* Floating restore button when panel is hidden */
+    #panelRestoreBtn{position:fixed;right:0;top:50%;transform:translateY(-50%);background:#0d1220;border:1px solid #1a2035;border-right:none;border-radius:6px 0 0 6px;padding:10px 5px;cursor:pointer;color:#a0c4ff;font-size:.65rem;z-index:500;writing-mode:vertical-rl;display:none;transition:all .2s;}
+    #panelRestoreBtn:hover{background:#1a2a4a;color:#fff;}
     .tab-header{display:flex;border-bottom:1px solid #1a2035;}
     .tab-btn{flex:1;padding:6px 2px;background:transparent;border:none;color:#4a6a8a;font-size:.5rem;font-weight:600;cursor:pointer;transition:all .2s;text-transform:uppercase;}
     .tab-btn.active{color:#00d4ff;border-bottom:2px solid #00d4ff;background:rgba(0,212,255,.04);}
@@ -603,6 +605,7 @@
   </div>
 </div>
 <div id="scanTooltipBox"></div>
+<button id="panelRestoreBtn" onclick="toggleRightPanel()" title="Show panel">▶ Panel</button>
 
 <!-- ══════════════════════════════════════════
      CHARTS MODAL — 8-panel floating workspace
@@ -662,8 +665,11 @@
 
   <!-- RIGHT PANEL -->
   <div class="right-panel" id="rightPanel" style="width:270px;min-width:270px;">
-    <button class="panel-toggle-btn" id="panelToggleBtn" onclick="toggleRightPanel()" title="Hide/Show panel">◀</button>
     <div class="tab-header">
+      <div style="display:flex;align-items:center;justify-content:space-between;padding:3px 6px;border-bottom:1px solid #1a2035;background:#080e1e;">
+        <span style="font-size:.48rem;color:#2a4a6a;">PANEL</span>
+        <button class="panel-toggle-tab" id="panelToggleBtn" onclick="toggleRightPanel()">◀ Hide</button>
+      </div>
       <button class="tab-btn active" onclick="switchTab('screener')">📋 Screen</button>
       <button class="tab-btn"        onclick="switchTab('news')">🌍 News</button>
       <button class="tab-btn"        onclick="switchTab('filters')">🎛 Filter</button>
@@ -1957,12 +1963,13 @@
   // ── RIGHT PANEL TOGGLE ──
   let panelOpen = true;
   function toggleRightPanel(){
-    const panel = document.getElementById('rightPanel');
-    const btn   = document.getElementById('panelToggleBtn');
-    panelOpen   = !panelOpen;
+    const panel   = document.getElementById('rightPanel');
+    const btn     = document.getElementById('panelToggleBtn');
+    const restore = document.getElementById('panelRestoreBtn');
+    panelOpen = !panelOpen;
     panel.classList.toggle('collapsed', !panelOpen);
-    btn.textContent = panelOpen ? '◀' : '▶';
-    btn.title       = panelOpen ? 'Hide panel' : 'Show panel';
+    if(btn){ btn.textContent = panelOpen ? '◀ Hide' : '▶ Show'; }
+    if(restore){ restore.style.display = panelOpen ? 'none' : 'block'; }
   }
 
   const TOOLTIP_DATA={
