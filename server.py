@@ -28,6 +28,13 @@ EMAIL_ADDRESS      = os.getenv('EMAIL_ADDRESS', '')
 EMAIL_PASSWORD     = os.getenv('EMAIL_PASSWORD', '')
 EMAIL_TO           = os.getenv('EMAIL_TO', '')
 
+# ── User auth — passwords stored as SHA-256 hashes, never in plaintext ──
+import hashlib
+USER_PASSWORDS = {
+    'shafkat': os.getenv('SHAFKAT_PW_HASH', '00c19523772ea30a3755c6fa1c5642a93e4e56e8dbcf977420ad2d4395448f5c'),
+    'irfan':   os.getenv('IRFAN_PW_HASH',   '6f596603a921a50a83c118911b9774b95a5fb081600b14429a34f3e66ee84176'),
+}
+
 # Tradier — production real-time data + paper trading sandbox
 TRADIER_TOKEN         = os.getenv('TRADIER_TOKEN',        'TJuXpKVavQJ6ad8GMiot6JWISGQG')
 TRADIER_SANDBOX_TOKEN = os.getenv('TRADIER_SANDBOX_TOKEN','uz4ojbfLroPKXmSrJOA1NffOXkiA')
@@ -678,7 +685,20 @@ async def cancel_paper_order(order_id: str):
     except Exception as e:
         return {'error': str(e)}
 
-class PaperOrderRequest(BaseModel):
+class LoginRequest(BaseModel):
+    user_id:  str
+    password: str
+
+@app.post("/api/auth/login")
+async def auth_login(req: LoginRequest):
+    uid = req.user_id.lower().strip()
+    if uid not in USER_PASSWORDS:
+        return {'success': False, 'error': 'Unknown user'}
+    pw_hash = hashlib.sha256(req.password.encode()).hexdigest()
+    if pw_hash == USER_PASSWORDS[uid]:
+        log_alert(f"🔐 Login: {uid}")
+        return {'success': True, 'user_id': uid}
+    return {'success': False, 'error': 'Incorrect password'}
     ticker:   str
     side:     str   # 'buy' or 'sell'
     qty:      float

@@ -24,6 +24,21 @@
     .boot-line.dim {color:#2a4a2a;}
     .boot-cursor{display:inline-block;width:8px;height:.85rem;background:#00c853;margin-left:2px;animation:blink .7s step-end infinite;vertical-align:middle;}
     @keyframes blink{0%,100%{opacity:1}50%{opacity:0}}
+    /* Password modal */
+    #pwModal{position:fixed;inset:0;background:rgba(0,0,0,.85);z-index:10001;display:none;align-items:center;justify-content:center;backdrop-filter:blur(4px);}
+    #pwModal.open{display:flex;}
+    .pw-box{background:#0f1729;border:1px solid #1e2d4a;border-radius:16px;padding:28px 32px;width:320px;text-align:center;box-shadow:0 20px 60px rgba(0,0,0,.7);}
+    .pw-avatar{width:64px;height:64px;border-radius:50%;margin:0 auto 12px;overflow:hidden;border:2px solid #2a4a7a;}
+    .pw-avatar img{width:100%;height:100%;object-fit:cover;}
+    .pw-name{font-size:.85rem;font-weight:800;color:#e0e6f0;margin-bottom:3px;}
+    .pw-sub{font-size:.6rem;color:#4a6a8a;margin-bottom:16px;}
+    .pw-input{width:100%;background:#060a12;border:1px solid #2a3a5a;border-radius:8px;color:#e0e6f0;font-size:.8rem;padding:9px 12px;box-sizing:border-box;text-align:center;letter-spacing:2px;margin-bottom:8px;}
+    .pw-input:focus{outline:none;border-color:#4a8aff;}
+    .pw-btn{width:100%;background:linear-gradient(135deg,#1a3a6a,#2a5a9a);border:none;border-radius:8px;color:#fff;font-size:.78rem;font-weight:700;padding:9px;cursor:pointer;transition:all .2s;margin-bottom:6px;}
+    .pw-btn:hover{background:linear-gradient(135deg,#2a5a9a,#4a8aff);}
+    .pw-err{font-size:.62rem;color:#ff4444;min-height:16px;margin-top:2px;}
+    .pw-back{font-size:.58rem;color:#4a6a8a;cursor:pointer;margin-top:4px;display:inline-block;}
+    .pw-back:hover{color:#a0c4ff;}
     .login-logos{display:flex;align-items:center;justify-content:center;gap:12px;margin-bottom:16px;}
     .login-logo{width:60px;height:60px;border-radius:50%;object-fit:cover;border:2px solid #2a3f6f;background:#0d1525;}
     .login-x{color:#ffd700;font-size:1.3rem;font-weight:800;}
@@ -410,6 +425,20 @@
 <body>
 
 <!-- LOGIN -->
+<!-- PASSWORD MODAL -->
+<div id="pwModal">
+  <div class="pw-box">
+    <div class="pw-avatar" id="pwAvatar"></div>
+    <div class="pw-name"  id="pwName"></div>
+    <div class="pw-sub"   id="pwSub"></div>
+    <input class="pw-input" id="pwInput" type="password" placeholder="Enter password"
+      onkeydown="if(event.key==='Enter')submitPassword()">
+    <button class="pw-btn" onclick="submitPassword()">🔐 Unlock</button>
+    <div class="pw-err" id="pwErr"></div>
+    <span class="pw-back" onclick="closePwModal()">← Back to profiles</span>
+  </div>
+</div>
+
 <!-- TERMINAL BOOT SCREEN -->
 <div id="bootScreen">
   <div id="bootLines"></div>
@@ -422,15 +451,15 @@
     <div class="login-sub">Capital Trading Agent</div>
     <div class="login-label">Select your profile to continue</div>
     <div class="user-cards">
-      <div class="user-card" onclick="selectUser('shafkat','Shafkat Uyghurkid','S')">
+      <div class="user-card" onclick="openPwModal('shafkat','Shafkat Uyghurkid','S','UyghurKid Capital')">
         <div class="user-avatar shafkat" id="loginAvatarShafkat">S</div>
         <div><div class="user-name">Shafkat Uyghurkid</div><div class="user-role">UyghurKid Capital</div></div>
-        <div class="user-arrow">→</div>
+        <div class="user-arrow">🔐</div>
       </div>
-      <div class="user-card" onclick="selectUser('irfan','Irfan Payda','I')">
+      <div class="user-card" onclick="openPwModal('irfan','Irfan Payda','I','Payda Capital')">
         <div class="user-avatar irfan" id="loginAvatarIrfan">I</div>
         <div><div class="user-name">Irfan Payda</div><div class="user-role">Payda Capital</div></div>
-        <div class="user-arrow">→</div>
+        <div class="user-arrow">🔐</div>
       </div>
     </div>
   </div>
@@ -1005,6 +1034,55 @@
   let screenerSort='grade'; // 'grade' | 'alpha' | 'gap'
 
   // ── USER ──
+  // ── PASSWORD MODAL ──
+  let _pwPending = null;
+
+  function openPwModal(id, name, initial, role){
+    _pwPending = {id, name, initial};
+    const modal = document.getElementById('pwModal');
+    const av = document.getElementById('pwAvatar');
+    const logo = id==='shafkat' ? UYGHUR_LOGO : PAYDA_LOGO;
+    av.innerHTML = `<img src="${logo}" onerror="this.parentNode.textContent='${initial}'" alt="${initial}">`;
+    document.getElementById('pwName').textContent = name;
+    document.getElementById('pwSub').textContent  = role;
+    document.getElementById('pwInput').value = '';
+    document.getElementById('pwErr').textContent = '';
+    modal.classList.add('open');
+    setTimeout(()=>document.getElementById('pwInput').focus(), 100);
+  }
+
+  function closePwModal(){
+    document.getElementById('pwModal').classList.remove('open');
+    _pwPending = null;
+  }
+
+  async function submitPassword(){
+    if(!_pwPending) return;
+    const pw = document.getElementById('pwInput').value;
+    const errEl = document.getElementById('pwErr');
+    if(!pw){ errEl.textContent='Please enter your password'; return; }
+    errEl.textContent = '⏳ Checking...';
+    try{
+      const r = await fetch(`${API_URL}/api/auth/login`, {
+        method:'POST',
+        headers:{'Content-Type':'application/json'},
+        body: JSON.stringify({user_id: _pwPending.id, password: pw})
+      });
+      const d = await r.json();
+      if(d.success){
+        document.getElementById('pwModal').classList.remove('open');
+        selectUser(_pwPending.id, _pwPending.name, _pwPending.initial);
+        _pwPending = null;
+      } else {
+        errEl.textContent = '❌ ' + (d.error||'Incorrect password');
+        document.getElementById('pwInput').value = '';
+        document.getElementById('pwInput').focus();
+      }
+    }catch(e){
+      errEl.textContent = '❌ Connection error — try again';
+    }
+  }
+
   function selectUser(id,name,initial){
     if(ws){ws.close();ws=null;}
     stopPolling();
@@ -1050,7 +1128,10 @@
   }
 
   const saved=sessionStorage.getItem('tradingUser');
-  if(saved){const u=JSON.parse(saved);selectUser(u.id,u.name,u.initial);}
+  if(saved){
+    // Already authenticated this session — skip password
+    const u=JSON.parse(saved);selectUser(u.id,u.name,u.initial);
+  }
 
   // ── TABS ──
   function switchTab(name){
