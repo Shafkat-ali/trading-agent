@@ -237,18 +237,18 @@
     /* ── FLOATING TOOLTIP (fixed, never inline) ── */
     #scanTooltipBox{
       position:fixed;z-index:999999;display:none;
-      background:#0a1020;border:1px solid #2a4a7a;border-radius:10px;
-      padding:11px 14px;width:230px;
-      box-shadow:0 16px 40px rgba(0,0,0,.85);
-      pointer-events:none;
+      background:#080e1e;border:1px solid #2a4a7a;border-radius:7px;
+      padding:8px 11px;width:195px;
+      box-shadow:0 12px 28px rgba(0,0,0,.9);
+      pointer-events:none;font-family:inherit;
     }
-    .tt-title{font-size:.74rem;font-weight:800;color:#e0e6f0;margin-bottom:7px;padding-bottom:5px;border-bottom:1px solid #1e2d4a;}
-    .tt-row{display:flex;justify-content:space-between;gap:8px;margin:3px 0;}
-    .tt-key{font-size:.63rem;color:#4a6a8a;}
-    .tt-val{font-size:.63rem;color:#a0c4ff;font-weight:700;}
-    .tt-divider{border:none;border-top:1px solid #1e2d4a;margin:7px 0;}
-    .tt-desc{font-size:.61rem;color:#6a8aaa;line-height:1.5;}
-    .tt-best{font-size:.59rem;color:#ffd700;margin-top:5px;font-weight:700;}
+    .tt-title{font-size:.65rem;font-weight:800;color:#e0e6f0;margin-bottom:5px;padding-bottom:4px;border-bottom:1px solid #1e2d4a;}
+    .tt-row{display:flex;justify-content:space-between;gap:6px;margin:2px 0;}
+    .tt-key{font-size:.57rem;color:#4a6a8a;}
+    .tt-val{font-size:.57rem;color:#a0c4ff;font-weight:700;}
+    .tt-divider{border:none;border-top:1px solid #1e2d4a;margin:5px 0;}
+    .tt-desc{font-size:.55rem;color:#6a8aaa;line-height:1.4;}
+    .tt-best{font-size:.53rem;color:#ffd700;margin-top:3px;font-weight:700;}
 
     /* ── CHARTS MODAL ── */
     #chartsModal{position:fixed;inset:0;background:#060a12;z-index:10000;display:none;flex-direction:column;}
@@ -619,6 +619,7 @@
       <button class="tab-btn"        onclick="switchTab('news')">🌍 News</button>
       <button class="tab-btn"        onclick="switchTab('filters')">🎛 Filter</button>
       <button class="tab-btn"        onclick="switchTab('log')">📝 Log</button>
+      <button class="tab-btn"        onclick="switchTab('paper')" style="color:#ffd700;">📄 Paper</button>
     </div>
 
     <!-- SCREENER -->
@@ -761,6 +762,68 @@
         <div class="alert-item"><div class="alert-time">--:--:--</div><div class="alert-msg">Waiting...</div></div>
       </div>
     </div>
+
+    <!-- PAPER TRADING -->
+    <div class="tab-content" id="tab-paper" style="padding:6px;overflow-y:auto;">
+      <div style="font-size:.58rem;color:#ffd700;font-weight:700;margin-bottom:6px;text-align:center;">
+        📄 Paper Trading — Tradier Sandbox · 15min Delayed · $100K Virtual
+      </div>
+
+      <!-- Account Summary -->
+      <div id="paperAccount" style="background:#0a1520;border:1px solid #1a2a4a;border-radius:6px;padding:8px;margin-bottom:6px;font-size:.6rem;color:#6a8aaa;">
+        <button onclick="loadPaperAccount()" style="width:100%;background:#1a3a6a;border:1px solid #2a4a8a;border-radius:5px;color:#a0c4ff;font-size:.6rem;padding:4px;cursor:pointer;">
+          🔄 Load Account
+        </button>
+      </div>
+
+      <!-- Order Entry -->
+      <div style="background:#0a1520;border:1px solid #1a2a4a;border-radius:6px;padding:8px;margin-bottom:6px;">
+        <div style="font-size:.6rem;color:#a0b8d0;font-weight:700;margin-bottom:5px;">Place Order</div>
+        <input id="paperTicker" type="text" placeholder="Ticker e.g. AAPL"
+          style="width:100%;background:#060a12;border:1px solid #2a3a5a;border-radius:4px;color:#e0e6f0;font-size:.68rem;padding:4px 6px;margin-bottom:4px;box-sizing:border-box;text-transform:uppercase;"
+          oninput="this.value=this.value.toUpperCase()">
+        <div style="display:flex;gap:4px;margin-bottom:4px;">
+          <input id="paperQty" type="number" placeholder="Shares" min="1" value="100"
+            style="flex:1;background:#060a12;border:1px solid #2a3a5a;border-radius:4px;color:#e0e6f0;font-size:.65rem;padding:4px 5px;">
+          <select id="paperOrderType" onchange="toggleLimitPrice()"
+            style="flex:1;background:#060a12;border:1px solid #2a3a5a;border-radius:4px;color:#a0b8d0;font-size:.62rem;padding:4px;">
+            <option value="market">Market</option>
+            <option value="limit">Limit</option>
+          </select>
+        </div>
+        <input id="paperLimitPrice" type="number" placeholder="Limit Price" step="0.01"
+          style="width:100%;background:#060a12;border:1px solid #2a3a5a;border-radius:4px;color:#e0e6f0;font-size:.65rem;padding:4px 6px;margin-bottom:6px;box-sizing:border-box;display:none;">
+        <div style="display:flex;gap:5px;">
+          <button onclick="placePaperOrder('buy')"
+            style="flex:1;background:linear-gradient(135deg,#00c853,#007c30);border:none;border-radius:5px;color:#fff;font-size:.72rem;font-weight:800;padding:7px;cursor:pointer;">
+            🟢 BUY
+          </button>
+          <button onclick="placePaperOrder('sell')"
+            style="flex:1;background:linear-gradient(135deg,#ff1744,#8b0000);border:none;border-radius:5px;color:#fff;font-size:.72rem;font-weight:800;padding:7px;cursor:pointer;">
+            🔴 SELL
+          </button>
+        </div>
+        <div id="paperOrderResult" style="margin-top:5px;font-size:.58rem;color:#ffd700;min-height:14px;text-align:center;"></div>
+      </div>
+
+      <!-- Positions -->
+      <div style="background:#0a1520;border:1px solid #1a2a4a;border-radius:6px;padding:8px;margin-bottom:6px;">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:5px;">
+          <span style="font-size:.6rem;color:#a0b8d0;font-weight:700;">Open Positions</span>
+          <button onclick="loadPaperPositions()" style="background:#1a3a6a;border:1px solid #2a4a8a;border-radius:4px;color:#a0c4ff;font-size:.55rem;padding:2px 6px;cursor:pointer;">↻ Refresh</button>
+        </div>
+        <div id="paperPositions" style="font-size:.58rem;color:#4a6a8a;">Click Refresh to load</div>
+      </div>
+
+      <!-- Order History -->
+      <div style="background:#0a1520;border:1px solid #1a2a4a;border-radius:6px;padding:8px;">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:5px;">
+          <span style="font-size:.6rem;color:#a0b8d0;font-weight:700;">Recent Orders</span>
+          <button onclick="loadPaperOrders()" style="background:#1a3a6a;border:1px solid #2a4a8a;border-radius:4px;color:#a0c4ff;font-size:.55rem;padding:2px 6px;cursor:pointer;">↻ Refresh</button>
+        </div>
+        <div id="paperOrders" style="font-size:.58rem;color:#4a6a8a;">Click Refresh to load</div>
+      </div>
+    </div>
   </div>
 </div>
 
@@ -840,7 +903,9 @@
     sessionStorage.setItem('tradingUser',JSON.stringify(currentUser));
     document.getElementById('loginScreen').classList.add('hidden');
     const av=document.getElementById('headerAvatar');
-    av.textContent=initial; av.className=`user-mini-avatar ${id}`;
+    const logoSrc=id==='shafkat'?UYGHUR_LOGO:PAYDA_LOGO;
+    av.innerHTML=`<img src="${logoSrc}" style="width:100%;height:100%;border-radius:50%;object-fit:cover;" onerror="this.parentNode.textContent='${initial}'">`;
+    av.className=`user-mini-avatar ${id}`;
     document.getElementById('headerUserName').textContent=name;
     resetLocalState();
     connectWS(id);
@@ -880,10 +945,125 @@
 
   // ── TABS ──
   function switchTab(name){
-    const names=['screener','news','filters','log'];
+    const names=['screener','news','filters','log','paper'];
     document.querySelectorAll('.tab-btn').forEach((b,i)=>b.classList.toggle('active',names[i]===name));
     names.forEach(n=>document.getElementById(`tab-${n}`).classList.toggle('active',n===name));
     if(name==='news')loadNewsTab();
+    if(name==='paper'){loadPaperAccount();loadPaperPositions();loadPaperOrders();}
+  }
+
+  // ── PAPER TRADING ──
+  function toggleLimitPrice(){
+    const show=document.getElementById('paperOrderType').value==='limit';
+    document.getElementById('paperLimitPrice').style.display=show?'block':'none';
+  }
+
+  async function loadPaperAccount(){
+    const el=document.getElementById('paperAccount');
+    el.innerHTML='<div style="color:#4a6a8a;font-size:.58rem;">⏳ Loading...</div>';
+    try{
+      const r=await fetch(`${API_URL}/api/paper/account`);
+      const d=await r.json();
+      const b=d?.balances;
+      if(!b){el.innerHTML=`<div style="color:#ff6666;font-size:.58rem;">Error: ${d?.error||'Unknown'}</div>`;return;}
+      const tb=b.total_balance||b.total_equity||'--';
+      const cash=b.cash?.cash_available||b.cash||'--';
+      const bp=b.buying_power||'--';
+      el.innerHTML=`
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:4px;">
+          <div style="text-align:center;background:#0f1a30;border-radius:4px;padding:5px;">
+            <div style="font-size:.65rem;color:#00c853;font-weight:800;">$${parseFloat(tb).toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2})}</div>
+            <div style="font-size:.52rem;color:#4a6a8a;">Total Value</div>
+          </div>
+          <div style="text-align:center;background:#0f1a30;border-radius:4px;padding:5px;">
+            <div style="font-size:.65rem;color:#a0c4ff;font-weight:800;">$${parseFloat(cash).toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2})}</div>
+            <div style="font-size:.52rem;color:#4a6a8a;">Cash Available</div>
+          </div>
+        </div>
+        <div style="text-align:center;margin-top:4px;font-size:.52rem;color:#3a5a7a;">Buying Power: $${parseFloat(bp).toLocaleString()}</div>`;
+    }catch(e){el.innerHTML=`<div style="color:#ff6666;font-size:.58rem;">Error: ${e.message}</div>`;}
+  }
+
+  async function loadPaperPositions(){
+    const el=document.getElementById('paperPositions');
+    el.innerHTML='<span style="color:#4a6a8a;">⏳ Loading...</span>';
+    try{
+      const r=await fetch(`${API_URL}/api/paper/positions`);
+      const d=await r.json();
+      const pos=d?.positions?.position;
+      if(!pos){el.innerHTML='<span style="color:#4a6a8a;">No open positions</span>';return;}
+      const arr=Array.isArray(pos)?pos:[pos];
+      el.innerHTML=arr.map(p=>{
+        const pl=((p.cost_basis||0)-(p.quantity*p.cost_basis/p.quantity||0));
+        const side=p.quantity>0?'LONG':'SHORT';
+        const sideColor=p.quantity>0?'#00c853':'#ff1744';
+        return`<div style="display:flex;justify-content:space-between;padding:4px 0;border-bottom:1px solid #1a2a4a;">
+          <div><span style="color:#e0e6f0;font-weight:700;font-size:.65rem;">${p.symbol}</span>
+          <span style="color:${sideColor};font-size:.55rem;margin-left:4px;">${side}</span></div>
+          <div style="text-align:right;">
+            <div style="color:#a0c4ff;font-size:.62rem;">${p.quantity} @ $${p.cost_basis}</div>
+          </div>
+        </div>`;
+      }).join('');
+    }catch(e){el.innerHTML=`<span style="color:#ff6666;">Error: ${e.message}</span>`;}
+  }
+
+  async function loadPaperOrders(){
+    const el=document.getElementById('paperOrders');
+    el.innerHTML='<span style="color:#4a6a8a;">⏳ Loading...</span>';
+    try{
+      const r=await fetch(`${API_URL}/api/paper/orders`);
+      const d=await r.json();
+      const orders=d?.orders?.order;
+      if(!orders){el.innerHTML='<span style="color:#4a6a8a;">No orders yet</span>';return;}
+      const arr=(Array.isArray(orders)?orders:[orders]).slice(0,10);
+      const statusColor={'filled':'#00c853','pending':'#ffd700','cancelled':'#ff1744','open':'#4a8aff'};
+      el.innerHTML=arr.map(o=>`
+        <div style="display:flex;justify-content:space-between;padding:3px 0;border-bottom:1px solid #0f1a2e;">
+          <div>
+            <span style="color:#e0e6f0;font-size:.62rem;font-weight:700;">${o.symbol}</span>
+            <span style="color:${o.side==='buy'?'#00c853':'#ff1744'};font-size:.55rem;margin-left:3px;">${(o.side||'').toUpperCase()}</span>
+          </div>
+          <div style="text-align:right;">
+            <span style="color:${statusColor[o.status]||'#6a8aaa'};font-size:.55rem;">${o.status}</span>
+            <span style="color:#6a8aaa;font-size:.55rem;margin-left:4px;">${o.quantity}sh</span>
+          </div>
+        </div>`).join('');
+    }catch(e){el.innerHTML=`<span style="color:#ff6666;">Error: ${e.message}</span>`;}
+  }
+
+  async function placePaperOrder(side){
+    const ticker=document.getElementById('paperTicker').value.trim().toUpperCase();
+    const qty=parseFloat(document.getElementById('paperQty').value||'0');
+    const orderType=document.getElementById('paperOrderType').value;
+    const limitPrice=parseFloat(document.getElementById('paperLimitPrice').value||'0');
+    const result=document.getElementById('paperOrderResult');
+
+    if(!ticker){result.textContent='⚠️ Enter a ticker';result.style.color='#ff9100';return;}
+    if(!qty||qty<1){result.textContent='⚠️ Enter quantity';result.style.color='#ff9100';return;}
+
+    result.textContent=`⏳ Placing ${side.toUpperCase()} order for ${qty}x ${ticker}...`;
+    result.style.color='#ffd700';
+
+    try{
+      const r=await fetch(`${API_URL}/api/paper/order`,{
+        method:'POST',
+        headers:{'Content-Type':'application/json'},
+        body:JSON.stringify({ticker,side,qty,order_type:orderType,limit_price:limitPrice,duration:'day'})
+      });
+      const d=await r.json();
+      if(d?.order?.id||d?.id){
+        result.textContent=`✅ ${side.toUpperCase()} order placed! ID: ${d?.order?.id||d?.id}`;
+        result.style.color='#00c853';
+        setTimeout(()=>{loadPaperPositions();loadPaperOrders();},1500);
+      }else{
+        result.textContent=`❌ ${d?.error||JSON.stringify(d).substring(0,80)}`;
+        result.style.color='#ff1744';
+      }
+    }catch(e){
+      result.textContent=`❌ Error: ${e.message}`;
+      result.style.color='#ff1744';
+    }
   }
 
   // ── WEBSOCKET ──
@@ -1486,12 +1666,15 @@
       `<div class="tt-title">${d.title}</div>`+
       d.rows.map(r=>`<div class="tt-row"><span class="tt-key">${r[0]}</span><span class="tt-val">${r[1]}</span></div>`).join('')+
       `<hr class="tt-divider"><div class="tt-desc">${d.desc}</div><div class="tt-best">${d.best}</div>`;
+    box.style.display='block';
     const rect=e.target.getBoundingClientRect();
-    const tipW=230;
+    const tipW=195, tipH=box.offsetHeight||140;
     let left=rect.left+rect.width/2-tipW/2;
     left=Math.max(8,Math.min(left,window.innerWidth-tipW-8));
-    const top=rect.top-10; // anchor to icon top, CSS moves it up
-    box.style.cssText=`position:fixed;z-index:999999;width:${tipW}px;left:${left}px;top:${top}px;transform:translateY(-100%);display:block;`;
+    // Show BELOW icon if near top of screen, else above
+    const spaceAbove=rect.top;
+    const top=spaceAbove>tipH+20 ? rect.top-tipH-8 : rect.bottom+8;
+    box.style.cssText=`position:fixed;z-index:999999;width:${tipW}px;left:${left}px;top:${top}px;display:block;`;
   }
   function hideTip(){
     const box=document.getElementById('scanTooltipBox');
@@ -1552,7 +1735,7 @@
     // Load lightweight-charts lib if not already loaded
     if(!window.LightweightCharts){
       const s=document.createElement('script');
-      s.src='https://unpkg.com/lightweight-charts/dist/lightweight-charts.standalone.production.js';
+      s.src='https://unpkg.com/lightweight-charts@3.8.0/dist/lightweight-charts.standalone.production.js';
       document.head.appendChild(s);
     }
   }
@@ -1570,38 +1753,27 @@
     const body=document.getElementById(`chartBody${idx}`);
     const badge=document.getElementById(`chartBadge${idx}`);
     if(!ticker){body.innerHTML='<div class="chart-placeholder"><span>⚠️ Enter a ticker</span></div>';return;}
-
     body.innerHTML='<div class="chart-placeholder"><span style="color:#ffd700">⏳ Loading '+ticker+'...</span></div>';
     badge.textContent='';
-
+    // Wait for lib (up to 5s)
+    let waited=0;
+    while(!window.LightweightCharts&&waited<50){await new Promise(r=>setTimeout(r,100));waited++;}
+    if(!window.LightweightCharts){
+      body.innerHTML='<div class="chart-placeholder"><span style="color:#ff6666">Chart lib failed to load</span></div>';return;
+    }
     try{
       const r=await fetch(`${API_URL}/api/stock/bars/${ticker}?timeframe=${tf}`);
       const data=await r.json();
       const bars=data.bars||[];
-
       body.innerHTML='';
-      body.style.position='relative';
-
       if(!bars.length){
-        body.innerHTML='<div class="chart-placeholder"><span style="color:#ff6666">No data for '+ticker+'</span><span style="font-size:.58rem">Market may be closed</span></div>';
-        return;
+        body.innerHTML='<div class="chart-placeholder"><span style="color:#ff6666">No data for '+ticker+'</span><span style="font-size:.58rem">Market closed or invalid ticker</span></div>';return;
       }
-
-      if(!window.LightweightCharts){
-        body.innerHTML='<div class="chart-placeholder"><span style="color:#ff6666">Chart lib loading, try again</span></div>';
-        return;
-      }
-
-      // Destroy old chart if exists
       if(chartInstances[idx]){try{chartInstances[idx].remove();}catch(e){} delete chartInstances[idx];}
-
-      // Get real dimensions — body must be visible with explicit size
-      const w=body.clientWidth||body.offsetWidth||400;
-      const h=body.clientHeight||body.offsetHeight||200;
-
+      const w=body.clientWidth||400, h=body.clientHeight||220;
       const chart=LightweightCharts.createChart(body,{
-        width:w, height:h,
-        layout:{background:{color:'#060a12'},textColor:'#8aa0c0'},
+        width:w,height:h,
+        layout:{backgroundColor:'#060a12',textColor:'#8aa0c0'},
         grid:{vertLines:{color:'#0f1a2e'},horzLines:{color:'#0f1a2e'}},
         timeScale:{timeVisible:true,secondsVisible:false,borderColor:'#1a2a4a'},
         rightPriceScale:{borderColor:'#1a2a4a'},
@@ -1610,39 +1782,28 @@
         handleScale:{mouseWheel:true,pinch:true},
       });
       chartInstances[idx]=chart;
-
+      // v3.8 API — addCandlestickSeries
       const candles=chart.addCandlestickSeries({
         upColor:'#00c853',downColor:'#ff1744',
         borderUpColor:'#00c853',borderDownColor:'#ff1744',
         wickUpColor:'#00c853',wickDownColor:'#ff1744',
       });
-
       const formatted=bars.map(b=>({
         time:Math.floor(new Date(b.time).getTime()/1000),
         open:b.open,high:b.high,low:b.low,close:b.close
       })).sort((a,b)=>a.time-b.time);
       candles.setData(formatted);
-
-      // VWAP line
       const vwapPts=bars.filter(b=>b.vwap>0).map(b=>({
         time:Math.floor(new Date(b.time).getTime()/1000),value:b.vwap
       })).sort((a,b)=>a.time-b.time);
       if(vwapPts.length){
-        const vwap=chart.addLineSeries({color:'#ffd700',lineWidth:1,title:'VWAP',priceLineVisible:false});
-        vwap.setData(vwapPts);
+        const vl=chart.addLineSeries({color:'#ffd700',lineWidth:1,title:'VWAP',priceLineVisible:false});
+        vl.setData(vwapPts);
       }
-
       chart.timeScale().fitContent();
       badge.textContent=ticker+' · '+tf+' · '+bars.length+' bars';
       badge.style.color='#00c853';
-
-      // Auto-resize chart when window resizes
-      const ro=new ResizeObserver(()=>{
-        if(chartInstances[idx])
-          chartInstances[idx].resize(body.offsetWidth,body.offsetHeight);
-      });
-      ro.observe(body);
-
+      new ResizeObserver(()=>{if(chartInstances[idx])chartInstances[idx].resize(body.clientWidth,body.clientHeight);}).observe(body);
     }catch(err){
       body.innerHTML='<div class="chart-placeholder"><span style="color:#ff4444">Error: '+err.message+'</span></div>';
     }

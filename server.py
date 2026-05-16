@@ -27,6 +27,15 @@ EMAIL_ADDRESS      = os.getenv('EMAIL_ADDRESS', '')
 EMAIL_PASSWORD     = os.getenv('EMAIL_PASSWORD', '')
 EMAIL_TO           = os.getenv('EMAIL_TO', '')
 
+# Tradier — production real-time data + paper trading sandbox
+TRADIER_TOKEN         = os.getenv('TRADIER_TOKEN',        'TJuXpKVavQJ6ad8GMiot6JWISGQG')
+TRADIER_SANDBOX_TOKEN = os.getenv('TRADIER_SANDBOX_TOKEN','uz4ojbfLroPKXmSrJOA1NffOXkiA')
+TRADIER_SANDBOX_ACCT  = os.getenv('TRADIER_SANDBOX_ACCT', 'VA47327054')
+TRADIER_API_URL       = 'https://api.tradier.com/v1'
+TRADIER_SANDBOX_URL   = 'https://sandbox.tradier.com/v1'
+TRADIER_HEADERS       = {'Authorization': f'Bearer {TRADIER_TOKEN}',        'Accept': 'application/json'}
+TRADIER_SANDBOX_HDR   = {'Authorization': f'Bearer {TRADIER_SANDBOX_TOKEN}','Accept': 'application/json'}
+
 ALPACA_HEADERS = {
     'APCA-API-KEY-ID':     ALPACA_API_KEY,
     'APCA-API-SECRET-KEY': ALPACA_SECRET_KEY,
@@ -66,12 +75,6 @@ SCAN_MODES = {
         'label':'💡 ScanOpp', 'desc':'Price $0.50–$15, Gap 9%+, $Vol $3M+, Trades 3K+',
         'min_price':0.50,'max_price':15.00,'min_gap':9.0,'min_dvol':3_000_000,
         'min_volume':300_000,'min_rvol':0,'max_float_m':0,'max_mktcap_m':0,'require_news':False,
-    },
-    'afterhrs': {
-        'label':'🌆 AfterHrs', 'desc':'Under $50, within 10% of VWAP — coiled for a spike',
-        'min_price':0.10,'max_price':50.00,'min_gap':0.0,'min_dvol':100_000,
-        'min_volume':10_000,'min_rvol':0,'max_float_m':0,'max_mktcap_m':0,'require_news':False,
-        'vwap_proximity_pct': 10.0,  # within 10% above or below VWAP
     },
     'standard': {
         'label':'🔍 Standard', 'desc':'Gap 10%+, $0.20–$20, $100K vol, RVOL 1.5x+',
@@ -189,7 +192,7 @@ def alpaca_get_quote(ticker):
         t_r   = requests.get(t_url, headers=ALPACA_HEADERS, timeout=6)
 
         # Latest bar (open/high/low/close/volume)
-        b_url = f"{ALPACA_DATA_URL}/stocks/{ticker}/bars/latest?timeframe=1Day&feed=sip"
+        b_url = f"{ALPACA_DATA_URL}/stocks/{ticker}/bars/latest?timeframe=1Day"
         b_r   = requests.get(b_url, headers=ALPACA_HEADERS, timeout=6)
 
         result = {}
@@ -400,16 +403,15 @@ async def set_scan_mode(user_id: str, mode: str):
     m = SCAN_MODES[mode]
     user_state[user_id]['mode'] = mode
     user_state[user_id]['filters'] = {
-        'min_price':          m['min_price'],
-        'max_price':          m['max_price'],
-        'min_gap_pct':        m['min_gap'],
-        'min_dollar_vol':     m['min_dvol'],
-        'min_volume':         m['min_volume'],
-        'min_rvol':           m['min_rvol'],
-        'max_float_m':        m['max_float_m'],
-        'max_market_cap_m':   m['max_mktcap_m'],
-        'require_news':       m['require_news'],
-        'vwap_proximity_pct': m.get('vwap_proximity_pct', 0),
+        'min_price':        m['min_price'],
+        'max_price':        m['max_price'],
+        'min_gap_pct':      m['min_gap'],
+        'min_dollar_vol':   m['min_dvol'],
+        'min_volume':       m['min_volume'],
+        'min_rvol':         m['min_rvol'],
+        'max_float_m':      m['max_float_m'],
+        'max_market_cap_m': m['max_mktcap_m'],
+        'require_news':     m['require_news'],
     }
     log_alert(f"🔄 [{user_id}] Mode: {m['label']}")
     return {'status':'ok','mode':mode,'filters':user_state[user_id]['filters']}
@@ -505,63 +507,130 @@ async def get_stock_snapshot(ticker: str):
     snap = alpaca_get_snapshot(ticker)
     return snap if snap else {'error': 'Snapshot unavailable'}
 
-@app.get("/api/stock/bars/{ticker}")
-async def get_stock_bars(ticker: str, timeframe: str = "1Min", days: int = 1):
-    """
-    Returns OHLCV bars including PRE and POST market data.
-    Fetches from 4:00am today through 8:00pm — full extended hours.
-    Used by the dashboard chart to show real premarket candles.
-    """
-    try:
-        ticker = ticker.upper().strip()
-        now    = datetime.now()
-
-        # Start from 4am today (premarket open), end at 8pm (afterhours close)
-        start  = now.replace(hour=4, minute=0, second=0, microsecond=0)
-        end    = now.replace(hour=20, minute=0, second=0, microsecond=0)
-
-        # If before 4am, go back to yesterday's session
-        if now.hour < 4:
-            start = (now - timedelta(days=1)).replace(hour=4, minute=0, second=0, microsecond=0)
-            end   = (now - timedelta(days=1)).replace(hour=20, minute=0, second=0, microsecond=0)
-
-        start_str = start.strftime('%Y-%m-%dT%H:%M:%SZ')
-        end_str   = end.strftime('%Y-%m-%dT%H:%M:%SZ')
-
-        # Alpaca bars endpoint — feed=sip gives full extended hours data
-        url = (f"{ALPACA_DATA_URL}/stocks/{ticker}/bars"
-               f"?timeframe={timeframe}&start={start_str}&end={end_str}"
-               f"&feed=sip&limit=1000")
-
-        r = requests.get(url, headers=ALPACA_HEADERS, timeout=10)
-
-        if r.status_code == 200:
-            raw_bars = r.json().get('bars', [])
-            # Format for frontend charting (TradingView lightweight charts format)
-            bars = []
-            for b in raw_bars:
-                bars.append({
-                    'time':   b.get('t', ''),
-                    'open':   round(b.get('o', 0), 4),
-                    'high':   round(b.get('h', 0), 4),
-                    'low':    round(b.get('l', 0), 4),
-                    'close':  round(b.get('c', 0), 4),
-                    'volume': b.get('v', 0),
-                    'vwap':   round(b.get('vw', 0), 4),
-                })
-            log_alert(f"📊 Chart bars [{ticker}]: {len(bars)} candles ({timeframe}, extended hrs)")
-            return {'ticker': ticker, 'timeframe': timeframe, 'bars': bars,
-                    'start': start_str, 'end': end_str, 'count': len(bars)}
-        else:
-            log_alert(f"⚠️ Bars error [{ticker}]: HTTP {r.status_code}")
-            return {'error': f'Alpaca bars HTTP {r.status_code}', 'bars': []}
-
-    except Exception as e:
-        log_alert(f"⚠️ Bars exception [{ticker}]: {e}")
-        return {'error': str(e), 'bars': []}
-
 @app.get("/api/stock/profile/{ticker}")
 async def get_stock_profile(ticker: str):
+    try:
+        r = requests.get(
+            "https://finnhub.io/api/v1/stock/profile2",
+            params={'symbol': ticker, 'token': FINNHUB_KEY},
+            timeout=8
+        )
+        return r.json() if r.status_code == 200 else {'error': f'Status {r.status_code}'}
+    except Exception as e:
+        return {'error': str(e)}
+
+# ── Original profile endpoint ──
+# PAPER TRADING — Tradier Sandbox (VA47327054)
+# 15-min delayed data, $100K virtual funds
+# ══════════════════════════════════════════════════════════
+
+@app.get("/api/paper/account")
+async def paper_account():
+    """Get paper trading account balance and positions"""
+    try:
+        r = requests.get(f"{TRADIER_SANDBOX_URL}/accounts/{TRADIER_SANDBOX_ACCT}/balances",
+                         headers=TRADIER_SANDBOX_HDR, timeout=8)
+        if r.status_code == 200:
+            return r.json()
+        return {'error': f'Tradier sandbox HTTP {r.status_code}'}
+    except Exception as e:
+        return {'error': str(e)}
+
+@app.get("/api/paper/positions")
+async def paper_positions():
+    """Get open paper trading positions"""
+    try:
+        r = requests.get(f"{TRADIER_SANDBOX_URL}/accounts/{TRADIER_SANDBOX_ACCT}/positions",
+                         headers=TRADIER_SANDBOX_HDR, timeout=8)
+        if r.status_code == 200:
+            return r.json()
+        return {'error': f'HTTP {r.status_code}'}
+    except Exception as e:
+        return {'error': str(e)}
+
+@app.get("/api/paper/orders")
+async def paper_orders():
+    """Get paper trading order history"""
+    try:
+        r = requests.get(f"{TRADIER_SANDBOX_URL}/accounts/{TRADIER_SANDBOX_ACCT}/orders",
+                         headers=TRADIER_SANDBOX_HDR, timeout=8)
+        if r.status_code == 200:
+            return r.json()
+        return {'error': f'HTTP {r.status_code}'}
+    except Exception as e:
+        return {'error': str(e)}
+
+class PaperOrderRequest(BaseModel):
+    ticker:   str
+    side:     str   # 'buy' or 'sell'
+    qty:      float
+    order_type: str = 'market'   # 'market' or 'limit'
+    limit_price: float = 0.0
+    duration:   str = 'day'
+
+@app.post("/api/paper/order")
+async def paper_order(req: PaperOrderRequest):
+    """Place a paper trade on Tradier sandbox"""
+    try:
+        ticker = req.ticker.upper().strip()
+        if not ticker:
+            return {'error': 'Ticker required'}
+        if req.side not in ('buy','sell'):
+            return {'error': 'Side must be buy or sell'}
+        if req.qty <= 0:
+            return {'error': 'Quantity must be positive'}
+
+        payload = {
+            'class':    'equity',
+            'symbol':   ticker,
+            'side':     req.side,
+            'quantity': str(int(req.qty)),
+            'type':     req.order_type,
+            'duration': req.duration,
+        }
+        if req.order_type == 'limit' and req.limit_price > 0:
+            payload['price'] = str(req.limit_price)
+
+        r = requests.post(
+            f"{TRADIER_SANDBOX_URL}/accounts/{TRADIER_SANDBOX_ACCT}/orders",
+            headers={**TRADIER_SANDBOX_HDR, 'Content-Type':'application/x-www-form-urlencoded'},
+            data=payload, timeout=10
+        )
+        log_alert(f"📝 Paper {req.side.upper()} {int(req.qty)}x {ticker} — HTTP {r.status_code}")
+        return r.json() if r.status_code in (200,201) else {'error': f'HTTP {r.status_code}: {r.text[:200]}'}
+    except Exception as e:
+        return {'error': str(e)}
+
+@app.get("/api/paper/quote/{ticker}")
+async def paper_quote(ticker: str):
+    """Get real-time Tradier quote (production key = real-time)"""
+    try:
+        r = requests.get(f"{TRADIER_API_URL}/markets/quotes",
+                         headers=TRADIER_HEADERS,
+                         params={'symbols': ticker.upper(), 'greeks': 'false'},
+                         timeout=8)
+        if r.status_code == 200:
+            return r.json()
+        return {'error': f'HTTP {r.status_code}'}
+    except Exception as e:
+        return {'error': str(e)}
+
+@app.get("/api/paper/history/{ticker}")
+async def paper_history(ticker: str, interval: str = '5min'):
+    """Get Tradier historical bars for paper trading chart"""
+    try:
+        r = requests.get(f"{TRADIER_API_URL}/markets/timesales",
+                         headers=TRADIER_HEADERS,
+                         params={'symbol': ticker.upper(), 'interval': interval,
+                                 'session_filter': 'all'},
+                         timeout=10)
+        if r.status_code == 200:
+            return r.json()
+        return {'error': f'HTTP {r.status_code}'}
+    except Exception as e:
+        return {'error': str(e)}
+
+# ── Original profile endpoint ──
     try:
         r = requests.get(
             "https://finnhub.io/api/v1/stock/profile2",
@@ -1180,13 +1249,6 @@ def process_ticker(stock_data, mode='morning_gap', filters=None):
         if dollar_vol < filters.get('min_dollar_vol', 0): return None
         if volume < filters.get('min_volume', 0):    return None
         if rvol < filters.get('min_rvol', 0):         return None
-
-        # AfterHrs — VWAP proximity filter (within X% above or below VWAP)
-        vwap_prox = filters.get('vwap_proximity_pct', 0)
-        if vwap_prox > 0 and vwap > 0:
-            pct_from_vwap = abs((price - vwap) / vwap) * 100
-            if pct_from_vwap > vwap_prox:
-                return None  # too far from VWAP, skip
 
         grade, notes             = grade_setup(gap_pct, dollar_vol, rvol)
         strength, news_count, headlines, warning = check_catalyst(ticker)
