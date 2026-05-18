@@ -550,7 +550,7 @@
 
       <div class="chart-container">
         <div class="popup-section-title" style="margin-bottom:7px">
-          📉 Live Chart <span class="chart-label">TradingView — Pre/After Market</span>
+          📉 Live Chart <span class="chart-label">Tradier — Pre/After Market</span>
         </div>
         <div id="popupChartContainer"></div>
       </div>
@@ -696,7 +696,7 @@
       <div class="results-header">
         <span class="results-title">
           📊 Live Results
-          <span class="data-badge">⚡ Massive.com</span>
+          <span class="data-badge" id="dataBadge">⚡ Tradier · Alpaca · Polygon</span>
           <span class="mode-badge" id="activeModeLabel">Select a scan to start</span>
         </span>
         <span class="last-scan" id="lastScan">Waiting...</span>
@@ -979,7 +979,7 @@
     {t:'info', txt:'> Initializing trading engine...'},
     {t:'',     txt:'> Loading market data feeds...              [OK]'},
     {t:'',     txt:'> Connecting to Alpaca API...               [OK]'},
-    {t:'',     txt:'> Connecting to Polygon data...             [OK]'},
+    {t:'',     txt:'> Connecting to Tradier live data...        [OK]'},
     {t:'',     txt:'> Connecting to Tradier production...       [OK]'},
     {t:'',     txt:'> Connecting to Finnhub news feed...        [OK]'},
     {t:'warn', txt:'> Checking PDT rules...       [$25K limit active]'},
@@ -1841,7 +1841,7 @@
     document.getElementById('newsTitle').textContent='📰 Latest News (past 5 days)';
     document.getElementById('secSection').style.display='none';
 
-    buildTradingViewChart(setup.ticker);
+    buildPopupChart(setup.ticker);
     fetchQuote(setup.ticker);fetchStats(setup.ticker);fetchNews(setup.ticker);fetchSecFilings(setup.ticker);
     if(quoteTimer)clearInterval(quoteTimer);
     quoteTimer=setInterval(()=>fetchQuote(setup.ticker),5000);
@@ -1859,7 +1859,7 @@
     return 2000;
   }
 
-  function buildTradingViewChart(ticker){
+  function buildPopupChart(ticker){
     popupCurrentTicker = ticker;
     popupCurrentTf     = '5Min';
     const container = document.getElementById('popupChartContainer');
