@@ -293,7 +293,7 @@ def alpaca_get_snapshot(ticker):
     """
     try:
         url = f"{ALPACA_DATA_URL}/stocks/{ticker}/snapshot"
-        r   = requests.get(url, headers=ALPACA_HEADERS, timeout=8)
+        r   = requests.get(url, headers=ALPACA_HEADERS, timeout=2.5)
         if r.status_code == 200:
             d             = r.json()
             daily_bar     = d.get('dailyBar', {})
@@ -380,7 +380,7 @@ def get_company_info(ticker):
         r = requests.get(
             "https://finnhub.io/api/v1/stock/profile2",
             params={'symbol': ticker, 'token': FINNHUB_KEY},
-            timeout=6
+            timeout=2.5
         )
         if r.status_code == 200:
             d = r.json()
@@ -603,7 +603,7 @@ async def get_stock_quote(ticker: str):
         r = requests.get(
             "https://finnhub.io/api/v1/quote",
             params={'symbol': ticker, 'token': FINNHUB_KEY},
-            timeout=8
+            timeout=4
         )
         if r.status_code == 200:
             d = r.json(); d['source'] = 'finnhub'; return d
@@ -779,7 +779,7 @@ async def get_stock_bars(ticker: str, timeframe: str = "5Min", days: int = 1, st
             f"{TRADIER_API_URL}/markets/timesales",
             headers=TRADIER_HEADERS,
             params=params,
-            timeout=10
+            timeout=4
         )
         log_alert(f"📊 Tradier bars [{ticker}] HTTP {r.status_code}")
 
@@ -1444,16 +1444,9 @@ def check_catalyst(ticker):
         r = requests.get(
             'https://finnhub.io/api/v1/company-news',
             params={'symbol': ticker, 'from': from_date, 'to': to_date, 'token': FINNHUB_KEY},
-            timeout=8
+            timeout=2.5
         )
         news_items = r.json()[:15] if r.status_code == 200 else []
-        if not news_items:
-            yf_news = yf.Ticker(ticker).news or []
-            cutoff  = datetime.now() - timedelta(days=5)
-            for n in yf_news[:10]:
-                pub = n.get('providerPublishTime', 0)
-                if pub and datetime.fromtimestamp(pub) >= cutoff:
-                    news_items.append({'headline': n.get('title', '')})
 
         news_count  = len(news_items)
         headlines   = []
@@ -1527,7 +1520,7 @@ def get_dynamic_universe():
             f"{ALPACA_DATA_URL}/stocks/most_actives",
             headers=ALPACA_HEADERS,
             params={'by': 'volume', 'top': 100},
-            timeout=10
+            timeout=4
         )
         if r.status_code == 200:
             before = len(tickers)
@@ -1549,7 +1542,7 @@ def get_dynamic_universe():
             f"{ALPACA_DATA_URL}/stocks/most_actives",
             headers=ALPACA_HEADERS,
             params={'by': 'trades', 'top': 100},
-            timeout=10
+            timeout=4
         )
         if r.status_code == 200:
             before = len(tickers)
@@ -1570,7 +1563,7 @@ def get_dynamic_universe():
         r = requests.get(
             f"https://api.polygon.io/v2/snapshot/locale/us/markets/stocks/gainers"
             f"?apiKey={POLYGON_API_KEY}&include_otc=false",
-            timeout=10
+            timeout=4
         )
         if r.status_code == 200:
             before = len(tickers)
@@ -1591,7 +1584,7 @@ def get_dynamic_universe():
         r = requests.get(
             "https://query1.finance.yahoo.com/v1/finance/screener/predefined/saved"
             "?formatted=false&scrIds=day_gainers,small_cap_gainers&count=100",
-            headers={'User-Agent': 'Mozilla/5.0'}, timeout=10
+            headers={'User-Agent': 'Mozilla/5.0'}, timeout=4
         )
         if r.status_code == 200:
             before = len(tickers)
@@ -1630,7 +1623,7 @@ def get_tradier_quotes(symbols, user_id='shafkat'):
                 f"{TRADIER_API_URL}/markets/quotes",
                 headers=hdrs,
                 params={'symbols': ','.join(chunk), 'greeks': 'false'},
-                timeout=15
+                timeout=7
             )
             if r.status_code == 200:
                 quotes = r.json().get('quotes', {}).get('quote', [])
@@ -1805,7 +1798,7 @@ def get_polygon_gainers(filters):
         r = requests.get(
             f"https://api.polygon.io/v2/snapshot/locale/us/markets/stocks/gainers"
             f"?apiKey={POLYGON_API_KEY}&include_otc=false",
-            timeout=15
+            timeout=5
         )
         candidates = []
         if r.status_code == 200:
@@ -1856,7 +1849,7 @@ def get_yahoo_gainers(filters):
             r = requests.get(
                 f"https://query1.finance.yahoo.com/v1/finance/screener/predefined/saved"
                 f"?formatted=false&scrIds={scrId}&count=50",
-                headers=headers, timeout=10
+                headers=headers, timeout=5
             )
             if r.status_code != 200: continue
             quotes = r.json().get('finance', {}).get('result', [{}])[0].get('quotes', [])
@@ -1900,6 +1893,7 @@ def process_ticker(stock_data, mode='morning_gap', filters=None):
     try:
         ticker     = stock_data['ticker']
         filters    = filters or {}
+        fast_scan  = mode in {'morning_gap', 'scanopp', 'afterhrs'}
 
         # Try Alpaca snapshot first for enriched data
         snap = alpaca_get_snapshot(ticker)
@@ -1975,7 +1969,7 @@ def process_ticker(stock_data, mode='morning_gap', filters=None):
         # Float check
         float_m   = 0.0
         max_float = filters.get('max_float_m', 0)
-        if max_float > 0:
+        if max_float > 0 and not fast_scan:
             try:
                 yf_info      = yf.Ticker(ticker).info
                 float_shares = yf_info.get('floatShares', 0)
@@ -1986,11 +1980,13 @@ def process_ticker(stock_data, mode='morning_gap', filters=None):
                 pass
 
         # Historical closes for pattern
-        try:
-            hist   = yf.Ticker(ticker).history(period="10d", interval="1d")
-            closes = hist['Close'].values.tolist() if not hist.empty else []
-        except:
-            closes = []
+        closes = []
+        if not fast_scan:
+            try:
+                hist   = yf.Ticker(ticker).history(period="10d", interval="1d")
+                closes = hist['Close'].values.tolist() if not hist.empty else []
+            except:
+                closes = []
 
         halt_info                               = get_halt_info(ticker)
         pattern, pattern_desc, pattern_criteria  = detect_sykes_pattern(
@@ -2122,6 +2118,46 @@ async def do_scan(user_id, scan_id=None):
             candidates = yahoo
             scan_source = 'yahoo'
 
+    if not candidates and mode in {'morning_gap', 'scanopp'}:
+        relaxed = filters.copy()
+        relaxed['min_gap_pct'] = min(relaxed.get('min_gap_pct', 0), 5.0)
+        relaxed['min_dollar_vol'] = min(relaxed.get('min_dollar_vol', 0), 250_000)
+        relaxed['min_volume'] = min(relaxed.get('min_volume', 0), 50_000)
+        relaxed['max_float_m'] = 0
+        if mode == 'scanopp':
+            relaxed['max_price'] = max(relaxed.get('max_price', 15.0), 50.0)
+
+        log_alert(f"🔁 [{user_id}] {mode} strict filters returned 0 — trying relaxed opportunity filters")
+        relaxed_candidates = []
+        if universe and 'quote_map' in locals() and quote_map:
+            for sym, q in quote_map.items():
+                try:
+                    price      = float(q.get('last') or q.get('bid') or 0)
+                    prev_close = float(q.get('prevclose') or 0)
+                    volume     = float(q.get('volume') or 0)
+                    avg_vol    = float(q.get('average_volume') or 1) or 1
+                    if price <= 0 or prev_close <= 0: continue
+                    pct        = ((price - prev_close) / prev_close) * 100
+                    dollar_vol = price * volume
+                    rvol       = round(volume / avg_vol, 1)
+                    if not (relaxed['min_price'] <= price <= relaxed['max_price']): continue
+                    if pct < relaxed['min_gap_pct']: continue
+                    if dollar_vol < relaxed['min_dollar_vol']: continue
+                    if volume < relaxed.get('min_volume', 0): continue
+                    relaxed_candidates.append({'ticker':sym,'price':price,'prev_close':prev_close,
+                        'gap_pct':round(pct,1),'volume':volume,'dollar_vol':dollar_vol,
+                        'rvol':rvol,'source':'tradier-relaxed'})
+                except:
+                    continue
+        if not relaxed_candidates:
+            relaxed_candidates = get_polygon_gainers(relaxed)
+        if not relaxed_candidates:
+            relaxed_candidates = get_yahoo_gainers(relaxed)
+        if relaxed_candidates:
+            filters = relaxed
+            candidates = relaxed_candidates
+            scan_source = f'{scan_source}+relaxed' if scan_source != 'none' else 'relaxed'
+
     if scan_id is not None and scan_id != s.get('scan_id'):
         return [], {'phase':'done','message':'Scan superseded by a newer request','progress':0,'total':0}
 
@@ -2134,6 +2170,12 @@ async def do_scan(user_id, scan_id=None):
         done_status = {'phase':'done','message':f'⚠️ {msg}','progress':0,'total':0}
         return [], done_status
 
+    candidate_limit = 25 if mode == 'afterhrs' else 35
+    candidates.sort(key=lambda x: (x.get('gap_pct', 0), x.get('dollar_vol', 0)), reverse=True)
+    if len(candidates) > candidate_limit:
+        log_alert(f"⚡ [{user_id}] Limiting {len(candidates)} candidates to top {candidate_limit} for faster results")
+        candidates = candidates[:candidate_limit]
+
     total = len(candidates)
     log_alert(f"📊 [{user_id}] {total} candidates from {scan_source}")
 
@@ -2144,15 +2186,26 @@ async def do_scan(user_id, scan_id=None):
     results = []
     count   = 0
 
-    for stock_data in candidates:
-        if not s['running'] or (scan_id is not None and scan_id != s.get('scan_id')): break
-        count  += 1
-        ticker  = stock_data.get('ticker', '')
-        status  = {'phase':'analyzing','message':f'Checking {ticker} ({count}/{total})...','progress':count,'total':total}
-        await broadcast_to_user(user_id, {'type':'scan_status','status':status})
-        await asyncio.sleep(0.05)
+    enrich_limit = 8 if mode in {'afterhrs', 'scanopp', 'morning_gap'} else 4
+    sem = asyncio.Semaphore(enrich_limit)
 
-        setup = process_ticker(stock_data, mode, filters)
+    async def enrich_candidate(stock_data):
+        async with sem:
+            if not s['running'] or (scan_id is not None and scan_id != s.get('scan_id')):
+                return stock_data.get('ticker', ''), None
+            setup = await asyncio.to_thread(process_ticker, stock_data, mode, filters)
+            return stock_data.get('ticker', ''), setup
+
+    tasks = [asyncio.create_task(enrich_candidate(stock_data)) for stock_data in candidates]
+    for task in asyncio.as_completed(tasks):
+        if not s['running'] or (scan_id is not None and scan_id != s.get('scan_id')):
+            for pending in tasks:
+                pending.cancel()
+            break
+        ticker, setup = await task
+        count += 1
+        status = {'phase':'analyzing','message':f'Checking {ticker} ({count}/{total})...','progress':count,'total':total}
+        await broadcast_to_user(user_id, {'type':'scan_status','status':status})
         if setup:
             results.append(setup)
             await broadcast_to_user(user_id, {'type':'new_ticker','setup':setup})
