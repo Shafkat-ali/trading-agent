@@ -2064,7 +2064,7 @@ def process_ticker(stock_data, mode='morning_gap', filters=None):
         fast_scan  = mode in {'morning_gap', 'scanopp', 'afterhrs'}
 
         # Try Alpaca snapshot first for enriched data
-        snap = None if mode == 'scanopp' else alpaca_get_snapshot(ticker)
+        snap = None if mode in {'morning_gap', 'scanopp'} else alpaca_get_snapshot(ticker)
 
         if snap and snap.get('price', 0) > 0:
             price      = snap['price']
@@ -2312,7 +2312,9 @@ async def do_scan(user_id, scan_id=None):
                 scan_source = f'{scan_source}+tradier-lookup'
             log_alert(f"🔍 [{user_id}] Tradier lookup filter: {len(lookup_quotes)} quoted → {len(candidates)-before} added | error: {lookup_error or 'none'}")
 
-    if mode == 'scanopp' and len(candidates) < 20:
+    listed_expansion_targets = {'morning_gap': 100, 'scanopp': 20}
+    listed_expansion_target = listed_expansion_targets.get(mode, 0)
+    if listed_expansion_target and len(candidates) < listed_expansion_target:
         listed_universe = get_listed_symbol_universe()
         known_symbols = {c.get('ticker') for c in candidates if c.get('ticker')}
         existing_universe = set(universe or [])
@@ -2321,11 +2323,11 @@ async def do_scan(user_id, scan_id=None):
             if sym not in known_symbols and sym not in existing_universe
         ]
         if extra_symbols:
-            status['message'] = f'Expanding ScanOpp with {len(extra_symbols)} listed symbols via Tradier...'
+            status['message'] = f'Expanding {label} with {len(extra_symbols)} listed symbols via Tradier...'
             await broadcast_to_user(user_id, {'type':'scan_status','status':status})
             await asyncio.sleep(0)
             listed_quotes, listed_error = get_tradier_quotes_parallel(extra_symbols, user_id)
-            listed_candidates = filter_tradier_quote_map(listed_quotes, filters, 'tradier-listed')
+            listed_candidates = filter_tradier_quote_map(listed_quotes, filters, f'{mode}-tradier-listed')
             if listed_candidates:
                 by_symbol = {c.get('ticker'): c for c in candidates if c.get('ticker')}
                 for c in listed_candidates:
@@ -2336,8 +2338,8 @@ async def do_scan(user_id, scan_id=None):
                 candidates = list(by_symbol.values())
                 candidates.sort(key=lambda x: x.get('gap_pct', 0), reverse=True)
                 if len(candidates) > before:
-                    scan_source = f'{scan_source}+tradier-listed'
-            log_alert(f"[{user_id}] Tradier listed filter: {len(listed_quotes)} quoted -> {len(listed_candidates)} passed | error: {listed_error or 'none'}")
+                    scan_source = f'{scan_source}+{mode}-tradier-listed'
+            log_alert(f"[{user_id}] {mode} Tradier listed filter: {len(listed_quotes)} quoted -> {len(listed_candidates)} passed | error: {listed_error or 'none'}")
 
     # Fallback: Polygon
     if not candidates:
@@ -2435,7 +2437,12 @@ async def do_scan(user_id, scan_id=None):
         done_status = {'phase':'done','message':f'⚠️ {msg}','progress':0,'total':0}
         return [], done_status
 
-    candidate_limit = 25 if mode == 'afterhrs' else 35
+    if mode == 'afterhrs':
+        candidate_limit = 25
+    elif mode == 'morning_gap':
+        candidate_limit = 125
+    else:
+        candidate_limit = 35
     candidates.sort(key=lambda x: (x.get('gap_pct', 0), x.get('dollar_vol', 0)), reverse=True)
     if len(candidates) > candidate_limit:
         log_alert(f"⚡ [{user_id}] Limiting {len(candidates)} candidates to top {candidate_limit} for faster results")
