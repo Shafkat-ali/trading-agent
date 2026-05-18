@@ -819,12 +819,12 @@ async def paper_orders():
         return {'error': str(e)}
 
 @app.delete("/api/paper/order/{order_id}")
-async def cancel_paper_order(order_id: str):
+async def cancel_paper_order(order_id: str, user: str = 'shafkat'):
     """Cancel a pending paper trading order"""
     try:
         r = requests.delete(
-            f"{TRADIER_SANDBOX_URL}/accounts/{get_tradier_sandbox_acct(req.user_id if hasattr(req,'user_id') else 'shafkat')}/orders/{order_id}",
-            headers=get_tradier_sandbox_headers('shafkat'), timeout=8
+            f"{TRADIER_SANDBOX_URL}/accounts/{get_tradier_sandbox_acct(user)}/orders/{order_id}",
+            headers=get_tradier_sandbox_headers(user), timeout=8
         )
         log_alert(f"🗑 Cancel order {order_id} — HTTP {r.status_code}")
         if r.status_code == 200:
@@ -894,7 +894,7 @@ async def paper_order(req: PaperOrderRequest):
             payload['stop'] = str(req.limit_price)
 
         r = requests.post(
-            f"{TRADIER_SANDBOX_URL}/accounts/{get_tradier_sandbox_acct(req.user_id)}/orders",
+            f"{TRADIER_SANDBOX_URL}/accounts/{get_tradier_sandbox_acct(req.user_id if req.user_id else 'shafkat')}/orders",
             headers={**get_tradier_sandbox_headers(req.user_id), 'Content-Type':'application/x-www-form-urlencoded'},
             data=payload, timeout=10
         )
