@@ -607,8 +607,10 @@ async def get_stock_quote(ticker: str, user: str = "shafkat"):
                 # After-hours: Tradier returns last trade even after 4pm
                 # Check if we're outside regular hours
                 from datetime import datetime
-                import pytz
-                now_et = datetime.now(pytz.timezone('America/New_York'))
+                from datetime import timezone, timedelta
+                # EST = UTC-5, EDT = UTC-4 (use UTC-4 for DST period May-Nov)
+                ET = timezone(timedelta(hours=-4))
+                now_et = datetime.now(ET)
                 h = now_et.hour
                 is_extended = (h < 9 or (h == 9 and now_et.minute < 30) or h >= 16)
 
