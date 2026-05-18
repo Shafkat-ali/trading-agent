@@ -35,14 +35,36 @@ USER_PASSWORDS = {
     'irfan':   os.getenv('IRFAN_PW_HASH',   '6f596603a921a50a83c118911b9774b95a5fb081600b14429a34f3e66ee84176'),
 }
 
-# Tradier — production real-time data + paper trading sandbox
+# Tradier — Shafkat's keys (production real-time + sandbox paper trading)
 TRADIER_TOKEN         = os.getenv('TRADIER_TOKEN',        'TJuXpKVavQJ6ad8GMiot6JWISGQG')
 TRADIER_SANDBOX_TOKEN = os.getenv('TRADIER_SANDBOX_TOKEN','uz4ojbfLroPKXmSrJOA1NffOXkiA')
 TRADIER_SANDBOX_ACCT  = os.getenv('TRADIER_SANDBOX_ACCT', 'VA47327054')
-TRADIER_API_URL       = 'https://api.tradier.com/v1'
-TRADIER_SANDBOX_URL   = 'https://sandbox.tradier.com/v1'
-TRADIER_HEADERS       = {'Authorization': f'Bearer {TRADIER_TOKEN}',        'Accept': 'application/json'}
-TRADIER_SANDBOX_HDR   = {'Authorization': f'Bearer {TRADIER_SANDBOX_TOKEN}','Accept': 'application/json'}
+
+# Tradier — Irfan's keys (separate account = separate rate limits)
+TRADIER_TOKEN_IRFAN         = os.getenv('TRADIER_TOKEN_IRFAN',        'lpiaEmzUA8B7sMuqwf5vUS0Ivp8T')
+TRADIER_SANDBOX_TOKEN_IRFAN = os.getenv('TRADIER_SANDBOX_TOKEN_IRFAN','AGAdfEQ5MLiAfAUNZvPg6lbuOG1q')
+TRADIER_SANDBOX_ACCT_IRFAN  = os.getenv('TRADIER_SANDBOX_ACCT_IRFAN', 'VA42488972')
+
+TRADIER_API_URL     = 'https://api.tradier.com/v1'
+TRADIER_SANDBOX_URL = 'https://sandbox.tradier.com/v1'
+
+# Headers per user — each gets their own Tradier account
+TRADIER_HEADERS       = {'Authorization': f'Bearer {TRADIER_TOKEN}',              'Accept': 'application/json'}
+TRADIER_SANDBOX_HDR   = {'Authorization': f'Bearer {TRADIER_SANDBOX_TOKEN}',       'Accept': 'application/json'}
+TRADIER_HEADERS_IRFAN     = {'Authorization': f'Bearer {TRADIER_TOKEN_IRFAN}',         'Accept': 'application/json'}
+TRADIER_SANDBOX_HDR_IRFAN = {'Authorization': f'Bearer {TRADIER_SANDBOX_TOKEN_IRFAN}', 'Accept': 'application/json'}
+
+def get_tradier_headers(user_id: str):
+    """Return the correct Tradier production headers for this user."""
+    return TRADIER_HEADERS_IRFAN if user_id == 'irfan' else TRADIER_HEADERS
+
+def get_tradier_sandbox_headers(user_id: str):
+    """Return the correct Tradier sandbox headers for this user."""
+    return TRADIER_SANDBOX_HDR_IRFAN if user_id == 'irfan' else TRADIER_SANDBOX_HDR
+
+def get_tradier_sandbox_acct(user_id: str):
+    """Return the correct Tradier sandbox account number for this user."""
+    return TRADIER_SANDBOX_ACCT_IRFAN if user_id == 'irfan' else TRADIER_SANDBOX_ACCT
 
 ALPACA_HEADERS = {
     'APCA-API-KEY-ID':     ALPACA_API_KEY,
@@ -516,7 +538,7 @@ async def get_stock_snapshot(ticker: str):
     return snap if snap else {'error': 'Snapshot unavailable'}
 
 @app.get("/api/stock/bars/{ticker}")
-async def get_stock_bars(ticker: str, timeframe: str = "5Min", days: int = 1, start: str = "", range: str = "1D"):
+async def get_stock_bars(ticker: str, timeframe: str = "5Min", days: int = 1, start: str = "", range: str = "1D", user: str = "shafkat"):
     """
     OHLCV bars — Tradier primary with full interval aggregation.
     Tradier native: 1min, 5min, 15min, 30min, daily
@@ -581,9 +603,9 @@ async def get_stock_bars(ticker: str, timeframe: str = "5Min", days: int = 1, st
         # Daily bars use /markets/history not /markets/timesales
         if tradier_interval == 'daily':
             params = {'symbol': ticker, 'start': start_str[:10], 'end': end_str[:10], 'interval': 'daily'}
-            r = requests.get(f"{TRADIER_API_URL}/markets/history", headers=TRADIER_HEADERS, params=params, timeout=12)
+            r = requests.get(f"{TRADIER_API_URL}/markets/history", headers=get_tradier_headers(user), params=params, timeout=12)
         else:
-            r = requests.get(f"{TRADIER_API_URL}/markets/timesales", headers=TRADIER_HEADERS, params=params, timeout=12)
+            r = requests.get(f"{TRADIER_API_URL}/markets/timesales", headers=get_tradier_headers(user), params=params, timeout=12)
 
         log_alert(f"📊 Tradier [{ticker}] {tradier_interval} agg={agg_n} HTTP {r.status_code}")
 
@@ -801,8 +823,8 @@ async def cancel_paper_order(order_id: str):
     """Cancel a pending paper trading order"""
     try:
         r = requests.delete(
-            f"{TRADIER_SANDBOX_URL}/accounts/{TRADIER_SANDBOX_ACCT}/orders/{order_id}",
-            headers=TRADIER_SANDBOX_HDR, timeout=8
+            f"{TRADIER_SANDBOX_URL}/accounts/{get_tradier_sandbox_acct(req.user_id if hasattr(req,'user_id') else 'shafkat')}/orders/{order_id}",
+            headers=get_tradier_sandbox_headers('shafkat'), timeout=8
         )
         log_alert(f"🗑 Cancel order {order_id} — HTTP {r.status_code}")
         if r.status_code == 200:
@@ -833,6 +855,7 @@ class PaperOrderRequest(BaseModel):
     order_type: str = 'market'   # 'market' or 'limit'
     limit_price: float = 0.0
     duration:   str = 'day'
+    user_id:  str = 'shafkat'
 
 @app.post("/api/paper/order")
 async def paper_order(req: PaperOrderRequest):
@@ -871,8 +894,8 @@ async def paper_order(req: PaperOrderRequest):
             payload['stop'] = str(req.limit_price)
 
         r = requests.post(
-            f"{TRADIER_SANDBOX_URL}/accounts/{TRADIER_SANDBOX_ACCT}/orders",
-            headers={**TRADIER_SANDBOX_HDR, 'Content-Type':'application/x-www-form-urlencoded'},
+            f"{TRADIER_SANDBOX_URL}/accounts/{get_tradier_sandbox_acct(req.user_id)}/orders",
+            headers={**get_tradier_sandbox_headers(req.user_id), 'Content-Type':'application/x-www-form-urlencoded'},
             data=payload, timeout=10
         )
 
@@ -1509,21 +1532,23 @@ def get_dynamic_universe():
     return list(tickers), errors
 
 
-def get_tradier_quotes(symbols):
+def get_tradier_quotes(symbols, user_id='shafkat'):
     """
-    Batch quote all symbols via Tradier production API.
+    Batch quote all symbols via the user's own Tradier production API.
     Returns (quote_map, error_msg).
     """
     results = {}
     if not symbols:
         return results, "No symbols to quote"
 
+    hdrs = get_tradier_headers(user_id)
+
     for i in range(0, len(symbols), 200):
         chunk = symbols[i:i+200]
         try:
             r = requests.get(
                 f"{TRADIER_API_URL}/markets/quotes",
-                headers=TRADIER_HEADERS,
+                headers=hdrs,
                 params={'symbols': ','.join(chunk), 'greeks': 'false'},
                 timeout=15
             )
@@ -1534,7 +1559,7 @@ def get_tradier_quotes(symbols):
                     sym = q.get('symbol', '')
                     if sym: results[sym] = q
             elif r.status_code == 403:
-                msg = f"Tradier quotes HTTP 403 — account may not be funded or API key invalid"
+                msg = f"Tradier quotes HTTP 403 — check API key for user '{user_id}'"
                 log_alert(f"⚠️ {msg}")
                 return results, msg
             else:
@@ -1546,11 +1571,11 @@ def get_tradier_quotes(symbols):
             log_alert(f"⚠️ {msg}")
             return results, msg
 
-    log_alert(f"📡 Tradier quotes: {len(results)}/{len(symbols)} returned")
+    log_alert(f"📡 Tradier quotes [{user_id}]: {len(results)}/{len(symbols)} returned")
     return results, None
 
 
-def get_tradier_movers(filters):
+def get_tradier_movers(filters, user_id='shafkat'):
     """
     Full dynamic scanner:
     1. Build universe from live sources
@@ -1567,7 +1592,7 @@ def get_tradier_movers(filters):
         return [], err
 
     # Step 2: Tradier quotes
-    quote_map, quote_error = get_tradier_quotes(universe)
+    quote_map, quote_error = get_tradier_quotes(universe, user_id)
 
     if not quote_map:
         err = quote_error or "Tradier returned 0 quotes"
@@ -1728,62 +1753,6 @@ def get_tradier_quotes(symbols):
 
     log_alert(f"📡 Tradier quotes: {len(results)} returned")
     return results
-
-
-def get_tradier_movers(filters):
-    """
-    Full Tradier-powered scanner:
-    1. Build dynamic universe from Alpaca/Polygon/Yahoo
-    2. Get real-time quotes from Tradier for all tickers
-    3. Filter by gap%, price, dollar volume
-    """
-    # Step 1: Get universe
-    universe = get_dynamic_universe()
-    if not universe:
-        log_alert("⚠️ Universe empty — no tickers to scan")
-        return []
-
-    # Step 2: Get Tradier real-time quotes
-    quote_map = get_tradier_quotes(universe)
-    if not quote_map:
-        log_alert("⚠️ Tradier returned no quotes — check API key/account funding")
-        return []
-
-    # Step 3: Filter
-    candidates = []
-    for sym, q in quote_map.items():
-        try:
-            # Use last trade price, fall back to bid
-            price      = float(q.get('last') or q.get('bid') or 0)
-            prev_close = float(q.get('prevclose') or 0)
-            volume     = float(q.get('volume') or 0)
-            avg_vol    = float(q.get('average_volume') or 1) or 1
-
-            if price <= 0 or prev_close <= 0: continue
-            pct        = ((price - prev_close) / prev_close) * 100
-            dollar_vol = price * volume
-            rvol       = round(volume / avg_vol, 1) if avg_vol > 0 else 0
-
-            if not (filters['min_price'] <= price <= filters['max_price']): continue
-            if pct < filters['min_gap_pct']:                                continue
-            if dollar_vol < filters['min_dollar_vol']:                      continue
-
-            candidates.append({
-                'ticker':     sym,
-                'price':      price,
-                'prev_close': prev_close,
-                'gap_pct':    round(pct, 1),
-                'volume':     volume,
-                'dollar_vol': dollar_vol,
-                'rvol':       rvol,
-                'source':     'tradier',
-            })
-        except Exception as e:
-            continue
-
-    candidates.sort(key=lambda x: x['gap_pct'], reverse=True)
-    log_alert(f"📊 Tradier scanner: {len(universe)} universe → {len(quote_map)} quoted → {len(candidates)} passed filters")
-    return candidates
 
 
 def get_polygon_gainers(filters):
@@ -2040,7 +2009,7 @@ async def do_scan(user_id):
     await asyncio.sleep(0)
 
     # Tradier primary (real-time), Polygon second, Yahoo fallback
-    candidates, scan_error = get_tradier_movers(filters)
+    candidates, scan_error = get_tradier_movers(filters, user_id)
 
     if scan_error and not candidates:
         # Show the error clearly on the frontend

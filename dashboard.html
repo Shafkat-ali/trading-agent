@@ -1942,7 +1942,7 @@
       const startDate = new Date(); startDate.setDate(startDate.getDate()-Math.ceil(days));
       startStr = startDate.toISOString().split('T')[0];
     }
-    const url = `${API_URL}/api/stock/bars/${ticker}?timeframe=${tf}&days=${Math.ceil(days)}&start=${startStr}`;
+    const url = `${API_URL}/api/stock/bars/${ticker}?user=${currentUser?.id||'shafkat'}&timeframe=${tf}&days=${Math.ceil(days)}&start=${startStr}`;
 
     // ── Wait for container to have real dimensions before first render ──
     // This fixes the blank chart on first popup open
