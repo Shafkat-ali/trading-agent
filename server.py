@@ -527,30 +527,14 @@ async def get_stock_bars(ticker: str, timeframe: str = "5Min", days: int = 1, st
 
     ticker = ticker.upper().strip()
 
-    # ── Aggregation map: what to fetch from Tradier → aggregate into target ──
-    AGGREGATE_MAP = {
-        '2Min':  {'base': '1min',  'n': 2},
-        '3Min':  {'base': '1min',  'n': 3},
-        '10Min': {'base': '5min',  'n': 2},   # 2x5=10
-        '30Min': {'base': '15min', 'n': 2},   # 2x15=30 (Tradier has 30min native too)
-        '1Hour': {'base': '15min', 'n': 4},   # 4x15=60
-        '2Hour': {'base': '15min', 'n': 8},   # 8x15=120
-        '4Hour': {'base': '15min', 'n': 16},  # 16x15=240
-    }
-
-    # ── Tradier native intervals ──
+    # ── Tradier native intervals ONLY ──
     NATIVE_MAP = {
-        '1Min': '1min', '1m': '1min',
-        '5Min': '5min', '5m': '5min',
-        '15Min': '15min', '15m': '15min',
-        '30Min': '30min', '30m': '30min',
-        '1Day': 'daily', '1D': 'daily',
+        '1Min': '1min', '5Min': '5min', '15Min': '15min', '1Day': 'daily',
+        '1m':   '1min', '5m':   '5min', '15m':   '15min', '1D':   'daily',
     }
-
-    needs_aggregation = timeframe in AGGREGATE_MAP
-    agg_cfg           = AGGREGATE_MAP.get(timeframe, {})
-    tradier_interval  = agg_cfg.get('base', NATIVE_MAP.get(timeframe, '5min'))
-    agg_n             = agg_cfg.get('n', 1)
+    tradier_interval  = NATIVE_MAP.get(timeframe, '5min')
+    needs_aggregation = False
+    agg_n             = 1
 
     # ── Date range ──
     now = datetime.now()

@@ -1876,8 +1876,8 @@
         <option value="1hr">1 hour</option>
         <option value="2hr">2 hours</option>
         <option value="4hr">4 hours</option>
-        <option value="1D" selected>1 day</option>
-        <option value="2D">2 days</option>
+        <option value="1D">1 day</option>
+        <option value="2D" selected>2 days</option>
         <option value="5D">5 days</option>
         <option value="10D">10 days</option>
         <option value="15D">15 days</option>
@@ -1895,10 +1895,10 @@
         <option value="20Y">20 years</option>
       </select>
       <select id="popupTf" style="background:#060a12;border:1px solid #2a3a5a;border-radius:4px;color:#a0b8d0;font-size:.6rem;padding:2px 4px;">
-        <option value="1Min">1m</option><option value="2Min">2m</option><option value="3Min">3m</option>
-        <option value="5Min" selected>5m</option><option value="10Min">10m</option>
-        <option value="15Min">15m</option><option value="30Min">30m</option>
-        <option value="1Hour">1h</option><option value="1Day">1D</option>
+        <option value="1Min" selected>1m</option>
+        <option value="5Min">5m</option>
+        <option value="15Min">15m</option>
+        <option value="1Day">1D</option>
       </select>
       <span id="popupPollBadge" style="font-size:.52rem;color:#00c853;margin-left:2px;">⟳ live</span>
       <span id="popupLastUpdate" style="font-size:.5rem;color:#3a5a7a;margin-left:4px;"></span>
@@ -1922,8 +1922,8 @@
     // Clear existing poll
     if(popupPollTimer){ clearInterval(popupPollTimer); popupPollTimer=null; }
 
-    const tf    = document.getElementById('popupTf')?.value    || '5Min';
-    const range = document.getElementById('popupRange')?.value || '1D';
+    const tf    = document.getElementById('popupTf')?.value    || '1Min';
+    const range = document.getElementById('popupRange')?.value || '2D';
     popupCurrentTf = tf;
 
     const RANGES_POP = {
@@ -2444,16 +2444,9 @@ button.ld:hover{background:#4a8aff;color:#fff;}
         <option value="10Y">10 years</option><option value="20Y">20 years</option>
       </select>
       <select class="exp-tf" id="expTf" onchange="exp.tf=this.value;if(document.getElementById('expTicker').value)expLoad()">
-        <option value="1Min">1m</option>
-        <option value="2Min">2m</option>
-        <option value="3Min">3m</option>
-        <option value="5Min" selected>5m</option>
-        <option value="10Min">10m</option>
+        <option value="1Min" selected>1m</option>
+        <option value="5Min">5m</option>
         <option value="15Min">15m</option>
-        <option value="30Min">30m</option>
-        <option value="1Hour">1h</option>
-        <option value="2Hour">2h</option>
-        <option value="4Hour">4h</option>
         <option value="1Day">1D</option>
       </select>
       <button class="exp-load" onclick="expLoad()">⟳ Load</button>
@@ -2486,14 +2479,14 @@ const RANGES={
   '30min':{days:0.021,tf:'1Min'},
   '1hr':  {days:0.042,tf:'1Min'},
   '2hr':  {days:0.083,tf:'1Min'},
-  '4hr':  {days:0.167,tf:'5Min'},
-  '1D':   {days:1,    tf:'5Min'},
-  '2D':   {days:2,    tf:'5Min'},
-  '5D':   {days:5,    tf:'15Min'},
-  '10D':  {days:10,   tf:'15Min'},
-  '15D':  {days:15,   tf:'30Min'},
-  '1M':   {days:30,   tf:'30Min'},
-  '2M':   {days:60,   tf:'1Hour'},
+  '4hr':  {days:0.167,tf:'1Min'},
+  '1D':   {days:1,    tf:'1Min'},
+  '2D':   {days:2,    tf:'1Min'},
+  '5D':   {days:5,    tf:'5Min'},
+  '10D':  {days:10,   tf:'5Min'},
+  '15D':  {days:15,   tf:'15Min'},
+  '1M':   {days:30,   tf:'15Min'},
+  '2M':   {days:60,   tf:'15Min'},
   '3M':   {days:90,   tf:'1Day'},
   '6M':   {days:180,  tf:'1Day'},
   'YTD':  {days:null, ytd:true, tf:'1Day'},
@@ -2528,7 +2521,7 @@ function buildUrl(ticker,range,tf){
 }
 
 // ── EXPAND / FULL SCREEN ──
-const exp={chart:null,rsiChart:null,macdChart:null,bars:[],range:'1D',tf:'5Min',showVol:true,showEMA:true,showRSI:false,showMACD:false};
+const exp={chart:null,rsiChart:null,macdChart:null,bars:[],range:'2D',tf:'1Min',showVol:true,showEMA:true,showRSI:false,showMACD:false};
 
 function expandCell(idx){
   const s=state[idx];
@@ -2674,7 +2667,7 @@ function expRender(){
 function init(){
   const g=document.getElementById('grid');
   for(let i=0;i<8;i++){
-    state[i]={chart:null,rsiChart:null,macdChart:null,_candles:null,pollTimer:null,showVol:true,showEMA:true,showRSI:false,showMACD:false,bars:[],range:'1D',tf:'5Min'};
+    state[i]={chart:null,rsiChart:null,macdChart:null,_candles:null,pollTimer:null,showVol:true,showEMA:true,showRSI:false,showMACD:false,bars:[],range:'2D',tf:'1Min'};
     const d=document.createElement('div');d.className='cell';d.id='cell'+i;
     d.innerHTML=\`
       <div class="cell-hdr">
@@ -2682,7 +2675,7 @@ function init(){
         <select class="rng-sel" id="rngSel\${i}" onchange="setRange(\${i},this.value)">
           <option value="30min">30min<\/option><option value="1hr">1hr<\/option>
           <option value="2hr">2hr<\/option><option value="4hr">4hr<\/option>
-          <option value="1D" selected>1D<\/option><option value="2D">2D<\/option>
+          <option value="1D">1D<\/option><option value="2D" selected>2D<\/option>
           <option value="5D">5D<\/option><option value="10D">10D<\/option>
           <option value="15D">15D<\/option><option value="1M">1M<\/option>
           <option value="2M">2M<\/option><option value="3M">3M<\/option>
@@ -2692,10 +2685,9 @@ function init(){
           <option value="10Y">10Y<\/option><option value="20Y">20Y<\/option>
         <\/select>
         <select class="tf" id="tf\${i}" onchange="state[\${i}].tf=this.value;const _tk=(document.getElementById('tk'+\${i}).value||'').trim().toUpperCase();if(_tk&&state[\${i}].bars.length)load(\${i})">
-          <option value="1Min">1m<\/option><option value="2Min">2m<\/option><option value="3Min">3m<\/option>
-          <option value="5Min" selected>5m<\/option><option value="10Min">10m<\/option>
-          <option value="15Min">15m<\/option><option value="30Min">30m<\/option>
-          <option value="1Hour">1h<\/option><option value="2Hour">2h<\/option><option value="4Hour">4h<\/option>
+          <option value="1Min" selected>1m<\/option>
+          <option value="5Min">5m<\/option>
+          <option value="15Min">15m<\/option>
           <option value="1Day">1D<\/option>
         <\/select>
         <button class="ld" onclick="load(\${i})">Load<\/button>
