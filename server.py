@@ -2041,39 +2041,81 @@ async def do_scan(user_id):
     mode    = s['mode']
     label   = SCAN_MODES.get(mode, {}).get('label', mode)
 
-    status = {'phase':'fetching','message':f'📡 Fetching [{label}]...','progress':0,'total':0}
+    status = {'phase':'fetching','message':f'📡 Building universe...','progress':0,'total':0}
     await broadcast_to_user(user_id, {'type':'scan_status','status':status})
     await asyncio.sleep(0)
 
-    # Tradier primary (real-time), Polygon second, Yahoo fallback
-    candidates, scan_error = get_tradier_movers(filters, user_id)
+    # Step 1: Build universe and log every source
+    universe, universe_errors = get_dynamic_universe()
+    log_alert(f"🔍 [{user_id}] Universe: {len(universe)} tickers | errors: {universe_errors or 'none'}")
 
-    if scan_error and not candidates:
-        # Show the error clearly on the frontend
-        error_status = {
-            'phase': 'error',
-            'message': f'❌ Scanner error: {scan_error}',
-            'progress': 0, 'total': 0
-        }
-        await broadcast_to_user(user_id, {'type':'scan_status','status':error_status})
-        log_alert(f"❌ [{user_id}] Scan failed: {scan_error}")
-        return [], error_status
+    status['message'] = f'📡 Universe: {len(universe)} tickers — querying Tradier...'
+    await broadcast_to_user(user_id, {'type':'scan_status','status':status})
+    await asyncio.sleep(0)
+
+    candidates = []
+    scan_source = 'none'
+
+    if universe:
+        # Step 2: Tradier quotes
+        hdrs = get_tradier_headers(user_id)
+        quote_map, quote_error = get_tradier_quotes(universe, user_id)
+        log_alert(f"🔍 [{user_id}] Tradier quotes: {len(quote_map)} returned | error: {quote_error or 'none'}")
+
+        if quote_error:
+            status['message'] = f'⚠️ Tradier: {quote_error} — trying Yahoo...'
+            await broadcast_to_user(user_id, {'type':'scan_status','status':status})
+            await asyncio.sleep(0)
+        elif quote_map:
+            # Filter the quotes
+            for sym, q in quote_map.items():
+                try:
+                    price      = float(q.get('last') or q.get('bid') or 0)
+                    prev_close = float(q.get('prevclose') or 0)
+                    volume     = float(q.get('volume') or 0)
+                    avg_vol    = float(q.get('average_volume') or 1) or 1
+                    if price <= 0 or prev_close <= 0: continue
+                    pct        = ((price - prev_close) / prev_close) * 100
+                    dollar_vol = price * volume
+                    rvol       = round(volume / avg_vol, 1)
+                    if not (filters['min_price'] <= price <= filters['max_price']): continue
+                    if pct < filters['min_gap_pct']:                               continue
+                    if dollar_vol < filters['min_dollar_vol']:                     continue
+                    candidates.append({'ticker':sym,'price':price,'prev_close':prev_close,
+                        'gap_pct':round(pct,1),'volume':volume,'dollar_vol':dollar_vol,
+                        'rvol':rvol,'source':'tradier'})
+                except: continue
+            candidates.sort(key=lambda x: x['gap_pct'], reverse=True)
+            scan_source = 'tradier'
+            log_alert(f"🔍 [{user_id}] Tradier filter: {len(quote_map)} quoted → {len(candidates)} passed (min_gap={filters['min_gap_pct']}% min_price=${filters['min_price']} min_dvol=${filters['min_dollar_vol']})")
+
+    # Fallback: Polygon
+    if not candidates:
+        poly = get_polygon_gainers(filters)
+        log_alert(f"🔍 [{user_id}] Polygon fallback: {len(poly)} candidates")
+        if poly:
+            candidates = poly
+            scan_source = 'polygon'
+
+    # Fallback: Yahoo
+    if not candidates:
+        yahoo = get_yahoo_gainers(filters)
+        log_alert(f"🔍 [{user_id}] Yahoo fallback: {len(yahoo)} candidates")
+        if yahoo:
+            candidates = yahoo
+            scan_source = 'yahoo'
 
     if not candidates:
-        # Tradier worked but no stocks passed filters — try Polygon then Yahoo directly
-        status['message'] = '⚠️ No stocks passed Tradier filters — trying Polygon...'
-        await broadcast_to_user(user_id, {'type':'scan_status','status':status})
-        await asyncio.sleep(0)
-        candidates = get_polygon_gainers(filters)
-
-    if not candidates:
-        status['message'] = '⚠️ Polygon empty — trying Yahoo...'
-        await broadcast_to_user(user_id, {'type':'scan_status','status':status})
-        await asyncio.sleep(0)
-        candidates = get_yahoo_gainers(filters)
+        msg = (f"0 stocks found. Universe:{len(universe)} Tradier:{len(quote_map) if universe else 0} quoted. "
+               f"Filters: price ${filters['min_price']}-${filters['max_price']} "
+               f"gap≥{filters['min_gap_pct']}% dvol≥${filters['min_dollar_vol']:,.0f}. "
+               f"Errors: {', '.join(universe_errors) if universe_errors else 'none'}")
+        log_alert(f"⚠️ [{user_id}] {msg}")
+        done_status = {'phase':'done','message':f'⚠️ {msg}','progress':0,'total':0}
+        return [], done_status
 
     total = len(candidates)
-    log_alert(f"📊 [{user_id}] {total} candidates")
+    log_alert(f"📊 [{user_id}] {total} candidates from {scan_source}")
 
     status = {'phase':'analyzing','message':f'Enriching {total} with Alpaca data...','progress':0,'total':total}
     await broadcast_to_user(user_id, {'type':'scan_status','status':status})
