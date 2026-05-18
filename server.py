@@ -1409,55 +1409,154 @@ def grade_setup(gap_pct, dollar_vol, vol_ratio=0):
 # DATA SOURCES — Polygon gainers + Alpaca snapshot enrichment
 # ============================================================
 
+def get_dynamic_universe():
+    """
+    Get a dynamic list of active tickers to scan.
+    Uses multiple sources to build a broad universe.
+    """
+    tickers = set()
+
+    # Source 1: Alpaca most actives (free, works, real-time)
+    try:
+        r = requests.get(
+            f"{ALPACA_DATA_URL}/stocks/most_actives",
+            headers=ALPACA_HEADERS,
+            params={'by': 'volume', 'top': 100},
+            timeout=10
+        )
+        if r.status_code == 200:
+            for s in r.json().get('most_actives', []):
+                sym = s.get('symbol', '')
+                if sym and sym.isalpha() and len(sym) <= 5:
+                    tickers.add(sym)
+            log_alert(f"📡 Alpaca most_actives: {len(tickers)} tickers")
+    except Exception as e:
+        log_alert(f"⚠️ Alpaca most_actives error: {e}")
+
+    # Source 2: Alpaca movers (top gainers)
+    try:
+        r = requests.get(
+            f"{ALPACA_DATA_URL}/stocks/most_actives",
+            headers=ALPACA_HEADERS,
+            params={'by': 'trades', 'top': 100},
+            timeout=10
+        )
+        if r.status_code == 200:
+            before = len(tickers)
+            for s in r.json().get('most_actives', []):
+                sym = s.get('symbol', '')
+                if sym and sym.isalpha() and len(sym) <= 5:
+                    tickers.add(sym)
+            log_alert(f"📡 Alpaca most_active trades: +{len(tickers)-before} tickers")
+    except Exception as e:
+        log_alert(f"⚠️ Alpaca movers error: {e}")
+
+    # Source 3: Polygon gainers (if available)
+    try:
+        r = requests.get(
+            f"https://api.polygon.io/v2/snapshot/locale/us/markets/stocks/gainers"
+            f"?apiKey={POLYGON_API_KEY}&include_otc=false",
+            timeout=10
+        )
+        if r.status_code == 200:
+            before = len(tickers)
+            for t in r.json().get('tickers', []):
+                sym = t.get('ticker', '')
+                if sym and sym.isalpha() and len(sym) <= 5:
+                    tickers.add(sym)
+            log_alert(f"📡 Polygon gainers: +{len(tickers)-before} tickers")
+    except Exception as e:
+        log_alert(f"⚠️ Polygon error: {e}")
+
+    # Source 4: Yahoo day gainers
+    try:
+        r = requests.get(
+            "https://query1.finance.yahoo.com/v1/finance/screener/predefined/saved"
+            "?formatted=false&scrIds=day_gainers,small_cap_gainers&count=100",
+            headers={'User-Agent': 'Mozilla/5.0'}, timeout=10
+        )
+        if r.status_code == 200:
+            before = len(tickers)
+            results = r.json().get('finance', {}).get('result', [])
+            for result in results:
+                for q in result.get('quotes', []):
+                    sym = q.get('symbol', '')
+                    if sym and sym.isalpha() and len(sym) <= 5:
+                        tickers.add(sym)
+            log_alert(f"📡 Yahoo gainers: +{len(tickers)-before} tickers")
+    except Exception as e:
+        log_alert(f"⚠️ Yahoo error: {e}")
+
+    log_alert(f"📊 Total universe: {len(tickers)} unique tickers")
+    return list(tickers)
+
+
+def get_tradier_quotes(symbols):
+    """
+    Batch quote all symbols via Tradier — returns real-time bid/ask/last including pre/post market.
+    Tradier supports up to 200 symbols per request.
+    """
+    results = {}
+    if not symbols: return results
+
+    # Chunk into batches of 200
+    for i in range(0, len(symbols), 200):
+        chunk = symbols[i:i+200]
+        try:
+            r = requests.get(
+                f"{TRADIER_API_URL}/markets/quotes",
+                headers=TRADIER_HEADERS,
+                params={'symbols': ','.join(chunk), 'greeks': 'false'},
+                timeout=15
+            )
+            if r.status_code != 200:
+                log_alert(f"⚠️ Tradier quotes batch error: {r.status_code}")
+                continue
+
+            quotes = r.json().get('quotes', {}).get('quote', [])
+            if isinstance(quotes, dict): quotes = [quotes]
+
+            for q in quotes:
+                sym = q.get('symbol', '')
+                if sym:
+                    results[sym] = q
+        except Exception as e:
+            log_alert(f"⚠️ Tradier quotes batch exception: {e}")
+
+    log_alert(f"📡 Tradier quotes: {len(results)} returned")
+    return results
+
+
 def get_tradier_movers(filters):
     """
-    Use Tradier quotes on a broad universe of active tickers to find movers.
-    Primary scanner — works pre/post market with real-time data.
+    Full Tradier-powered scanner:
+    1. Build dynamic universe from Alpaca/Polygon/Yahoo
+    2. Get real-time quotes from Tradier for all tickers
+    3. Filter by gap%, price, dollar volume
     """
-    try:
-        # Broad universe of active small-mid cap tickers known for gaps
-        # Pull quotes in one batch call — Tradier supports up to 200 symbols
-        UNIVERSE = (
-            # Small cap movers & frequent gappers
-            "NVDA,AMD,TSLA,AAPL,MSFT,META,GOOGL,AMZN,NFLX,DIS,"
-            "SPY,QQQ,IWM,SQQQ,TQQQ,SPXS,SPXL,UVXY,VXX,VIXY,"
-            "PLTR,SOFI,RIVN,LCID,NIO,XPEV,LI,FSR,GOEV,RIDE,"
-            "AMC,GME,BBBY,SNDL,CLOV,WISH,WKHS,EXPR,KOSS,BB,"
-            "DWAC,PHUN,BRQS,MULN,BFRI,FFIE,ILUS,BBAI,CENN,ATER,"
-            "MMAT,TRKA,IDEX,ATNF,SHIP,SIGA,SLRX,CTIC,AGEN,NKTR,"
-            "BIIB,MRNA,BNTX,PFE,GILD,VRTX,REGN,SGEN,ALNY,BMRN,"
-            "COIN,MSTR,RIOT,MARA,HUT,BITF,BTBT,CIFR,WGMI,GBTC,"
-            "SNAP,TWTR,PINS,UBER,LYFT,DASH,ABNB,RBLX,U,HOOD,"
-            "DKNG,PENN,MGM,WYNN,LVS,CZR,RSI,PDFS,EVERI,AGS,"
-            "SPCE,RKLB,ASTR,MNTS,VORB,CFV,PL,BKSY,ASTS,SATL,"
-            "GEVO,PLUG,FCEL,BLDP,BE,BLOOM,FLNC,VVPR,AMPE,HYSR,"
-            "CVNA,CARVANA,KMX,AN,SAH,PAG,ABG,LAD,GPI,RUSHA,"
-            "NKLA,HYLN,XL,DKNG,SKLZ,GENI,MGAM,AGS,EVERI,DKNG"
-        )
+    # Step 1: Get universe
+    universe = get_dynamic_universe()
+    if not universe:
+        log_alert("⚠️ Universe empty — no tickers to scan")
+        return []
 
-        r = requests.get(
-            "https://api.tradier.com/v1/markets/quotes",
-            headers=TRADIER_HEADERS,
-            params={'symbols': UNIVERSE, 'greeks': 'false'},
-            timeout=15
-        )
+    # Step 2: Get Tradier real-time quotes
+    quote_map = get_tradier_quotes(universe)
+    if not quote_map:
+        log_alert("⚠️ Tradier returned no quotes — check API key/account funding")
+        return []
 
-        if r.status_code != 200:
-            log_alert(f"⚠️ Tradier quotes error: {r.status_code}")
-            return []
-
-        quotes = r.json().get('quotes', {}).get('quote', [])
-        if isinstance(quotes, dict): quotes = [quotes]
-
-        candidates = []
-        for q in quotes:
-            sym        = q.get('symbol', '')
+    # Step 3: Filter
+    candidates = []
+    for sym, q in quote_map.items():
+        try:
+            # Use last trade price, fall back to bid
             price      = float(q.get('last') or q.get('bid') or 0)
             prev_close = float(q.get('prevclose') or 0)
             volume     = float(q.get('volume') or 0)
             avg_vol    = float(q.get('average_volume') or 1) or 1
 
-            if not sym or price <= 0 or prev_close <= 0: continue
+            if price <= 0 or prev_close <= 0: continue
             pct        = ((price - prev_close) / prev_close) * 100
             dollar_vol = price * volume
             rvol       = round(volume / avg_vol, 1) if avg_vol > 0 else 0
@@ -1476,13 +1575,12 @@ def get_tradier_movers(filters):
                 'rvol':       rvol,
                 'source':     'tradier',
             })
+        except Exception as e:
+            continue
 
-        log_alert(f"📡 Tradier universe: {len(quotes)} quotes → {len(candidates)} candidates")
-        return sorted(candidates, key=lambda x: x['gap_pct'], reverse=True)
-
-    except Exception as e:
-        log_alert(f"⚠️ Tradier movers error: {e}")
-        return []
+    candidates.sort(key=lambda x: x['gap_pct'], reverse=True)
+    log_alert(f"📊 Tradier scanner: {len(universe)} universe → {len(quote_map)} quoted → {len(candidates)} passed filters")
+    return candidates
 
 
 def get_polygon_gainers(filters):
