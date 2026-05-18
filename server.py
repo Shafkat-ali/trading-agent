@@ -2227,6 +2227,37 @@ async def do_scan(user_id, scan_id=None):
                     )
                 )
 
+    if mode == 'scanopp' and not results and candidates:
+        scanopp_filters = filters.copy()
+        scanopp_filters['min_gap_pct'] = min(scanopp_filters.get('min_gap_pct', 0), 5.0)
+        scanopp_filters['min_dollar_vol'] = min(scanopp_filters.get('min_dollar_vol', 0), 250_000)
+        scanopp_filters['min_volume'] = min(scanopp_filters.get('min_volume', 0), 50_000)
+        scanopp_filters['max_price'] = max(scanopp_filters.get('max_price', 15.0), 50.0)
+        log_alert(f"🔁 [{user_id}] ScanOpp enrichment returned 0 — retrying with relaxed momentum filters")
+        await broadcast_to_user(user_id, {'type':'scan_status','status':{
+            'phase':'analyzing',
+            'message':'ScanOpp strict pass found 0 — retrying broader momentum scan...',
+            'progress':0,
+            'total':total,
+        }})
+
+        async def retry_scanopp(stock_data):
+            setup = await asyncio.to_thread(process_ticker, stock_data, mode, scanopp_filters)
+            return setup
+
+        retry_tasks = [asyncio.create_task(retry_scanopp(stock_data)) for stock_data in candidates]
+        for task in asyncio.as_completed(retry_tasks):
+            if not s['running'] or (scan_id is not None and scan_id != s.get('scan_id')):
+                for pending in retry_tasks:
+                    pending.cancel()
+                break
+            setup = await task
+            if setup:
+                setup['scan_pass'] = 'relaxed'
+                results.append(setup)
+                await broadcast_to_user(user_id, {'type':'new_ticker','setup':setup})
+                await asyncio.sleep(0)
+
     results.sort(
         key=lambda x: (0 if x['warning'] else {'A+':4,'A':3,'B':2}.get(x['grade'],1)),
         reverse=True
