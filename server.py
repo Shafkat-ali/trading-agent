@@ -94,6 +94,7 @@ halt_cache_ts  = None
 
 # Company info cache
 _company_cache = {}
+_tradier_lookup_cache = {'ts': None, 'tickers': []}
 
 SCAN_MODES = {
     'morning_gap': {
@@ -1584,7 +1585,7 @@ def get_dynamic_universe():
     try:
         r = requests.get(
             "https://query1.finance.yahoo.com/v1/finance/screener/predefined/saved"
-            "?formatted=false&scrIds=day_gainers,small_cap_gainers&count=100",
+            "?formatted=false&scrIds=day_gainers&count=100",
             headers={'User-Agent': 'Mozilla/5.0'}, timeout=4
         )
         if r.status_code == 200:
@@ -1647,6 +1648,41 @@ def get_tradier_quotes(symbols, user_id='shafkat'):
 
     log_alert(f"📡 Tradier quotes [{user_id}]: {len(results)}/{len(symbols)} returned")
     return results, None
+
+
+def get_tradier_lookup_universe(user_id='shafkat'):
+    """Build a broader symbol universe from Tradier lookup searches."""
+    now = datetime.now()
+    if _tradier_lookup_cache['ts'] and (now - _tradier_lookup_cache['ts']).total_seconds() < 300:
+        return _tradier_lookup_cache['tickers']
+
+    tickers = set()
+    headers = get_tradier_headers(user_id)
+    for q in 'abcdefghijklmnopqrstuvwxyz':
+        try:
+            r = requests.get(
+                f"{TRADIER_API_URL}/markets/lookup",
+                headers=headers,
+                params={'q': q, 'types': 'stock', 'exchanges': 'NASDAQ,NYSE,AMEX'},
+                timeout=3
+            )
+            if r.status_code != 200:
+                continue
+            securities = r.json().get('securities', {}).get('security', [])
+            if isinstance(securities, dict):
+                securities = [securities]
+            for sec in securities:
+                sym = (sec.get('symbol') or '').strip().upper()
+                if sym and sym.isalpha() and len(sym) <= 5:
+                    tickers.add(sym)
+        except Exception:
+            continue
+
+    result = sorted(tickers)
+    _tradier_lookup_cache['ts'] = now
+    _tradier_lookup_cache['tickers'] = result
+    log_alert(f"📡 Tradier lookup universe: {len(result)} symbols")
+    return result
 
 
 def get_tradier_movers(filters, user_id='shafkat'):
@@ -1772,7 +1808,7 @@ def get_tradier_movers(filters, user_id='shafkat'):
     try:
         r = requests.get(
             "https://query1.finance.yahoo.com/v1/finance/screener/predefined/saved"
-            "?formatted=false&scrIds=day_gainers,small_cap_gainers&count=100",
+            "?formatted=false&scrIds=day_gainers&count=100",
             headers={'User-Agent': 'Mozilla/5.0'}, timeout=10
         )
         if r.status_code == 200:
@@ -2115,6 +2151,41 @@ async def do_scan(user_id, scan_id=None):
             scan_source = 'tradier'
             log_alert(f"🔍 [{user_id}] Tradier filter: {len(quote_map)} quoted → {len(candidates)} passed (min_gap={filters['min_gap_pct']}% min_price=${filters['min_price']} min_dvol=${filters['min_dollar_vol']})")
 
+    if mode == 'scanopp' and len(candidates) < 10:
+        lookup_universe = get_tradier_lookup_universe(user_id)
+        existing_universe = set(universe or [])
+        extra_symbols = [sym for sym in lookup_universe if sym not in existing_universe]
+        if extra_symbols:
+            status['message'] = f'📡 Expanding ScanOpp with {len(extra_symbols)} Tradier lookup symbols...'
+            await broadcast_to_user(user_id, {'type':'scan_status','status':status})
+            await asyncio.sleep(0)
+            lookup_quotes, lookup_error = get_tradier_quotes(extra_symbols, user_id)
+            before = len(candidates)
+            for sym, q in lookup_quotes.items():
+                try:
+                    price      = float(q.get('last') or q.get('bid') or 0)
+                    prev_close = float(q.get('prevclose') or 0)
+                    volume     = float(q.get('volume') or 0)
+                    trades     = float(q.get('trades') or q.get('trade_count') or q.get('num_trades') or 0)
+                    avg_vol    = float(q.get('average_volume') or 1) or 1
+                    if price <= 0 or prev_close <= 0: continue
+                    pct        = ((price - prev_close) / prev_close) * 100
+                    dollar_vol = price * volume
+                    rvol       = round(volume / avg_vol, 1)
+                    if not (filters['min_price'] <= price <= filters['max_price']): continue
+                    if pct < filters['min_gap_pct']: continue
+                    if dollar_vol < filters['min_dollar_vol']: continue
+                    if trades and trades < filters.get('min_trades', 0): continue
+                    candidates.append({'ticker':sym,'price':price,'prev_close':prev_close,
+                        'gap_pct':round(pct,1),'volume':volume,'dollar_vol':dollar_vol,
+                        'trades':trades,'bid':float(q.get('bid') or 0),'ask':float(q.get('ask') or 0),
+                        'rvol':rvol,'source':'tradier-lookup'})
+                except:
+                    continue
+            if len(candidates) > before:
+                scan_source = f'{scan_source}+tradier-lookup'
+            log_alert(f"🔍 [{user_id}] Tradier lookup filter: {len(lookup_quotes)} quoted → {len(candidates)-before} added | error: {lookup_error or 'none'}")
+
     # Fallback: Polygon
     if not candidates:
         poly = get_polygon_gainers(filters)
@@ -2130,6 +2201,31 @@ async def do_scan(user_id, scan_id=None):
         if yahoo:
             candidates = yahoo
             scan_source = 'yahoo'
+
+    if mode == 'scanopp':
+        by_symbol = {c.get('ticker'): c for c in candidates if c.get('ticker')}
+        extra_sources = []
+
+        poly = get_polygon_gainers(filters)
+        if poly:
+            extra_sources.append(f'polygon:{len(poly)}')
+            for c in poly:
+                sym = c.get('ticker')
+                if sym and (sym not in by_symbol or c.get('dollar_vol', 0) > by_symbol[sym].get('dollar_vol', 0)):
+                    by_symbol[sym] = c
+
+        yahoo = get_yahoo_gainers(filters)
+        if yahoo:
+            extra_sources.append(f'yahoo:{len(yahoo)}')
+            for c in yahoo:
+                sym = c.get('ticker')
+                if sym and (sym not in by_symbol or c.get('dollar_vol', 0) > by_symbol[sym].get('dollar_vol', 0)):
+                    by_symbol[sym] = c
+
+        candidates = list(by_symbol.values())
+        if extra_sources:
+            scan_source = f"{scan_source}+{'+'.join(extra_sources)}"
+        log_alert(f"🔍 [{user_id}] ScanOpp merged sources: {len(candidates)} candidates from {scan_source}")
 
     if not candidates and mode in {'morning_gap', 'scanopp'}:
         relaxed = filters.copy()
