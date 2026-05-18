@@ -1565,7 +1565,14 @@
       </div>`;
     document.getElementById('screenerList').innerHTML='<div class="screener-empty">Scanning...</div>';
     ['statSetups','statAplus','fStatSetups','fStatAplus'].forEach(id=>document.getElementById(id).textContent='0');
-    await fetch(`${API_URL}/api/scanner/mode/${currentUser.id}/${mode}`,{method:'POST'});
+    const modeResp = await fetch(`${API_URL}/api/scanner/mode/${currentUser.id}/${mode}`,{method:'POST'});
+    const modeData = await modeResp.json();
+    if(!modeResp.ok || modeData.error){
+      isLoading=false;
+      alert(modeData.error||`Could not switch to ${mode}`);
+      clearResults();
+      return;
+    }
     currentMode=mode;
     updateActiveModeLabel(mode);
     try{

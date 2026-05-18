@@ -106,6 +106,12 @@ SCAN_MODES = {
         'min_price':0.50,'max_price':15.00,'min_gap':9.0,'min_dvol':3_000_000,
         'min_volume':300_000,'min_rvol':0,'max_float_m':0,'max_mktcap_m':0,'require_news':False,
     },
+    'afterhrs': {
+        'label':'AfterHrs', 'desc':'Price under $50, within 10% of VWAP, $Vol $100K+',
+        'min_price':0.01,'max_price':50.00,'min_gap':-100.0,'min_dvol':100_000,
+        'min_volume':10_000,'min_rvol':0,'max_float_m':0,'max_mktcap_m':0,'require_news':False,
+        'max_vwap_distance_pct':10.0,
+    },
     'standard': {
         'label':'🔍 Standard', 'desc':'Gap 10%+, $0.20–$20, $100K vol, RVOL 1.5x+',
         'min_price':0.20,'max_price':20.00,'min_gap':10.0,'min_dvol':100_000,
@@ -514,6 +520,7 @@ async def set_scan_mode(user_id: str, mode: str):
         'max_float_m':      m['max_float_m'],
         'max_market_cap_m': m['max_mktcap_m'],
         'require_news':     m['require_news'],
+        'max_vwap_distance_pct': m.get('max_vwap_distance_pct', 0),
     }
     log_alert(f"🔄 [{user_id}] Mode: {m['label']}")
     return {'status':'ok','mode':mode,'filters':user_state[user_id]['filters']}
@@ -1898,14 +1905,14 @@ def process_ticker(stock_data, mode='morning_gap', filters=None):
 
         if snap and snap.get('price', 0) > 0:
             price      = snap['price']
-            prev_close = snap['prev_close']
-            gap_pct    = snap['pct_change']
-            dollar_vol = snap['dollar_vol']
-            volume     = snap['volume']
-            rvol       = snap['rvol']
-            vwap       = snap['vwap']
-            bid        = snap['bid']
-            ask        = snap['ask']
+            prev_close = snap.get('prev_close') or stock_data.get('prev_close', 0)
+            gap_pct    = snap.get('pct_change') if snap.get('pct_change') not in (None, 0) else stock_data.get('gap_pct', 0)
+            dollar_vol = snap.get('dollar_vol') if snap.get('dollar_vol') not in (None, 0) else stock_data.get('dollar_vol', 0)
+            volume     = snap.get('volume') if snap.get('volume') not in (None, 0) else stock_data.get('volume', 0)
+            rvol       = snap.get('rvol') if snap.get('rvol') not in (None, 0) else stock_data.get('rvol', 0)
+            vwap       = snap.get('vwap', 0)
+            bid        = snap.get('bid', 0)
+            ask        = snap.get('ask', 0)
         else:
             price      = stock_data['price']
             prev_close = stock_data['prev_close']
@@ -1924,6 +1931,13 @@ def process_ticker(stock_data, mode='morning_gap', filters=None):
         if dollar_vol < filters.get('min_dollar_vol', 0): return None
         if volume < filters.get('min_volume', 0):    return None
         if rvol < filters.get('min_rvol', 0):         return None
+        if mode == 'afterhrs':
+            max_vwap_dist = filters.get('max_vwap_distance_pct', 10)
+            if vwap <= 0:
+                return None
+            vwap_dist = abs((price - vwap) / vwap * 100)
+            if vwap_dist > max_vwap_dist:
+                return None
 
         grade, notes             = grade_setup(gap_pct, dollar_vol, rvol)
         strength, news_count, headlines, warning = check_catalyst(ticker)
