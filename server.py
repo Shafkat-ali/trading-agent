@@ -536,17 +536,19 @@ async def get_stock_bars(ticker: str, timeframe: str = "5Min", days: int = 1, st
     needs_aggregation = False
     agg_n             = 1
 
-    # ── Date range — start always takes priority ──
+    # ── Date range — add buffer for weekends/holidays ──
     now = datetime.now()
     if start:
-        # Frontend calculated the start date — use it directly
-        start_str = start + ' 04:00'
+        # Frontend sent a start date — push back 3 extra days as buffer for weekends
+        start_dt  = datetime.strptime(start, '%Y-%m-%d') - timedelta(days=3)
+        start_str = start_dt.strftime('%Y-%m-%d') + ' 04:00'
     elif days > 1:
-        start_dt  = now - timedelta(days=int(days))
+        start_dt  = now - timedelta(days=int(days) + 3)  # +3 day buffer
         start_str = start_dt.strftime('%Y-%m-%d') + ' 04:00'
     else:
-        # Default: today from 4am
-        start_str = now.strftime('%Y-%m-%d') + ' 04:00'
+        # 1D — go back 5 days to ensure we always get data regardless of weekends
+        start_dt  = now - timedelta(days=5)
+        start_str = start_dt.strftime('%Y-%m-%d') + ' 04:00'
     end_str = now.strftime('%Y-%m-%d') + ' 20:00'
 
     def aggregate_bars(raw_bars, n):
@@ -618,11 +620,9 @@ async def get_stock_bars(ticker: str, timeframe: str = "5Min", days: int = 1, st
     # ── Fallback: Alpaca ──
     try:
         now   = datetime.now()
-        s_dt  = now.replace(hour=4, minute=0, second=0, microsecond=0)
+        # Use same start_str calculated above (already has buffer)
+        s_dt  = datetime.strptime(start_str[:10], '%Y-%m-%d').replace(hour=4, minute=0, second=0, microsecond=0)
         e_dt  = now.replace(hour=20, minute=0, second=0, microsecond=0)
-        if now.hour < 4:
-            s_dt = (now - timedelta(days=1)).replace(hour=4, minute=0, second=0, microsecond=0)
-            e_dt = (now - timedelta(days=1)).replace(hour=20, minute=0, second=0, microsecond=0)
 
         alpaca_tf = {'1Min':'1Min','5Min':'5Min','15Min':'15Min','30Min':'30Min',
                      '1Hour':'1Hour','1Day':'1Day'}.get(timeframe, '5Min')
