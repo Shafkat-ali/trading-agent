@@ -100,9 +100,9 @@ _listed_symbol_cache = {'ts': None, 'tickers': []}
 
 SCAN_MODES = {
     'morning_gap': {
-        'label':'🌅 MorningGap', 'desc':'Price $0.10–$50, Gap 5%+, $Vol $250K+, Float ≤20M',
+        'label':'🌅 MorningGap', 'desc':'Price $0.10-$50, % Chg 5%+, $Vol $250K+, Volume 50K+',
         'min_price':0.10,'max_price':50.00,'min_gap':5.0,'min_dvol':250_000,
-        'min_volume':50_000,'min_rvol':0,'max_float_m':20.0,'max_mktcap_m':0,'require_news':False,
+        'min_volume':50_000,'min_rvol':0,'max_float_m':0,'max_mktcap_m':0,'require_news':False,
     },
     'scanopp': {
         'label':'💡 ScanOpp', 'desc':'Price $0.50–$20, % Chg 15%+, $Vol $3M+, Trades 3K+',
@@ -110,7 +110,7 @@ SCAN_MODES = {
         'min_volume':0,'min_trades':3_000,'min_rvol':0,'max_float_m':0,'max_mktcap_m':0,'require_news':False,
     },
     'afterhrs': {
-        'label':'AfterHrs', 'desc':'Price under $50, within 10% of VWAP, $Vol $100K+',
+        'label':'AfterHrs', 'desc':'Price $0.01-$50, within 10% of VWAP, $Vol $100K+, Volume 10K+',
         'min_price':0.01,'max_price':50.00,'min_gap':-100.0,'min_dvol':100_000,
         'min_volume':10_000,'min_rvol':0,'max_float_m':0,'max_mktcap_m':0,'require_news':False,
         'max_vwap_distance_pct':10.0,
