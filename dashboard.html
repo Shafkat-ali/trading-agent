@@ -2751,6 +2751,7 @@ function init(){
     d.innerHTML=\`
       <div class="cell-hdr">
         <input class="tk" id="tk\${i}" placeholder="AAPL" oninput="this.value=this.value.toUpperCase()" onkeydown="if(event.key==='Enter')load(\${i})">
+        <span id="cn\${i}" style="font-size:.48rem;color:#4a6a8a;white-space:nowrap;max-width:100px;overflow:hidden;text-overflow:ellipsis;"></span>
         <select class="rng-sel" id="rngSel\${i}" onchange="setRange(\${i},this.value)">
           <option value="1D">1D<\/option><option value="2D" selected>2D<\/option>
           <option value="5D">5D<\/option><option value="10D">10D<\/option>
@@ -2819,7 +2820,15 @@ async function load(i){
     const d=await r.json();const bars=d.bars||[];
     if(!bars.length){document.getElementById('cw'+i).innerHTML='<div class="ph"><span style="color:#ff6666">No data — '+tk+'<\/span><span style="font-size:.52rem;color:#3a5a7a">Try different range or market closed<\/span><\/div>';return;}
     s.bars=bars;
-    const bg=document.getElementById('bg'+i);bg.textContent=tk+' · '+s.range+' · '+bars.length+'bars · '+(d.source||'');bg.style.color='#00c853';
+    const bg=document.getElementById('bg'+i);
+    bg.textContent=tk+' · '+s.range+' · '+bars.length+'bars · '+(d.source||'');
+    bg.style.color='#00c853';
+    // Fetch and show company name
+    getCompanyName(tk).then(name=>{
+      if(name&&bg)bg.textContent=tk+' — '+name+' · '+s.range+' · '+bars.length+'bars';
+      const cnEl=document.getElementById('cn'+i);
+      if(cnEl)cnEl.textContent=name||'';
+    });
     render(i,bars);
   }catch(e){document.getElementById('cw'+i).innerHTML='<div class="ph"><span style="color:#ff4444">'+e.message+'<\/span><\/div>';}
 }
@@ -2941,6 +2950,27 @@ function stopAllPolls(){
   for(let i=0;i<8;i++){
     if(state[i]?.pollTimer){clearInterval(state[i].pollTimer);state[i].pollTimer=null;}
   }
+}
+
+// ── Company name cache ──
+const COMPANY_NAMES={
+  'QQQ':'Invesco QQQ Trust','SPY':'SPDR S&P 500 ETF','SPX':'S&P 500 Index',
+  'NDX':'Nasdaq-100 Index','NVDA':'NVIDIA Corp','MU':'Micron Technology',
+  'TSLA':'Tesla Inc','AMD':'Advanced Micro Devices','AAPL':'Apple Inc',
+  'MSFT':'Microsoft Corp','GOOGL':'Alphabet Inc','AMZN':'Amazon.com',
+  'META':'Meta Platforms','NFLX':'Netflix Inc','DIS':'Walt Disney Co',
+  'IWM':'iShares Russell 2000','VXX':'iPath VIX ETF','GLD':'SPDR Gold Shares',
+  'CBRL':'Cracker Barrel','DVLT':'Datavault AI Inc',
+};
+async function getCompanyName(ticker){
+  if(COMPANY_NAMES[ticker]) return COMPANY_NAMES[ticker];
+  try{
+    const r=await fetch(API+'/api/stock/profile/'+ticker);
+    const d=await r.json();
+    const name=d?.name||'';
+    if(name) COMPANY_NAMES[ticker]=name;
+    return name;
+  }catch(e){ return ''; }
 }
 
 // ── INTERVAL AUTO-SWITCH (based on Tradier actual limits) ──
@@ -3114,8 +3144,11 @@ const DEFAULT_TF      = '5Min';
         vl.setData(vwapPts);
       }
       chart.timeScale().fitContent();
-      badge.textContent=ticker+' · '+tf+' · '+bars.length+' bars · '+( data.source||'');
+      badge.textContent=ticker+' · '+tf+' · '+bars.length+' bars · '+(data.source||'');
       badge.style.color='#00c853';
+      getCompanyName(ticker).then(name=>{
+        if(name&&badge)badge.textContent=ticker+' — '+name+' · '+tf+' · '+bars.length+' bars';
+      });
       new ResizeObserver(()=>{if(chartInstances[idx])chartInstances[idx].resize(body.clientWidth,body.clientHeight);}).observe(body);
     }catch(err){
       body.innerHTML='<div class="chart-placeholder"><span style="color:#ff4444">Error: '+err.message+'</span></div>';
