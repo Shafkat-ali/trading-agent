@@ -2608,6 +2608,11 @@ function expandCell(idx){
   const tk=(document.getElementById('tk'+idx).value||'').trim().toUpperCase();
   document.getElementById('expandOverlay').classList.add('open');
   document.getElementById('expTitle').textContent='📊 '+(tk||'Panel '+(idx+1));
+  // Fetch company name for title
+  if(tk) getCompanyName(tk).then(name=>{
+    const t=document.getElementById('expTitle');
+    if(t) t.textContent='📊 '+tk+(name?' — '+name:'');
+  });
   document.getElementById('expTicker').value=tk;
   // Copy state from panel
   exp.range=s.range||'1D';exp.tf=s.tf||'5Min';
@@ -2666,6 +2671,12 @@ async function expLoad(){
     if(!bars.length){document.getElementById('expChart').innerHTML='<div class="ph"><span style="color:#ff6666">No data — '+tk+'</span></div>';return;}
     exp.bars=bars;
     document.getElementById('expBadge').textContent=tk+' · '+exp.range+' · '+bars.length+' bars · '+(d.source||'');
+    getCompanyName(tk).then(name=>{
+      const t=document.getElementById('expTitle');
+      if(t) t.textContent='📊 '+tk+(name?' — '+name:'');
+      const b=document.getElementById('expBadge');
+      if(b) b.textContent=tk+(name?' — '+name:'')+' · '+exp.range+' · '+bars.length+' bars';
+    });
     expRender();
   }catch(e){document.getElementById('expChart').innerHTML='<div class="ph"><span style="color:#ff4444">'+e.message+'</span></div>';}
 }
