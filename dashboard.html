@@ -2188,17 +2188,20 @@
         // ── After-hours price (like Yahoo Finance) ──
         const ahEl = document.getElementById('popupAfterHours');
         if(ahEl && d.is_extended && d.pc > 0){
-          // During extended hours: show last as after-hrs price vs prev close
+          // Main price = current last trade (after-hours price)
+          // Show regular session close separately
+          const regularClose = d.pc;
           const ahPrice = d.c;
-          const ahChg   = ((ahPrice - d.pc) / d.pc * 100).toFixed(2);
-          const ahSign  = ahChg >= 0 ? '+' : '';
-          ahEl.textContent = `After hrs $${ahPrice.toFixed(2)} ${ahSign}${ahChg}%`;
-          ahEl.style.color = ahChg >= 0 ? '#00c853' : '#ff4444';
+          const ahChg = ((ahPrice - regularClose) / regularClose * 100).toFixed(2);
+          const ahSign = ahChg >= 0 ? '+' : '';
+          // Main price shows live after-hrs price
+          document.getElementById('popupPrice').textContent = `$${ahPrice.toFixed(2)}`;
+          document.getElementById('popupChange').textContent = `${ahSign}${ahChg}%`;
+          document.getElementById('popupChange').style.color = ahChg >= 0 ? '#00ff88' : '#ff4444';
+          // After-hrs badge shows closed price
+          ahEl.textContent = `Closed $${regularClose.toFixed(2)}`;
+          ahEl.style.color = '#6a8aaa';
           ahEl.style.display = 'inline';
-          // Show regular close price separately
-          document.getElementById('popupPrice').textContent = `$${d.pc.toFixed(2)}`;
-          document.getElementById('popupChange').textContent = `Close`;
-          document.getElementById('popupChange').style.color = '#6a8aaa';
         } else if(ahEl){
           ahEl.style.display = 'none';
         }
