@@ -2180,27 +2180,26 @@
       const r=await fetch(`${API_URL}/api/stock/quote/${ticker}?user=${currentUser?.id||'shafkat'}`);
       const d=await r.json();
       if(d&&d.c&&d.c>0){
-        const chg=((d.c-d.pc)/d.pc*100).toFixed(2);
-        document.getElementById('popupPrice').textContent=`$${d.c.toFixed(2)}`;
+        const chg=((d.c-(d.rc||d.pc))/(d.rc||d.pc)*100).toFixed(2);
+        document.getElementById('popupPrice').textContent=`$${d.c.toFixed(4)}`;
         document.getElementById('popupChange').textContent=`${chg>0?'+':''}${chg}%`;
         document.getElementById('popupChange').style.color=chg>=0?'#00ff88':'#ff4444';
 
         // ── After-hours price (like Yahoo Finance) ──
         const ahEl = document.getElementById('popupAfterHours');
-        if(ahEl && d.is_extended && d.pc > 0){
-          // Main price = current last trade (after-hours price)
-          // Show regular session close separately
-          const regularClose = d.pc;
-          const ahPrice = d.c;
-          const ahChg = ((ahPrice - regularClose) / regularClose * 100).toFixed(2);
-          const ahSign = ahChg >= 0 ? '+' : '';
-          // Main price shows live after-hrs price
-          document.getElementById('popupPrice').textContent = `$${ahPrice.toFixed(2)}`;
-          document.getElementById('popupChange').textContent = `${ahSign}${ahChg}%`;
-          document.getElementById('popupChange').style.color = ahChg >= 0 ? '#00ff88' : '#ff4444';
-          // After-hrs badge shows closed price
-          ahEl.textContent = `Closed $${regularClose.toFixed(2)}`;
-          ahEl.style.color = '#6a8aaa';
+        if(ahEl && d.is_extended && d.after_hours_price){
+          // Main price = today's regular session close (rc)
+          const regClose = d.rc || d.pc;
+          const ahPrice  = d.after_hours_price;
+          const ahChg    = d.after_hours_change || 0;
+          const ahSign   = ahChg >= 0 ? '+' : '';
+          // Show regular close as main price
+          document.getElementById('popupPrice').textContent = `$${regClose.toFixed(4)}`;
+          document.getElementById('popupChange').textContent = `${((regClose - d.pc)/d.pc*100).toFixed(2)}%`;
+          document.getElementById('popupChange').style.color = regClose >= d.pc ? '#00ff88' : '#ff4444';
+          // After-hrs badge
+          ahEl.textContent = `After hrs $${ahPrice.toFixed(4)} ${ahSign}${ahChg}%`;
+          ahEl.style.color = ahChg >= 0 ? '#00c853' : '#ff4444';
           ahEl.style.display = 'inline';
         } else if(ahEl){
           ahEl.style.display = 'none';

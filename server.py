@@ -597,31 +597,35 @@ async def get_stock_quote(ticker: str, user: str = "shafkat"):
             q = r.json().get('quotes', {}).get('quote', {})
             if isinstance(q, list): q = q[0] if q else {}
             if q and q.get('last'):
-                price      = float(q.get('last') or 0)
-                prev_close = float(q.get('prevclose') or 0)
+                last       = float(q.get('last') or 0)
+                close      = float(q.get('close') or 0)   # today's regular session close (4pm)
+                prev_close = float(q.get('prevclose') or 0) # yesterday's close
                 bid        = float(q.get('bid') or 0)
                 ask        = float(q.get('ask') or 0)
                 volume     = float(q.get('volume') or 0)
                 avg_vol    = float(q.get('average_volume') or 1) or 1
 
-                # After-hours: Tradier returns last trade even after 4pm
-                # Check if we're outside regular hours
-                from datetime import datetime
-                from datetime import timezone, timedelta
-                # EST = UTC-5, EDT = UTC-4 (use UTC-4 for DST period May-Nov)
+                from datetime import datetime, timezone, timedelta
                 ET = timezone(timedelta(hours=-4))
                 now_et = datetime.now(ET)
                 h = now_et.hour
                 is_extended = (h < 9 or (h == 9 and now_et.minute < 30) or h >= 16)
 
+                # During after-hours:
+                # 'close' = today's 4pm regular session close
+                # 'last'  = most recent after-hours trade
+                # 'prevclose' = yesterday's close
+                regular_close = close if close > 0 else prev_close
                 after_hours_price = None
                 after_hours_change = None
-                if is_extended and prev_close > 0:
-                    after_hours_price  = price
-                    after_hours_change = round(((price - prev_close) / prev_close) * 100, 2)
+                if is_extended and regular_close > 0 and last != regular_close:
+                    after_hours_price  = last
+                    after_hours_change = round(((last - regular_close) / regular_close) * 100, 2)
 
                 return {
-                    'c':    price, 'pc': prev_close,
+                    'c':    last,           # current price (after-hrs last trade)
+                    'rc':   regular_close,  # today's regular session close
+                    'pc':   prev_close,     # yesterday's close
                     'h':    float(q.get('high') or 0),
                     'l':    float(q.get('low') or 0),
                     'o':    float(q.get('open') or 0),
