@@ -1411,12 +1411,14 @@ def grade_setup(gap_pct, dollar_vol, vol_ratio=0):
 
 def get_dynamic_universe():
     """
-    Get a dynamic list of active tickers to scan.
-    Uses multiple sources to build a broad universe.
+    Build a fully dynamic universe of tickers from live sources only.
+    No hardcoded stocks — everything is discovered dynamically.
+    Returns (tickers, errors) so caller can report failures clearly.
     """
     tickers = set()
+    errors  = []
 
-    # Source 1: Alpaca most actives (free, works, real-time)
+    # Source 1: Alpaca most actives by volume
     try:
         r = requests.get(
             f"{ALPACA_DATA_URL}/stocks/most_actives",
@@ -1425,15 +1427,20 @@ def get_dynamic_universe():
             timeout=10
         )
         if r.status_code == 200:
+            before = len(tickers)
             for s in r.json().get('most_actives', []):
                 sym = s.get('symbol', '')
                 if sym and sym.isalpha() and len(sym) <= 5:
                     tickers.add(sym)
-            log_alert(f"📡 Alpaca most_actives: {len(tickers)} tickers")
+            log_alert(f"📡 Alpaca volume actives: +{len(tickers)-before}")
+        else:
+            msg = f"Alpaca most_actives HTTP {r.status_code}"
+            errors.append(msg); log_alert(f"⚠️ {msg}")
     except Exception as e:
-        log_alert(f"⚠️ Alpaca most_actives error: {e}")
+        msg = f"Alpaca most_actives: {e}"
+        errors.append(msg); log_alert(f"⚠️ {msg}")
 
-    # Source 2: Alpaca movers (top gainers)
+    # Source 2: Alpaca most actives by trades
     try:
         r = requests.get(
             f"{ALPACA_DATA_URL}/stocks/most_actives",
@@ -1447,11 +1454,15 @@ def get_dynamic_universe():
                 sym = s.get('symbol', '')
                 if sym and sym.isalpha() and len(sym) <= 5:
                     tickers.add(sym)
-            log_alert(f"📡 Alpaca most_active trades: +{len(tickers)-before} tickers")
+            log_alert(f"📡 Alpaca trade actives: +{len(tickers)-before}")
+        else:
+            msg = f"Alpaca trade_actives HTTP {r.status_code}"
+            errors.append(msg); log_alert(f"⚠️ {msg}")
     except Exception as e:
-        log_alert(f"⚠️ Alpaca movers error: {e}")
+        msg = f"Alpaca trade actives: {e}"
+        errors.append(msg); log_alert(f"⚠️ {msg}")
 
-    # Source 3: Polygon gainers (if available)
+    # Source 3: Polygon gainers
     try:
         r = requests.get(
             f"https://api.polygon.io/v2/snapshot/locale/us/markets/stocks/gainers"
@@ -1464,11 +1475,15 @@ def get_dynamic_universe():
                 sym = t.get('ticker', '')
                 if sym and sym.isalpha() and len(sym) <= 5:
                     tickers.add(sym)
-            log_alert(f"📡 Polygon gainers: +{len(tickers)-before} tickers")
+            log_alert(f"📡 Polygon gainers: +{len(tickers)-before}")
+        else:
+            msg = f"Polygon gainers HTTP {r.status_code}"
+            errors.append(msg); log_alert(f"⚠️ {msg}")
     except Exception as e:
-        log_alert(f"⚠️ Polygon error: {e}")
+        msg = f"Polygon gainers: {e}"
+        errors.append(msg); log_alert(f"⚠️ {msg}")
 
-    # Source 4: Yahoo day gainers
+    # Source 4: Yahoo gainers
     try:
         r = requests.get(
             "https://query1.finance.yahoo.com/v1/finance/screener/predefined/saved"
@@ -1477,18 +1492,206 @@ def get_dynamic_universe():
         )
         if r.status_code == 200:
             before = len(tickers)
-            results = r.json().get('finance', {}).get('result', [])
-            for result in results:
+            for result in r.json().get('finance', {}).get('result', []):
                 for q in result.get('quotes', []):
                     sym = q.get('symbol', '')
                     if sym and sym.isalpha() and len(sym) <= 5:
                         tickers.add(sym)
-            log_alert(f"📡 Yahoo gainers: +{len(tickers)-before} tickers")
+            log_alert(f"📡 Yahoo gainers: +{len(tickers)-before}")
+        else:
+            msg = f"Yahoo gainers HTTP {r.status_code}"
+            errors.append(msg); log_alert(f"⚠️ {msg}")
     except Exception as e:
-        log_alert(f"⚠️ Yahoo error: {e}")
+        msg = f"Yahoo gainers: {e}"
+        errors.append(msg); log_alert(f"⚠️ {msg}")
 
-    log_alert(f"📊 Total universe: {len(tickers)} unique tickers")
-    return list(tickers)
+    log_alert(f"📊 Universe: {len(tickers)} tickers | errors: {errors or 'none'}")
+    return list(tickers), errors
+
+
+def get_tradier_quotes(symbols):
+    """
+    Batch quote all symbols via Tradier production API.
+    Returns (quote_map, error_msg).
+    """
+    results = {}
+    if not symbols:
+        return results, "No symbols to quote"
+
+    for i in range(0, len(symbols), 200):
+        chunk = symbols[i:i+200]
+        try:
+            r = requests.get(
+                f"{TRADIER_API_URL}/markets/quotes",
+                headers=TRADIER_HEADERS,
+                params={'symbols': ','.join(chunk), 'greeks': 'false'},
+                timeout=15
+            )
+            if r.status_code == 200:
+                quotes = r.json().get('quotes', {}).get('quote', [])
+                if isinstance(quotes, dict): quotes = [quotes]
+                for q in quotes:
+                    sym = q.get('symbol', '')
+                    if sym: results[sym] = q
+            elif r.status_code == 403:
+                msg = f"Tradier quotes HTTP 403 — account may not be funded or API key invalid"
+                log_alert(f"⚠️ {msg}")
+                return results, msg
+            else:
+                msg = f"Tradier quotes HTTP {r.status_code}: {r.text[:100]}"
+                log_alert(f"⚠️ {msg}")
+                return results, msg
+        except Exception as e:
+            msg = f"Tradier quotes exception: {e}"
+            log_alert(f"⚠️ {msg}")
+            return results, msg
+
+    log_alert(f"📡 Tradier quotes: {len(results)}/{len(symbols)} returned")
+    return results, None
+
+
+def get_tradier_movers(filters):
+    """
+    Full dynamic scanner:
+    1. Build universe from live sources
+    2. Get real-time Tradier quotes
+    3. Filter by scan criteria
+    Returns (candidates, error_message)
+    """
+    # Step 1: Universe
+    universe, universe_errors = get_dynamic_universe()
+
+    if not universe:
+        err = f"No tickers found from any source. Errors: {', '.join(universe_errors)}"
+        log_alert(f"❌ {err}")
+        return [], err
+
+    # Step 2: Tradier quotes
+    quote_map, quote_error = get_tradier_quotes(universe)
+
+    if not quote_map:
+        err = quote_error or "Tradier returned 0 quotes"
+        if universe_errors:
+            err += f" | Universe errors: {', '.join(universe_errors)}"
+        log_alert(f"❌ {err}")
+        return [], err
+
+    # Step 3: Filter
+    candidates = []
+    for sym, q in quote_map.items():
+        try:
+            price      = float(q.get('last') or q.get('bid') or 0)
+            prev_close = float(q.get('prevclose') or 0)
+            volume     = float(q.get('volume') or 0)
+            avg_vol    = float(q.get('average_volume') or 1) or 1
+
+            if price <= 0 or prev_close <= 0: continue
+            pct        = ((price - prev_close) / prev_close) * 100
+            dollar_vol = price * volume
+            rvol       = round(volume / avg_vol, 1) if avg_vol > 0 else 0
+
+            if not (filters['min_price'] <= price <= filters['max_price']): continue
+            if pct < filters['min_gap_pct']:                                continue
+            if dollar_vol < filters['min_dollar_vol']:                      continue
+
+            candidates.append({
+                'ticker':     sym,
+                'price':      price,
+                'prev_close': prev_close,
+                'gap_pct':    round(pct, 1),
+                'volume':     volume,
+                'dollar_vol': dollar_vol,
+                'rvol':       rvol,
+                'source':     'tradier',
+            })
+        except:
+            continue
+
+    candidates.sort(key=lambda x: x['gap_pct'], reverse=True)
+    summary = f"Universe: {len(universe)} → Quoted: {len(quote_map)} → Passed: {len(candidates)}"
+    log_alert(f"📊 {summary}")
+    return candidates, None
+
+    # Source 1: Alpaca most actives by volume
+    try:
+        r = requests.get(
+            f"{ALPACA_DATA_URL}/stocks/most_actives",
+            headers=ALPACA_HEADERS,
+            params={'by': 'volume', 'top': 100},
+            timeout=10
+        )
+        if r.status_code == 200:
+            before = len(tickers)
+            for s in r.json().get('most_actives', []):
+                sym = s.get('symbol', '')
+                if sym and sym.isalpha() and len(sym) <= 5:
+                    tickers.add(sym)
+            log_alert(f"📡 Alpaca volume actives: +{len(tickers)-before}")
+        else:
+            log_alert(f"⚠️ Alpaca most_actives: {r.status_code}")
+    except Exception as e:
+        log_alert(f"⚠️ Alpaca most_actives error: {e}")
+
+    # Source 2: Alpaca movers by trades
+    try:
+        r = requests.get(
+            f"{ALPACA_DATA_URL}/stocks/most_actives",
+            headers=ALPACA_HEADERS,
+            params={'by': 'trades', 'top': 100},
+            timeout=10
+        )
+        if r.status_code == 200:
+            before = len(tickers)
+            for s in r.json().get('most_actives', []):
+                sym = s.get('symbol', '')
+                if sym and sym.isalpha() and len(sym) <= 5:
+                    tickers.add(sym)
+            log_alert(f"📡 Alpaca trade actives: +{len(tickers)-before}")
+    except Exception as e:
+        log_alert(f"⚠️ Alpaca trade actives error: {e}")
+
+    # Source 3: Polygon gainers
+    try:
+        r = requests.get(
+            f"https://api.polygon.io/v2/snapshot/locale/us/markets/stocks/gainers"
+            f"?apiKey={POLYGON_API_KEY}&include_otc=false",
+            timeout=10
+        )
+        if r.status_code == 200:
+            before = len(tickers)
+            for t in r.json().get('tickers', []):
+                sym = t.get('ticker', '')
+                if sym and sym.isalpha() and len(sym) <= 5:
+                    tickers.add(sym)
+            log_alert(f"📡 Polygon gainers: +{len(tickers)-before}")
+        else:
+            log_alert(f"⚠️ Polygon gainers: {r.status_code}")
+    except Exception as e:
+        log_alert(f"⚠️ Polygon gainers error: {e}")
+
+    # Source 4: Yahoo gainers
+    try:
+        r = requests.get(
+            "https://query1.finance.yahoo.com/v1/finance/screener/predefined/saved"
+            "?formatted=false&scrIds=day_gainers,small_cap_gainers&count=100",
+            headers={'User-Agent': 'Mozilla/5.0'}, timeout=10
+        )
+        if r.status_code == 200:
+            before = len(tickers)
+            for result in r.json().get('finance', {}).get('result', []):
+                for q in result.get('quotes', []):
+                    sym = q.get('symbol', '')
+                    if sym and sym.isalpha() and len(sym) <= 5:
+                        tickers.add(sym)
+            log_alert(f"📡 Yahoo gainers: +{len(tickers)-before}")
+        else:
+            log_alert(f"⚠️ Yahoo gainers: {r.status_code}")
+    except Exception as e:
+        log_alert(f"⚠️ Yahoo gainers error: {e}")
+
+    result = list(tickers)
+    log_alert(f"📊 Universe total: {len(result)} tickers")
+    return result
 
 
 def get_tradier_quotes(symbols):
@@ -1836,15 +2039,29 @@ async def do_scan(user_id):
     await broadcast_to_user(user_id, {'type':'scan_status','status':status})
     await asyncio.sleep(0)
 
-    # Tradier primary (real-time, pre/post market), Polygon second, Yahoo fallback
-    candidates = get_tradier_movers(filters)
+    # Tradier primary (real-time), Polygon second, Yahoo fallback
+    candidates, scan_error = get_tradier_movers(filters)
+
+    if scan_error and not candidates:
+        # Show the error clearly on the frontend
+        error_status = {
+            'phase': 'error',
+            'message': f'❌ Scanner error: {scan_error}',
+            'progress': 0, 'total': 0
+        }
+        await broadcast_to_user(user_id, {'type':'scan_status','status':error_status})
+        log_alert(f"❌ [{user_id}] Scan failed: {scan_error}")
+        return [], error_status
+
     if not candidates:
-        status['message'] = '⚠️ Tradier empty, trying Polygon...'
+        # Tradier worked but no stocks passed filters — try Polygon then Yahoo directly
+        status['message'] = '⚠️ No stocks passed Tradier filters — trying Polygon...'
         await broadcast_to_user(user_id, {'type':'scan_status','status':status})
         await asyncio.sleep(0)
         candidates = get_polygon_gainers(filters)
+
     if not candidates:
-        status['message'] = '⚠️ Polygon empty, trying Yahoo...'
+        status['message'] = '⚠️ Polygon empty — trying Yahoo...'
         await broadcast_to_user(user_id, {'type':'scan_status','status':status})
         await asyncio.sleep(0)
         candidates = get_yahoo_gainers(filters)
