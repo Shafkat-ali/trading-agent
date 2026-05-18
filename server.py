@@ -1409,6 +1409,82 @@ def grade_setup(gap_pct, dollar_vol, vol_ratio=0):
 # DATA SOURCES — Polygon gainers + Alpaca snapshot enrichment
 # ============================================================
 
+def get_tradier_movers(filters):
+    """
+    Use Tradier quotes on a broad universe of active tickers to find movers.
+    Primary scanner — works pre/post market with real-time data.
+    """
+    try:
+        # Broad universe of active small-mid cap tickers known for gaps
+        # Pull quotes in one batch call — Tradier supports up to 200 symbols
+        UNIVERSE = (
+            # Small cap movers & frequent gappers
+            "NVDA,AMD,TSLA,AAPL,MSFT,META,GOOGL,AMZN,NFLX,DIS,"
+            "SPY,QQQ,IWM,SQQQ,TQQQ,SPXS,SPXL,UVXY,VXX,VIXY,"
+            "PLTR,SOFI,RIVN,LCID,NIO,XPEV,LI,FSR,GOEV,RIDE,"
+            "AMC,GME,BBBY,SNDL,CLOV,WISH,WKHS,EXPR,KOSS,BB,"
+            "DWAC,PHUN,BRQS,MULN,BFRI,FFIE,ILUS,BBAI,CENN,ATER,"
+            "MMAT,TRKA,IDEX,ATNF,SHIP,SIGA,SLRX,CTIC,AGEN,NKTR,"
+            "BIIB,MRNA,BNTX,PFE,GILD,VRTX,REGN,SGEN,ALNY,BMRN,"
+            "COIN,MSTR,RIOT,MARA,HUT,BITF,BTBT,CIFR,WGMI,GBTC,"
+            "SNAP,TWTR,PINS,UBER,LYFT,DASH,ABNB,RBLX,U,HOOD,"
+            "DKNG,PENN,MGM,WYNN,LVS,CZR,RSI,PDFS,EVERI,AGS,"
+            "SPCE,RKLB,ASTR,MNTS,VORB,CFV,PL,BKSY,ASTS,SATL,"
+            "GEVO,PLUG,FCEL,BLDP,BE,BLOOM,FLNC,VVPR,AMPE,HYSR,"
+            "CVNA,CARVANA,KMX,AN,SAH,PAG,ABG,LAD,GPI,RUSHA,"
+            "NKLA,HYLN,XL,DKNG,SKLZ,GENI,MGAM,AGS,EVERI,DKNG"
+        )
+
+        r = requests.get(
+            "https://api.tradier.com/v1/markets/quotes",
+            headers=TRADIER_HEADERS,
+            params={'symbols': UNIVERSE, 'greeks': 'false'},
+            timeout=15
+        )
+
+        if r.status_code != 200:
+            log_alert(f"⚠️ Tradier quotes error: {r.status_code}")
+            return []
+
+        quotes = r.json().get('quotes', {}).get('quote', [])
+        if isinstance(quotes, dict): quotes = [quotes]
+
+        candidates = []
+        for q in quotes:
+            sym        = q.get('symbol', '')
+            price      = float(q.get('last') or q.get('bid') or 0)
+            prev_close = float(q.get('prevclose') or 0)
+            volume     = float(q.get('volume') or 0)
+            avg_vol    = float(q.get('average_volume') or 1) or 1
+
+            if not sym or price <= 0 or prev_close <= 0: continue
+            pct        = ((price - prev_close) / prev_close) * 100
+            dollar_vol = price * volume
+            rvol       = round(volume / avg_vol, 1) if avg_vol > 0 else 0
+
+            if not (filters['min_price'] <= price <= filters['max_price']): continue
+            if pct < filters['min_gap_pct']:                                continue
+            if dollar_vol < filters['min_dollar_vol']:                      continue
+
+            candidates.append({
+                'ticker':     sym,
+                'price':      price,
+                'prev_close': prev_close,
+                'gap_pct':    round(pct, 1),
+                'volume':     volume,
+                'dollar_vol': dollar_vol,
+                'rvol':       rvol,
+                'source':     'tradier',
+            })
+
+        log_alert(f"📡 Tradier universe: {len(quotes)} quotes → {len(candidates)} candidates")
+        return sorted(candidates, key=lambda x: x['gap_pct'], reverse=True)
+
+    except Exception as e:
+        log_alert(f"⚠️ Tradier movers error: {e}")
+        return []
+
+
 def get_polygon_gainers(filters):
     try:
         r = requests.get(
@@ -1662,8 +1738,13 @@ async def do_scan(user_id):
     await broadcast_to_user(user_id, {'type':'scan_status','status':status})
     await asyncio.sleep(0)
 
-    # Polygon primary, Yahoo fallback
-    candidates = get_polygon_gainers(filters)
+    # Tradier primary (real-time, pre/post market), Polygon second, Yahoo fallback
+    candidates = get_tradier_movers(filters)
+    if not candidates:
+        status['message'] = '⚠️ Tradier empty, trying Polygon...'
+        await broadcast_to_user(user_id, {'type':'scan_status','status':status})
+        await asyncio.sleep(0)
+        candidates = get_polygon_gainers(filters)
     if not candidates:
         status['message'] = '⚠️ Polygon empty, trying Yahoo...'
         await broadcast_to_user(user_id, {'type':'scan_status','status':status})
