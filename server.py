@@ -536,14 +536,16 @@ async def get_stock_bars(ticker: str, timeframe: str = "5Min", days: int = 1, st
     needs_aggregation = False
     agg_n             = 1
 
-    # ── Date range ──
+    # ── Date range — start always takes priority ──
     now = datetime.now()
     if start:
+        # Frontend calculated the start date — use it directly
         start_str = start + ' 04:00'
     elif days > 1:
-        start_dt  = now - timedelta(days=days)
+        start_dt  = now - timedelta(days=int(days))
         start_str = start_dt.strftime('%Y-%m-%d') + ' 04:00'
     else:
+        # Default: today from 4am
         start_str = now.strftime('%Y-%m-%d') + ' 04:00'
     end_str = now.strftime('%Y-%m-%d') + ' 20:00'
 
