@@ -414,6 +414,78 @@ async def debug():
                   for uid, s in user_state.items()}
     }
 
+@app.get("/api/scanner_diag")
+async def scanner_diag():
+    """Diagnose scanner data sources — call this to see exactly what's working."""
+    result = {}
+
+    # 1. Test Alpaca most_actives
+    try:
+        r = requests.get(f"{ALPACA_DATA_URL}/stocks/most_actives",
+            headers=ALPACA_HEADERS, params={'by':'volume','top':10}, timeout=10)
+        tickers = [s.get('symbol') for s in r.json().get('most_actives',[])]
+        result['alpaca_most_actives'] = {'status': r.status_code, 'count': len(tickers), 'sample': tickers[:5]}
+    except Exception as e:
+        result['alpaca_most_actives'] = {'status': 'error', 'error': str(e)}
+
+    # 2. Test Polygon gainers
+    try:
+        r = requests.get(
+            f"https://api.polygon.io/v2/snapshot/locale/us/markets/stocks/gainers"
+            f"?apiKey={POLYGON_API_KEY}&include_otc=false", timeout=10)
+        tickers = [t.get('ticker') for t in r.json().get('tickers',[])]
+        result['polygon_gainers'] = {'status': r.status_code, 'count': len(tickers), 'sample': tickers[:5]}
+    except Exception as e:
+        result['polygon_gainers'] = {'status': 'error', 'error': str(e)}
+
+    # 3. Test Yahoo gainers
+    try:
+        r = requests.get(
+            "https://query1.finance.yahoo.com/v1/finance/screener/predefined/saved"
+            "?formatted=false&scrIds=day_gainers&count=10",
+            headers={'User-Agent':'Mozilla/5.0'}, timeout=10)
+        quotes = r.json().get('finance',{}).get('result',[{}])[0].get('quotes',[]) if r.status_code==200 else []
+        tickers = [q.get('symbol') for q in quotes]
+        result['yahoo_gainers'] = {'status': r.status_code, 'count': len(tickers), 'sample': tickers[:5]}
+    except Exception as e:
+        result['yahoo_gainers'] = {'status': 'error', 'error': str(e)}
+
+    # 4. Test Tradier quotes on sample tickers
+    test_syms = ['AAPL','NVDA','TSLA','SPY','QQQ']
+    try:
+        r = requests.get(f"{TRADIER_API_URL}/markets/quotes",
+            headers=TRADIER_HEADERS,
+            params={'symbols': ','.join(test_syms), 'greeks':'false'}, timeout=10)
+        if r.status_code == 200:
+            quotes = r.json().get('quotes',{}).get('quote',[])
+            if isinstance(quotes, dict): quotes = [quotes]
+            sample = [{'sym':q.get('symbol'),'last':q.get('last'),'prev':q.get('prevclose')} for q in quotes[:3]]
+            result['tradier_quotes_shafkat'] = {'status': r.status_code, 'count': len(quotes), 'sample': sample}
+        else:
+            result['tradier_quotes_shafkat'] = {'status': r.status_code, 'body': r.text[:200]}
+    except Exception as e:
+        result['tradier_quotes_shafkat'] = {'status': 'error', 'error': str(e)}
+
+    # 5. Test Tradier quotes for Irfan
+    try:
+        r = requests.get(f"{TRADIER_API_URL}/markets/quotes",
+            headers=TRADIER_HEADERS_IRFAN,
+            params={'symbols': ','.join(test_syms), 'greeks':'false'}, timeout=10)
+        if r.status_code == 200:
+            quotes = r.json().get('quotes',{}).get('quote',[])
+            if isinstance(quotes, dict): quotes = [quotes]
+            result['tradier_quotes_irfan'] = {'status': r.status_code, 'count': len(quotes)}
+        else:
+            result['tradier_quotes_irfan'] = {'status': r.status_code, 'body': r.text[:200]}
+    except Exception as e:
+        result['tradier_quotes_irfan'] = {'status': 'error', 'error': str(e)}
+
+    # 6. Simulate full universe build
+    universe, errors = get_dynamic_universe()
+    result['universe'] = {'total': len(universe), 'errors': errors, 'sample': universe[:10]}
+
+    return result
+
 @app.get("/api/scan_modes")
 async def get_scan_modes():
     return {'modes': SCAN_MODES}
