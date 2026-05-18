@@ -1719,41 +1719,6 @@ def get_tradier_movers(filters, user_id='shafkat'):
     return result
 
 
-def get_tradier_quotes(symbols):
-    """
-    Batch quote all symbols via Tradier — returns real-time bid/ask/last including pre/post market.
-    Tradier supports up to 200 symbols per request.
-    """
-    results = {}
-    if not symbols: return results
-
-    # Chunk into batches of 200
-    for i in range(0, len(symbols), 200):
-        chunk = symbols[i:i+200]
-        try:
-            r = requests.get(
-                f"{TRADIER_API_URL}/markets/quotes",
-                headers=TRADIER_HEADERS,
-                params={'symbols': ','.join(chunk), 'greeks': 'false'},
-                timeout=15
-            )
-            if r.status_code != 200:
-                log_alert(f"⚠️ Tradier quotes batch error: {r.status_code}")
-                continue
-
-            quotes = r.json().get('quotes', {}).get('quote', [])
-            if isinstance(quotes, dict): quotes = [quotes]
-
-            for q in quotes:
-                sym = q.get('symbol', '')
-                if sym:
-                    results[sym] = q
-        except Exception as e:
-            log_alert(f"⚠️ Tradier quotes batch exception: {e}")
-
-    log_alert(f"📡 Tradier quotes: {len(results)} returned")
-    return results
-
 
 def get_polygon_gainers(filters):
     try:
