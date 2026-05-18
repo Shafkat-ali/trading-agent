@@ -1921,7 +1921,6 @@
   }
 
   async function popupLoadChart(ticker){
-    // Clear existing poll
     if(popupPollTimer){ clearInterval(popupPollTimer); popupPollTimer=null; }
 
     const tf    = document.getElementById('popupTf')?.value    || '1Min';
@@ -1929,13 +1928,12 @@
     popupCurrentTf = tf;
 
     const RANGES_POP = {
-      '30min':0.021,'1hr':0.042,'2hr':0.083,'4hr':0.167,
       '1D':1,'2D':2,'5D':5,'10D':10,'15D':15,
       '1M':30,'2M':60,'3M':90,'6M':180,
       'YTD':null,
       '1Y':365,'2Y':730,'3Y':1095,'4Y':1460,'5Y':1825,'10Y':3650,'20Y':7300
     };
-    let days = RANGES_POP[range] ?? 1;
+    let days = RANGES_POP[range] ?? 2;
     let startStr;
     if(range==='YTD'){
       startStr = new Date(new Date().getFullYear(),0,1).toISOString().split('T')[0];
@@ -1946,9 +1944,24 @@
     }
     const url = `${API_URL}/api/stock/bars/${ticker}?timeframe=${tf}&days=${Math.ceil(days)}&start=${startStr}`;
 
+    // ── Wait for container to have real dimensions before first render ──
+    // This fixes the blank chart on first popup open
+    const chartDiv = document.getElementById('popupChartDiv');
+    if(chartDiv && chartDiv.clientWidth === 0){
+      await new Promise(resolve=>{
+        const ro = new ResizeObserver(entries=>{
+          if(entries[0].contentRect.width > 0){ ro.disconnect(); resolve(); }
+        });
+        ro.observe(chartDiv);
+        setTimeout(resolve, 800); // fallback
+      });
+    } else {
+      // Already has dimensions but give browser one frame to finish painting
+      await new Promise(r=>requestAnimationFrame(r));
+    }
+
     await popupRenderChart(ticker, url);
 
-    // Start polling
     const interval = getPollInterval(tf);
     document.getElementById('popupPollBadge').textContent = `⟳ ${interval/1000}s`;
     popupPollTimer = setInterval(async()=>{
@@ -1996,7 +2009,8 @@
       chartDiv.innerHTML='';
 
       const chart = LightweightCharts.createChart(chartDiv,{
-        width: chartDiv.clientWidth, height: chartDiv.clientHeight||300,
+        width: chartDiv.clientWidth||chartDiv.offsetWidth||600,
+        height: chartDiv.clientHeight||chartDiv.offsetHeight||300,
         layout:{backgroundColor:'#060a12',textColor:'#8aa0c0'},
         grid:{vertLines:{color:'#0f1a2e'},horzLines:{color:'#0f1a2e'}},
         timeScale:{timeVisible:true,secondsVisible:false,borderColor:'#1a2a4a'},
