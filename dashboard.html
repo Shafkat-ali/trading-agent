@@ -2299,7 +2299,8 @@
 
   // ── INTERVAL AUTO-SWITCH — main page (popup + expanded charts) ──
   const AUTO_TF={
-    '1D':'1Min','2D':'1Min','5D':'1Min','10D':'1Min','15D':'1Min','1M':'1Min',
+    '1D':'1Min','2D':'1Min','5D':'1Min','10D':'1Min','15D':'1Min',
+    '1M':'5Min',
     '2M':'1Day','3M':'1Day','6M':'1Day','YTD':'1Day',
     '1Y':'1Day','2Y':'1Day','3Y':'1Day','4Y':'1Day',
     '5Y':'1Day','10Y':'1Day','20Y':'1Day',
@@ -2307,7 +2308,8 @@
   const VALID_TF={
     '1D':['1Min','5Min','15Min','1Day'],'2D':['1Min','5Min','15Min','1Day'],
     '5D':['1Min','5Min','15Min','1Day'],'10D':['1Min','5Min','15Min','1Day'],
-    '15D':['1Min','5Min','15Min','1Day'],'1M':['1Min','5Min','15Min','1Day'],
+    '15D':['1Min','5Min','15Min','1Day'],
+    '1M':['5Min','15Min','1Day'],
     '2M':['1Day'],'3M':['1Day'],'6M':['1Day'],'YTD':['1Day'],
     '1Y':['1Day'],'2Y':['1Day'],'3Y':['1Day'],'4Y':['1Day'],
     '5Y':['1Day'],'10Y':['1Day'],'20Y':['1Day'],
@@ -2524,7 +2526,7 @@ const RANGES={
   '5D':   {days:5,    tf:'1Min'},
   '10D':  {days:10,   tf:'1Min'},
   '15D':  {days:15,   tf:'1Min'},
-  '1M':   {days:30,   tf:'1Min'},
+  '1M':   {days:30,   tf:'5Min'},
   '2M':   {days:60,   tf:'1Day'},
   '3M':   {days:90,   tf:'1Day'},
   '6M':   {days:180,  tf:'1Day'},
@@ -2943,14 +2945,16 @@ function stopAllPolls(){
 
 // ── INTERVAL AUTO-SWITCH (based on Tradier actual limits) ──
 const AUTO_TF_C={
-  '1D':'1Min','2D':'1Min','5D':'1Min','10D':'1Min','15D':'1Min','1M':'1Min',
+  '1D':'1Min','2D':'1Min','5D':'1Min','10D':'1Min','15D':'1Min',
+  '1M':'5Min',
   '2M':'1Day','3M':'1Day','6M':'1Day','YTD':'1Day',
   '1Y':'1Day','2Y':'1Day','3Y':'1Day','5Y':'1Day','10Y':'1Day','20Y':'1Day',
 };
 const VALID_TF_C={
   '1D':['1Min','5Min','15Min','1Day'],'2D':['1Min','5Min','15Min','1Day'],
   '5D':['1Min','5Min','15Min','1Day'],'10D':['1Min','5Min','15Min','1Day'],
-  '15D':['1Min','5Min','15Min','1Day'],'1M':['1Min','5Min','15Min','1Day'],
+  '15D':['1Min','5Min','15Min','1Day'],
+  '1M':['5Min','15Min','1Day'],
   '2M':['1Day'],'3M':['1Day'],'6M':['1Day'],'YTD':['1Day'],
   '1Y':['1Day'],'2Y':['1Day'],'3Y':['1Day'],'5Y':['1Day'],
   '10Y':['1Day'],'20Y':['1Day'],
