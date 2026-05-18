@@ -2905,6 +2905,37 @@ document.addEventListener('visibilitychange',()=>{
 });
 
 init();
+
+// ── DEFAULT TICKERS — load on page open ──
+const DEFAULT_TICKERS = ['QQQ','SPY','SPX','NDX','NVDA','MU','TSLA','AMD'];
+const DEFAULT_RANGE   = '5D';
+const DEFAULT_TF      = '5Min';
+
+(async function loadDefaults(){
+  // Wait for LightweightCharts to load
+  let waited=0;
+  while(!window.LightweightCharts && waited<50){ await new Promise(r=>setTimeout(r,100)); waited++; }
+
+  for(let i=0;i<DEFAULT_TICKERS.length;i++){
+    const ticker=DEFAULT_TICKERS[i];
+    // Set ticker input
+    const tkEl=document.getElementById('tk'+i);
+    if(tkEl) tkEl.value=ticker;
+    // Set range dropdown
+    const rngEl=document.getElementById('rngSel'+i);
+    if(rngEl) rngEl.value=DEFAULT_RANGE;
+    // Set interval dropdown and sync disabled states
+    syncTfDropdown('tf'+i, DEFAULT_RANGE);
+    const tfEl=document.getElementById('tf'+i);
+    if(tfEl) tfEl.value=DEFAULT_TF;
+    // Update state
+    state[i].range=DEFAULT_RANGE;
+    state[i].tf=DEFAULT_TF;
+    // Stagger loads slightly so we don't hammer API all at once
+    await new Promise(r=>setTimeout(r,300));
+    load(i);
+  }
+})();
 <\/script>
 </body>
 </html>`;
