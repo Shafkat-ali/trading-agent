@@ -511,6 +511,7 @@
           <span class="popup-ticker" id="popupTicker">--</span>
           <span class="popup-price"  id="popupPrice" style="color:#00ff88">$--</span>
           <span class="popup-change" id="popupChange"></span>
+          <span id="popupPrevClose" style="font-size:.6rem;color:#6a8aaa;margin-left:6px;font-weight:500;"></span>
           <span id="popupAfterHours" style="display:none;font-size:.65rem;color:#ffd700;margin-left:6px;font-weight:600;"></span>
         </div>
         <!-- Company centered on its own line -->
@@ -2180,29 +2181,36 @@
       const r=await fetch(`${API_URL}/api/stock/quote/${ticker}?user=${currentUser?.id||'shafkat'}`);
       const d=await r.json();
       if(d&&d.c&&d.c>0){
-        const chg=((d.c-(d.rc||d.pc))/(d.rc||d.pc)*100).toFixed(2);
-        document.getElementById('popupPrice').textContent=`$${d.c.toFixed(4)}`;
-        document.getElementById('popupChange').textContent=`${chg>0?'+':''}${chg}%`;
-        document.getElementById('popupChange').style.color=chg>=0?'#00ff88':'#ff4444';
+        // ── Price display logic ──
+        const ahEl  = document.getElementById('popupAfterHours');
+        const pcEl  = document.getElementById('popupPrevClose');
+        const regClose = d.rc || d.c;  // today's 4pm close (or last if not available)
 
-        // ── After-hours price (like Yahoo Finance) ──
-        const ahEl = document.getElementById('popupAfterHours');
-        if(ahEl && d.is_extended && d.after_hours_price){
-          // Main price = today's regular session close (rc)
-          const regClose = d.rc || d.pc;
-          const ahPrice  = d.after_hours_price;
-          const ahChg    = d.after_hours_change || 0;
-          const ahSign   = ahChg >= 0 ? '+' : '';
-          // Show regular close as main price
-          document.getElementById('popupPrice').textContent = `$${regClose.toFixed(4)}`;
-          document.getElementById('popupChange').textContent = `${((regClose - d.pc)/d.pc*100).toFixed(2)}%`;
-          document.getElementById('popupChange').style.color = regClose >= d.pc ? '#00ff88' : '#ff4444';
+        if(d.is_extended && d.after_hours_price && d.rc > 0){
+          // AFTER HOURS: main=today's close, badge=after-hrs price
+          const ahChg = d.after_hours_change || 0;
+          const ahSign = ahChg >= 0 ? '+' : '';
+          // Main price = today's regular session close
+          document.getElementById('popupPrice').textContent = `$${d.rc.toFixed(4)}`;
+          const dayChg = ((d.rc - d.pc)/d.pc*100).toFixed(2);
+          document.getElementById('popupChange').textContent = `${dayChg>0?'+':''}${dayChg}%`;
+          document.getElementById('popupChange').style.color = dayChg>=0?'#00ff88':'#ff4444';
+          // Prev day close
+          if(pcEl) pcEl.textContent = `Prev $${d.pc.toFixed(4)}`;
           // After-hrs badge
-          ahEl.textContent = `After hrs $${ahPrice.toFixed(4)} ${ahSign}${ahChg}%`;
-          ahEl.style.color = ahChg >= 0 ? '#00c853' : '#ff4444';
-          ahEl.style.display = 'inline';
-        } else if(ahEl){
-          ahEl.style.display = 'none';
+          if(ahEl){
+            ahEl.textContent = `After hrs $${d.after_hours_price.toFixed(4)} ${ahSign}${ahChg.toFixed(2)}%`;
+            ahEl.style.color = ahChg >= 0 ? '#00c853' : '#ff4444';
+            ahEl.style.display = 'inline';
+          }
+        } else {
+          // REGULAR HOURS: main=current price vs prev close
+          const chg = ((d.c - d.pc)/d.pc*100).toFixed(2);
+          document.getElementById('popupPrice').textContent = `$${d.c.toFixed(4)}`;
+          document.getElementById('popupChange').textContent = `${chg>0?'+':''}${chg}%`;
+          document.getElementById('popupChange').style.color = chg>=0?'#00ff88':'#ff4444';
+          if(pcEl) pcEl.textContent = `Prev $${d.pc.toFixed(4)}`;
+          if(ahEl) ahEl.style.display = 'none';
         }
 
         // Real bid/ask from Alpaca/Tradier
@@ -2892,6 +2900,8 @@ function expRender(){
     const os=rc.addLineSeries({color:'rgba(0,200,83,.5)',lineWidth:1,lineStyle:2,priceLineVisible:false});os.setData([{time:times[0],value:30},{time:times[times.length-1],value:30}]);
     rc.timeScale().fitContent();
     chart.subscribeCrosshairMove(p=>{if(p.time)rc.setCrosshairPosition(p.point?.x||0,0,rl);});
+    // Sync time scale so sub-chart follows main drag
+    chart.timeScale().subscribeVisibleLogicalRangeChange(range=>{if(range)rc.timeScale().setVisibleLogicalRange(range);});
   }
 
   if(exp.showMACD&&closes.length>=26){
@@ -3000,13 +3010,13 @@ async function load(i){
       const cnEl=document.getElementById('cn'+i);
       if(cnEl)cnEl.textContent=name||'';
     });
-    // Set last price in header from bars
-    if(sorted.length){
-      const lastBar=sorted[sorted.length-1];
+    // FIX 4: use bars[] not sorted (sorted is inside render scope)
+    if(bars.length){
+      const lastBar=bars[bars.length-1];
       const cpEl=document.getElementById('cp'+i);
       if(cpEl){
-        cpEl.textContent='$'+lastBar.c.toFixed(2);
-        cpEl.style.color=lastBar.c>=lastBar.o?'#00c853':'#ff1744';
+        cpEl.textContent='$'+(lastBar.close||lastBar.c||0).toFixed(4);
+        cpEl.style.color=(lastBar.close||lastBar.c||0)>=(lastBar.open||lastBar.o||0)?'#00c853':'#ff1744';
       }
     }
     render(i,bars);
@@ -3068,6 +3078,8 @@ function render(i,bars){
     const os=rc.addLineSeries({color:'rgba(0,200,83,.4)',lineWidth:1,lineStyle:2,priceLineVisible:false});os.setData([{time:times[0],value:30},{time:times[times.length-1],value:30}]);
     rc.timeScale().fitContent();
     chart.subscribeCrosshairMove(p=>{if(p.time)rc.setCrosshairPosition(p.point?.x||0,0,rl);});
+    // Sync time scale so sub-chart follows main drag
+    chart.timeScale().subscribeVisibleLogicalRangeChange(range=>{if(range)rc.timeScale().setVisibleLogicalRange(range);});
   }
 
   if(s.showMACD&&closes.length>=26){
@@ -3079,6 +3091,7 @@ function render(i,bars){
     const mll=mc.addLineSeries({color:'#00d4ff',lineWidth:1,priceLineVisible:false,title:'MACD'});mll.setData(times.map((t,j)=>({time:t,value:ml[j]})));
     const sgl=mc.addLineSeries({color:'#ff9100',lineWidth:1,priceLineVisible:false,title:'Sig'});sgl.setData(times.map((t,j)=>({time:t,value:sig[j]})));
     mc.timeScale().fitContent();
+    chart.timeScale().subscribeVisibleLogicalRangeChange(range=>{if(range)mc.timeScale().setVisibleLogicalRange(range);});
   }
 
   new ResizeObserver(()=>{
@@ -3120,6 +3133,16 @@ function render(i,bars){
         const bg=document.getElementById('bg'+i);
         if(bg)bg.textContent=tk+' · '+s.range+' · '+newBars.length+'bars · live · '
           +new Date().toLocaleTimeString('en-US',{hour12:true,hour:'numeric',minute:'2-digit',second:'2-digit'});
+        // Update price in header
+        if(newBars.length){
+          const lb=newBars[newBars.length-1];
+          const cpEl=document.getElementById('cp'+i);
+          if(cpEl){
+            const lc=lb.close||lb.c||0, lo=lb.open||lb.o||0;
+            cpEl.textContent='$'+lc.toFixed(4);
+            cpEl.style.color=lc>=lo?'#00c853':'#ff1744';
+          }
+        }
       }catch(e){}
     }, pInterval);
   }
