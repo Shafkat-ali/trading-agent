@@ -1879,6 +1879,26 @@
 
   // ── TICKER POPUP CHART — Tradier + live polling ──
   let popupChartInstance = null;
+  const popupInd = {Vol:true, EMA:false, RSI:false, MACD:false};
+  function togglePopupInd(ind){
+    popupInd[ind] = !popupInd[ind];
+    const btn = document.getElementById('popupInd'+ind);
+    const colors = {Vol:'#4a8aff', EMA:'#ff9100', RSI:'#a78bfa', MACD:'#00d4ff'};
+    if(btn){
+      if(popupInd[ind]){
+        btn.style.background = 'rgba(0,0,0,.3)';
+        btn.style.borderColor = colors[ind];
+        btn.style.color = colors[ind];
+      } else {
+        btn.style.background = '#0f1a2e';
+        btn.style.borderColor = '#1a2a4a';
+        btn.style.color = '#4a6a8a';
+      }
+    }
+    // Re-render with new indicator state
+    const ticker = document.getElementById('popupTicker')?.textContent;
+    if(ticker && ticker !== '--') popupLoadChart(ticker);
+  }
   let popupPollTimer     = null;
   let popupCurrentTicker = null;
   let popupCurrentTf     = '5Min';
@@ -1927,13 +1947,33 @@
       </select>
       <span id="popupPollBadge" style="font-size:.52rem;color:#00c853;margin-left:2px;">⟳ live</span>
       <span id="popupLastUpdate" style="font-size:.5rem;color:#3a5a7a;margin-left:4px;"></span>
+      <div style="display:flex;gap:3px;margin-left:6px;">
+        <button id="popupIndVol"  onclick="togglePopupInd('Vol')"  style="background:#1a3a6a;border:1px solid #4a8aff;border-radius:3px;color:#4a8aff;font-size:.5rem;padding:1px 5px;cursor:pointer;">Vol</button>
+        <button id="popupIndEMA"  onclick="togglePopupInd('EMA')"  style="background:#0f1a2e;border:1px solid #1a2a4a;border-radius:3px;color:#4a6a8a;font-size:.5rem;padding:1px 5px;cursor:pointer;">EMA</button>
+        <button id="popupIndRSI"  onclick="togglePopupInd('RSI')"  style="background:#0f1a2e;border:1px solid #1a2a4a;border-radius:3px;color:#4a6a8a;font-size:.5rem;padding:1px 5px;cursor:pointer;">RSI</button>
+        <button id="popupIndMACD" onclick="togglePopupInd('MACD')" style="background:#0f1a2e;border:1px solid #1a2a4a;border-radius:3px;color:#4a6a8a;font-size:.5rem;padding:1px 5px;cursor:pointer;">MACD</button>
+      </div>
     `;
     container.appendChild(ctrl);
 
     const chartDiv = document.createElement('div');
     chartDiv.id = 'popupChartDiv';
-    chartDiv.style.cssText = 'height:300px;position:relative;';
+    chartDiv.style.cssText = 'height:260px;position:relative;flex:1;';
     container.appendChild(chartDiv);
+
+    // RSI sub-panel
+    const rsiDiv = document.createElement('div');
+    rsiDiv.id = 'popupRsiDiv';
+    rsiDiv.style.cssText = 'height:70px;position:relative;border-top:1px solid #1a2a4a;display:none;';
+    rsiDiv.innerHTML = '<div style="position:absolute;top:2px;left:4px;font-size:.44rem;color:#3a5a7a;z-index:10;">RSI(14)</div><div id="popupRsiChart" style="width:100%;height:100%"></div>';
+    container.appendChild(rsiDiv);
+
+    // MACD sub-panel
+    const macdDiv = document.createElement('div');
+    macdDiv.id = 'popupMacdDiv';
+    macdDiv.style.cssText = 'height:70px;position:relative;border-top:1px solid #1a2a4a;display:none;';
+    macdDiv.innerHTML = '<div style="position:absolute;top:2px;left:4px;font-size:.44rem;color:#3a5a7a;z-index:10;">MACD</div><div id="popupMacdChart" style="width:100%;height:100%"></div>';
+    container.appendChild(macdDiv);
 
     // Change handlers
     ctrl.querySelector('#popupTf').onchange    = e => { popupCurrentTf=e.target.value; popupLoadChart(ticker); };
@@ -2036,15 +2076,25 @@
 
       // Full render
       if(popupChartInstance){ try{popupChartInstance.remove();}catch(e){} popupChartInstance=null; }
+      if(window._popupRsiChart){ try{window._popupRsiChart.remove();}catch(e){} window._popupRsiChart=null; }
+      if(window._popupMacdChart){ try{window._popupMacdChart.remove();}catch(e){} window._popupMacdChart=null; }
       chartDiv.innerHTML='';
+
+      // Show/hide sub-panels
+      const rsiDiv  = document.getElementById('popupRsiDiv');
+      const macdDiv = document.getElementById('popupMacdDiv');
+      if(rsiDiv)  rsiDiv.style.display  = popupInd.RSI  ? 'block' : 'none';
+      if(macdDiv) macdDiv.style.display = popupInd.MACD ? 'block' : 'none';
+      if(document.getElementById('popupRsiChart'))  document.getElementById('popupRsiChart').innerHTML='';
+      if(document.getElementById('popupMacdChart')) document.getElementById('popupMacdChart').innerHTML='';
 
       const chart = LightweightCharts.createChart(chartDiv,{
         width: chartDiv.clientWidth||chartDiv.offsetWidth||600,
-        height: chartDiv.clientHeight||chartDiv.offsetHeight||300,
+        height: chartDiv.clientHeight||chartDiv.offsetHeight||260,
         layout:{backgroundColor:'#060a12',textColor:'#8aa0c0'},
         grid:{vertLines:{color:'#0f1a2e'},horzLines:{color:'#0f1a2e'}},
         timeScale:{timeVisible:true,secondsVisible:false,borderColor:'#1a2a4a',localization:{timeFormatter:t=>{const d=new Date(t*1000);return d.toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit',hour12:true,timeZone:'America/New_York'});}}},
-        rightPriceScale:{borderColor:'#1a2a4a',scaleMarginTop:0.08,scaleMarginBottom:0.2},
+        rightPriceScale:{borderColor:'#1a2a4a',scaleMarginTop:0.08,scaleMarginBottom:popupInd.Vol?0.2:0.05},
         crosshair:{mode:1},
         handleScroll:{mouseWheel:true,pressedMouseMove:true},
         handleScale:{mouseWheel:true,pinch:true},
@@ -2055,12 +2105,12 @@
       candles.setData(sorted.map(b=>({time:b.t,open:b.o,high:b.h,low:b.l,close:b.c})));
       chart._candles = candles;
 
-      // VWAP
+      // VWAP — always on
       const vwpts = sorted.filter(b=>b.vw>0).map(b=>({time:b.t,value:b.vw}));
       if(vwpts.length){ const vl=chart.addLineSeries({color:'#ffd700',lineWidth:2,priceLineVisible:false,title:'VWAP'}); vl.setData(vwpts); }
 
       // EMA 9 + 20
-      if(closes.length>=20){
+      if(popupInd.EMA && closes.length>=20){
         const calcEMA=(d,p)=>{const k=2/(p+1);let e=null;return d.map(v=>{if(e===null)e=v;else e=v*k+e*(1-k);return e;});};
         const e9=calcEMA(closes,9), e20=calcEMA(closes,20);
         chart.addLineSeries({color:'#ff9100',lineWidth:1,priceLineVisible:false,title:'EMA9'}).setData(times.map((t,i)=>({time:t,value:e9[i]})));
@@ -2068,14 +2118,46 @@
       }
 
       // Volume
-      const vs=chart.addHistogramSeries({color:'#1a3a6a',priceFormat:{type:'volume'},priceScaleId:'vol'});
-      chart.priceScale('vol').applyOptions({scaleMarginTop:0.8,scaleMarginBottom:0,borderColor:'#1a2a4a'});
-      vs.setData(sorted.map(b=>({time:b.t,value:b.v,color:b.c>=b.o?'rgba(0,200,83,.35)':'rgba(255,23,68,.35)'})));
+      if(popupInd.Vol){
+        const vs=chart.addHistogramSeries({color:'#1a3a6a',priceFormat:{type:'volume'},priceScaleId:'vol'});
+        chart.priceScale('vol').applyOptions({scaleMarginTop:0.8,scaleMarginBottom:0,borderColor:'#1a2a4a'});
+        vs.setData(sorted.map(b=>({time:b.t,value:b.v,color:b.c>=b.o?'rgba(0,200,83,.35)':'rgba(255,23,68,.35)'})));
+      }
 
       chart.timeScale().fitContent();
 
+      // RSI sub-chart
+      if(popupInd.RSI && closes.length>=14 && document.getElementById('popupRsiChart')){
+        const re=document.getElementById('popupRsiChart');
+        const calcRSI=(c,p=14)=>c.map((_,i)=>{if(i<p)return null;let g=0,l=0;for(let j=i-p+1;j<=i;j++){const d=c[j]-c[j-1];if(d>0)g+=d;else l-=d;}const rs=(g/p)/((l/p)||0.0001);return 100-100/(1+rs);});
+        const rc=LightweightCharts.createChart(re,{width:re.clientWidth,height:re.clientHeight||65,layout:{backgroundColor:'#040810',textColor:'#5a7a9a'},grid:{vertLines:{color:'#0a1020'},horzLines:{color:'#0a1020'}},timeScale:{visible:false},rightPriceScale:{borderColor:'#1a2a4a'},crosshair:{mode:1},handleScroll:false,handleScale:false});
+        window._popupRsiChart=rc;
+        const rv=calcRSI(closes);
+        const rl=rc.addLineSeries({color:'#a78bfa',lineWidth:1,priceLineVisible:false});
+        rl.setData(times.map((t,j)=>rv[j]!==null?{time:t,value:rv[j]}:null).filter(Boolean));
+        const ob=rc.addLineSeries({color:'rgba(255,68,68,.4)',lineWidth:1,lineStyle:2,priceLineVisible:false});ob.setData([{time:times[0],value:70},{time:times[times.length-1],value:70}]);
+        const os=rc.addLineSeries({color:'rgba(0,200,83,.4)',lineWidth:1,lineStyle:2,priceLineVisible:false});os.setData([{time:times[0],value:30},{time:times[times.length-1],value:30}]);
+        rc.timeScale().fitContent();
+      }
+
+      // MACD sub-chart
+      if(popupInd.MACD && closes.length>=26 && document.getElementById('popupMacdChart')){
+        const me=document.getElementById('popupMacdChart');
+        const calcEMA2=(d,p)=>{const k=2/(p+1);let e=null;return d.map(v=>{if(e===null)e=v;else e=v*k+e*(1-k);return e;});};
+        const eF=calcEMA2(closes,12),eS=calcEMA2(closes,26);
+        const ml=eF.map((v,i)=>v-eS[i]);
+        const sig=calcEMA2(ml,9);
+        const h=ml.map((v,i)=>v-sig[i]);
+        const mc=LightweightCharts.createChart(me,{width:me.clientWidth,height:me.clientHeight||65,layout:{backgroundColor:'#040810',textColor:'#5a7a9a'},grid:{vertLines:{color:'#0a1020'},horzLines:{color:'#0a1020'}},timeScale:{visible:false},rightPriceScale:{borderColor:'#1a2a4a'},crosshair:{mode:1},handleScroll:false,handleScale:false});
+        window._popupMacdChart=mc;
+        mc.addHistogramSeries({priceLineVisible:false}).setData(times.map((t,j)=>({time:t,value:h[j],color:h[j]>=0?'rgba(0,200,83,.6)':'rgba(255,23,68,.6)'})));
+        mc.addLineSeries({color:'#00d4ff',lineWidth:1,priceLineVisible:false}).setData(times.map((t,j)=>({time:t,value:ml[j]})));
+        mc.addLineSeries({color:'#ff9100',lineWidth:1,priceLineVisible:false}).setData(times.map((t,j)=>({time:t,value:sig[j]})));
+        mc.timeScale().fitContent();
+      }
+
       const lu = document.getElementById('popupLastUpdate');
-      if(lu) lu.textContent = new Date().toLocaleTimeString('en-US',{hour12:true,hour:'numeric',minute:'2-digit',second:'2-digit'});
+      if(lu) lu.textContent = new Date().toLocaleTimeString('en-US',{hour12:true,hour:'numeric',minute:'2-digit',second:'2-digit',timeZone:'America/New_York'});
 
       new ResizeObserver(()=>{ if(popupChartInstance) popupChartInstance.resize(chartDiv.clientWidth,chartDiv.clientHeight); }).observe(chartDiv);
 
@@ -2105,16 +2187,20 @@
 
         // ── After-hours price (like Yahoo Finance) ──
         const ahEl = document.getElementById('popupAfterHours');
-        if(ahEl){
-          if(d.after_hours_price && d.is_extended){
-            const ahChg = d.after_hours_change;
-            const ahSign = ahChg >= 0 ? '+' : '';
-            ahEl.textContent = `After hrs $${d.after_hours_price.toFixed(2)} ${ahSign}${ahChg}%`;
-            ahEl.style.color = ahChg >= 0 ? '#00c853' : '#ff4444';
-            ahEl.style.display = 'inline';
-          } else {
-            ahEl.style.display = 'none';
-          }
+        if(ahEl && d.is_extended && d.pc > 0){
+          // During extended hours: show last as after-hrs price vs prev close
+          const ahPrice = d.c;
+          const ahChg   = ((ahPrice - d.pc) / d.pc * 100).toFixed(2);
+          const ahSign  = ahChg >= 0 ? '+' : '';
+          ahEl.textContent = `After hrs $${ahPrice.toFixed(2)} ${ahSign}${ahChg}%`;
+          ahEl.style.color = ahChg >= 0 ? '#00c853' : '#ff4444';
+          ahEl.style.display = 'inline';
+          // Show regular close price separately
+          document.getElementById('popupPrice').textContent = `$${d.pc.toFixed(2)}`;
+          document.getElementById('popupChange').textContent = `Close`;
+          document.getElementById('popupChange').style.color = '#6a8aaa';
+        } else if(ahEl){
+          ahEl.style.display = 'none';
         }
 
         // Real bid/ask from Alpaca/Tradier
@@ -2832,7 +2918,9 @@ function init(){
     d.innerHTML=\`
       <div class="cell-hdr">
         <input class="tk" id="tk\${i}" placeholder="AAPL" oninput="this.value=this.value.toUpperCase()" onkeydown="if(event.key==='Enter')load(\${i})">
-        <span id="cn\${i}" style="font-size:.48rem;color:#4a6a8a;white-space:nowrap;max-width:100px;overflow:hidden;text-overflow:ellipsis;"></span>
+        <span id="cn\${i}" style="font-size:.48rem;color:#4a6a8a;white-space:nowrap;max-width:90px;overflow:hidden;text-overflow:ellipsis;"></span>
+        <span id="cp\${i}" style="font-size:.58rem;font-weight:700;color:#00c853;margin-left:auto;white-space:nowrap;"></span>
+        <span id="cah\${i}" style="font-size:.48rem;color:#ffd700;white-space:nowrap;display:none;"></span>
         <select class="rng-sel" id="rngSel\${i}" onchange="setRange(\${i},this.value)">
           <option value="1D">1D<\/option><option value="2D" selected>2D<\/option>
           <option value="5D">5D<\/option><option value="10D">10D<\/option>
@@ -2910,6 +2998,15 @@ async function load(i){
       const cnEl=document.getElementById('cn'+i);
       if(cnEl)cnEl.textContent=name||'';
     });
+    // Set last price in header from bars
+    if(sorted.length){
+      const lastBar=sorted[sorted.length-1];
+      const cpEl=document.getElementById('cp'+i);
+      if(cpEl){
+        cpEl.textContent='$'+lastBar.c.toFixed(2);
+        cpEl.style.color=lastBar.c>=lastBar.o?'#00c853':'#ff1744';
+      }
+    }
     render(i,bars);
   }catch(e){document.getElementById('cw'+i).innerHTML='<div class="ph"><span style="color:#ff4444">'+e.message+'<\/span><\/div>';}
 }
