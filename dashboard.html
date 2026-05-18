@@ -511,6 +511,7 @@
           <span class="popup-ticker" id="popupTicker">--</span>
           <span class="popup-price"  id="popupPrice" style="color:#00ff88">$--</span>
           <span class="popup-change" id="popupChange"></span>
+          <span id="popupAfterHours" style="display:none;font-size:.65rem;color:#ffd700;margin-left:6px;font-weight:600;"></span>
         </div>
         <!-- Company centered on its own line -->
         <div class="popup-company" id="popupCompany"></div>
@@ -2042,7 +2043,7 @@
         height: chartDiv.clientHeight||chartDiv.offsetHeight||300,
         layout:{backgroundColor:'#060a12',textColor:'#8aa0c0'},
         grid:{vertLines:{color:'#0f1a2e'},horzLines:{color:'#0f1a2e'}},
-        timeScale:{timeVisible:true,secondsVisible:false,borderColor:'#1a2a4a'},
+        timeScale:{timeVisible:true,secondsVisible:false,borderColor:'#1a2a4a',localization:{timeFormatter:t=>{const d=new Date(t*1000);return d.toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit',hour12:true,timeZone:'America/New_York'});}}},
         rightPriceScale:{borderColor:'#1a2a4a',scaleMarginTop:0.08,scaleMarginBottom:0.2},
         crosshair:{mode:1},
         handleScroll:{mouseWheel:true,pressedMouseMove:true},
@@ -2094,14 +2095,29 @@
 
   async function fetchQuote(ticker){
     try{
-      const r=await fetch(`${API_URL}/api/stock/quote/${ticker}`);
+      const r=await fetch(`${API_URL}/api/stock/quote/${ticker}?user=${currentUser?.id||'shafkat'}`);
       const d=await r.json();
       if(d&&d.c&&d.c>0){
         const chg=((d.c-d.pc)/d.pc*100).toFixed(2);
         document.getElementById('popupPrice').textContent=`$${d.c.toFixed(2)}`;
         document.getElementById('popupChange').textContent=`${chg>0?'+':''}${chg}%`;
         document.getElementById('popupChange').style.color=chg>=0?'#00ff88':'#ff4444';
-        // Real bid/ask from Alpaca
+
+        // ── After-hours price (like Yahoo Finance) ──
+        const ahEl = document.getElementById('popupAfterHours');
+        if(ahEl){
+          if(d.after_hours_price && d.is_extended){
+            const ahChg = d.after_hours_change;
+            const ahSign = ahChg >= 0 ? '+' : '';
+            ahEl.textContent = `After hrs $${d.after_hours_price.toFixed(2)} ${ahSign}${ahChg}%`;
+            ahEl.style.color = ahChg >= 0 ? '#00c853' : '#ff4444';
+            ahEl.style.display = 'inline';
+          } else {
+            ahEl.style.display = 'none';
+          }
+        }
+
+        // Real bid/ask from Alpaca/Tradier
         if(d.bid&&d.ask&&d.bid>0&&d.ask>0){
           const spread=((d.ask-d.bid)/((d.ask+d.bid)/2)*100).toFixed(2);
           document.getElementById('popupBid').textContent=`$${d.bid.toFixed(2)}`;
@@ -2752,7 +2768,7 @@ function expRender(){
     width:cw.clientWidth,height:cw.clientHeight,
     layout:{backgroundColor:'#060a12',textColor:'#8aa0c0'},
     grid:{vertLines:{color:'#0f1a2e'},horzLines:{color:'#0f1a2e'}},
-    timeScale:{timeVisible:true,secondsVisible:false,borderColor:'#1a2a4a'},
+    timeScale:{timeVisible:true,secondsVisible:false,borderColor:'#1a2a4a',localization:{timeFormatter:t=>{const d=new Date(t*1000);return d.toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit',hour12:true,timeZone:'America/New_York'});}}},
     rightPriceScale:{borderColor:'#1a2a4a',scaleMarginTop:0.08,scaleMarginBottom:exp.showVol?0.2:0.05},
     crosshair:{mode:1},handleScroll:{mouseWheel:true,pressedMouseMove:true},handleScale:{mouseWheel:true,pinch:true},
   });
@@ -2916,7 +2932,7 @@ function render(i,bars){
     width:cw.clientWidth,height:cw.clientHeight,
     layout:{backgroundColor:'#060a12',textColor:'#8aa0c0'},
     grid:{vertLines:{color:'#0f1a2e'},horzLines:{color:'#0f1a2e'}},
-    timeScale:{timeVisible:true,secondsVisible:false,borderColor:'#1a2a4a'},
+    timeScale:{timeVisible:true,secondsVisible:false,borderColor:'#1a2a4a',localization:{timeFormatter:t=>{const d=new Date(t*1000);return d.toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit',hour12:true,timeZone:'America/New_York'});}}},
     rightPriceScale:{borderColor:'#1a2a4a',scaleMarginTop:0.1,scaleMarginBottom:s.showVol?0.22:0.05},
     crosshair:{mode:1},handleScroll:{mouseWheel:true,pressedMouseMove:true},handleScale:{mouseWheel:true,pinch:true},
   });
@@ -3174,7 +3190,7 @@ const DEFAULT_TF      = '5Min';
         width:w,height:h,
         layout:{backgroundColor:'#060a12',textColor:'#8aa0c0'},
         grid:{vertLines:{color:'#0f1a2e'},horzLines:{color:'#0f1a2e'}},
-        timeScale:{timeVisible:true,secondsVisible:false,borderColor:'#1a2a4a'},
+        timeScale:{timeVisible:true,secondsVisible:false,borderColor:'#1a2a4a',localization:{timeFormatter:t=>{const d=new Date(t*1000);return d.toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit',hour12:true,timeZone:'America/New_York'});}}},
         rightPriceScale:{borderColor:'#1a2a4a'},
         crosshair:{mode:1},
         handleScroll:{mouseWheel:true,pressedMouseMove:true},

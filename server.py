@@ -582,37 +582,83 @@ async def clear_alerts_route(user_id: str):
 # ── STOCK DATA — Alpaca primary, Finnhub fallback ──
 
 @app.get("/api/stock/quote/{ticker}")
-async def get_stock_quote(ticker: str):
-    """Real bid/ask from Alpaca, fallback to Finnhub"""
-    snap = alpaca_get_snapshot(ticker)
-    if snap and snap.get('price', 0) > 0:
-        # Format to match what dashboard expects (c, pc, h, l, o fields)
-        return {
-            'c':      snap['price'],
-            'pc':     snap['prev_close'],
-            'h':      snap['high'],
-            'l':      snap['low'],
-            'o':      snap['open'],
-            'v':      snap['volume'],
-            'bid':    snap['bid'],
-            'ask':    snap['ask'],
-            'bid_size': snap.get('bid_size', 0),
-            'ask_size': snap.get('ask_size', 0),
-            'vwap':   snap['vwap'],
-            'rvol':   snap['rvol'],
-            'source': 'alpaca',
-        }
-    # Finnhub fallback
+async def get_stock_quote(ticker: str, user: str = "shafkat"):
+    """Real bid/ask from Tradier (includes after-hours), fallback to Alpaca then Finnhub"""
+
+    # ── Try Tradier first — real-time including pre/post market ──
     try:
         r = requests.get(
-            "https://finnhub.io/api/v1/quote",
-            params={'symbol': ticker, 'token': FINNHUB_KEY},
-            timeout=4
+            f"{TRADIER_API_URL}/markets/quotes",
+            headers=get_tradier_headers(user),
+            params={'symbols': ticker, 'greeks': 'false'},
+            timeout=6
         )
         if r.status_code == 200:
-            d = r.json(); d['source'] = 'finnhub'; return d
-    except:
-        pass
+            q = r.json().get('quotes', {}).get('quote', {})
+            if isinstance(q, list): q = q[0] if q else {}
+            if q and q.get('last'):
+                price      = float(q.get('last') or 0)
+                prev_close = float(q.get('prevclose') or 0)
+                bid        = float(q.get('bid') or 0)
+                ask        = float(q.get('ask') or 0)
+                volume     = float(q.get('volume') or 0)
+                avg_vol    = float(q.get('average_volume') or 1) or 1
+
+                # After-hours: Tradier returns last trade even after 4pm
+                # Check if we're outside regular hours
+                from datetime import datetime
+                import pytz
+                now_et = datetime.now(pytz.timezone('America/New_York'))
+                h = now_et.hour
+                is_extended = (h < 9 or (h == 9 and now_et.minute < 30) or h >= 16)
+
+                after_hours_price = None
+                after_hours_change = None
+                if is_extended and prev_close > 0:
+                    after_hours_price  = price
+                    after_hours_change = round(((price - prev_close) / prev_close) * 100, 2)
+
+                return {
+                    'c':    price, 'pc': prev_close,
+                    'h':    float(q.get('high') or 0),
+                    'l':    float(q.get('low') or 0),
+                    'o':    float(q.get('open') or 0),
+                    'v':    volume,
+                    'bid':  bid, 'ask': ask,
+                    'bid_size': float(q.get('bidsize') or 0),
+                    'ask_size': float(q.get('asksize') or 0),
+                    'vwap': float(q.get('vwap') or 0),
+                    'rvol': round(volume / avg_vol, 1),
+                    'after_hours_price':  after_hours_price,
+                    'after_hours_change': after_hours_change,
+                    'is_extended': is_extended,
+                    'source': 'tradier',
+                }
+    except Exception as e:
+        log_alert(f"⚠️ Tradier quote {ticker}: {e}")
+
+    # ── Alpaca fallback ──
+    snap = alpaca_get_snapshot(ticker)
+    if snap and snap.get('price', 0) > 0:
+        return {
+            'c': snap['price'], 'pc': snap['prev_close'],
+            'h': snap['high'],  'l':  snap['low'], 'o': snap['open'],
+            'v': snap['volume'], 'bid': snap['bid'], 'ask': snap['ask'],
+            'bid_size': snap.get('bid_size', 0), 'ask_size': snap.get('ask_size', 0),
+            'vwap': snap['vwap'], 'rvol': snap['rvol'],
+            'after_hours_price': None, 'after_hours_change': None,
+            'source': 'alpaca',
+        }
+
+    # ── Finnhub fallback ──
+    try:
+        r = requests.get("https://finnhub.io/api/v1/quote",
+            params={'symbol': ticker, 'token': FINNHUB_KEY}, timeout=4)
+        if r.status_code == 200:
+            d = r.json(); d['source'] = 'finnhub'
+            d['after_hours_price'] = None; d['after_hours_change'] = None
+            return d
+    except: pass
     return {'error': 'Quote unavailable'}
 
 @app.get("/api/stock/snapshot/{ticker}")
