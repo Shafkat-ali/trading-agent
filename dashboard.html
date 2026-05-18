@@ -1907,9 +1907,16 @@
 
     // Change handlers
     ctrl.querySelector('#popupTf').onchange    = e => { popupCurrentTf=e.target.value; popupLoadChart(ticker); };
-    ctrl.querySelector('#popupRange').onchange = e => { popupLoadChart(ticker); };
+    ctrl.querySelector('#popupRange').onchange = e => {
+      const r=e.target.value;
+      syncTfDropdown('popupTf', r);
+      const autoTf=document.getElementById('popupTf')?.value||AUTO_TF[r]||'1Min';
+      popupCurrentTf=autoTf;
+      popupLoadChart(ticker);
+    };
 
-    // Initial load
+    // Sync dropdowns on open then load
+    syncTfDropdown('popupTf','2D');
     popupLoadChart(ticker);
   }
 
@@ -2472,11 +2479,11 @@ function parseT(t){if(!t)return 0;return Math.floor(new Date(t.includes('T')?t:t
 const RANGES={
   '1D':   {days:1,    tf:'1Min'},
   '2D':   {days:2,    tf:'1Min'},
-  '5D':   {days:5,    tf:'5Min'},
-  '10D':  {days:10,   tf:'5Min'},
-  '15D':  {days:15,   tf:'15Min'},
-  '1M':   {days:30,   tf:'15Min'},
-  '2M':   {days:60,   tf:'15Min'},
+  '5D':   {days:5,    tf:'1Min'},
+  '10D':  {days:10,   tf:'1Min'},
+  '15D':  {days:15,   tf:'1Min'},
+  '1M':   {days:30,   tf:'1Min'},
+  '2M':   {days:60,   tf:'1Day'},
   '3M':   {days:90,   tf:'1Day'},
   '6M':   {days:180,  tf:'1Day'},
   'YTD':  {days:null, ytd:true, tf:'1Day'},
@@ -2488,6 +2495,51 @@ const RANGES={
   '10Y':  {days:3650, tf:'1Day'},
   '20Y':  {days:7300, tf:'1Day'},
 };
+// Auto-interval per range based on Tradier actual limits (tested)
+// 1m/5m/15m work up to 1 month, 1D works for everything
+const AUTO_TF={
+  '1D':'1Min','2D':'1Min','5D':'1Min','10D':'1Min','15D':'1Min',
+  '1M':'1Min',
+  '2M':'1Day','3M':'1Day','6M':'1Day',
+  'YTD':'1Day','1Y':'1Day','2Y':'1Day','3Y':'1Day','4Y':'1Day',
+  '5Y':'1Day','10Y':'1Day','20Y':'1Day',
+};
+
+// Which intervals are valid for each range
+const VALID_TF={
+  '1D':   ['1Min','5Min','15Min','1Day'],
+  '2D':   ['1Min','5Min','15Min','1Day'],
+  '5D':   ['1Min','5Min','15Min','1Day'],
+  '10D':  ['1Min','5Min','15Min','1Day'],
+  '15D':  ['1Min','5Min','15Min','1Day'],
+  '1M':   ['1Min','5Min','15Min','1Day'],
+  '2M':   ['1Day'],
+  '3M':   ['1Day'],
+  '6M':   ['1Day'],
+  'YTD':  ['1Day'],
+  '1Y':   ['1Day'],
+  '2Y':   ['1Day'],
+  '3Y':   ['1Day'],
+  '4Y':   ['1Day'],
+  '5Y':   ['1Day'],
+  '10Y':  ['1Day'],
+  '20Y':  ['1Day'],
+};
+
+// Update interval dropdown — disable options that don't work for selected range
+function syncTfDropdown(tfSelId, range){
+  const sel=document.getElementById(tfSelId);
+  if(!sel)return;
+  const valid=VALID_TF[range]||['1Min','5Min','15Min','1Day'];
+  Array.from(sel.options).forEach(opt=>{
+    opt.disabled=!valid.includes(opt.value);
+    opt.style.color=!valid.includes(opt.value)?'#3a3a4a':'';
+  });
+  // If current selection is now disabled, auto-switch
+  if(sel.options[sel.selectedIndex]?.disabled){
+    sel.value=AUTO_TF[range]||'1Day';
+  }
+}
 
 function buildUrl(ticker,range,tf){
   let t=tf||'1Min', extra='';
@@ -2543,10 +2595,9 @@ function closeExpand(){
 
 function expSetRange(r){
   exp.range=r;
-  // Auto-set sensible interval for this range
-  const autoTf=RANGES[r]?.tf||'5Min';
+  syncTfDropdown('expTf', r);
+  const autoTf=document.getElementById('expTf')?.value||AUTO_TF[r]||'1Min';
   exp.tf=autoTf;
-  document.getElementById('expTf').value=autoTf;
   const tk=(document.getElementById('expTicker').value||'').trim().toUpperCase();
   if(tk)expLoad();
 }
@@ -2693,8 +2744,9 @@ function init(){
 
 function setRange(i,r){
   state[i].range=r;
-  const tf=RANGES[r]?.tf||'5Min';state[i].tf=tf;
-  const sel=document.getElementById('tf'+i);if(sel)sel.value=tf;
+  syncTfDropdown('tf'+i, r);
+  const autoTf=document.getElementById('tf'+i)?.value||AUTO_TF[r]||'1Min';
+  state[i].tf=autoTf;
   const rsel=document.getElementById('rngSel'+i);if(rsel)rsel.value=r;
   const tk=(document.getElementById('tk'+i).value||'').trim().toUpperCase();
   if(tk)load(i);
