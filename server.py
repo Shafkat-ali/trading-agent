@@ -9,6 +9,7 @@ import smtplib
 import threading
 import csv
 import io
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 from datetime import datetime, timedelta
@@ -95,6 +96,7 @@ halt_cache_ts  = None
 # Company info cache
 _company_cache = {}
 _tradier_lookup_cache = {'ts': None, 'tickers': []}
+_listed_symbol_cache = {'ts': None, 'tickers': []}
 
 SCAN_MODES = {
     'morning_gap': {
@@ -1650,6 +1652,54 @@ def get_tradier_quotes(symbols, user_id='shafkat'):
     return results, None
 
 
+def get_tradier_quotes_parallel(symbols, user_id='shafkat', max_workers=6):
+    """Quote a broad symbol list faster by requesting Tradier chunks concurrently."""
+    results = {}
+    if not symbols:
+        return results, "No symbols to quote"
+
+    headers = get_tradier_headers(user_id)
+    chunks = [symbols[i:i+200] for i in range(0, len(symbols), 200)]
+
+    def fetch_chunk(chunk):
+        try:
+            r = requests.get(
+                f"{TRADIER_API_URL}/markets/quotes",
+                headers=headers,
+                params={'symbols': ','.join(chunk), 'greeks': 'false'},
+                timeout=7
+            )
+            if r.status_code == 200:
+                chunk_results = {}
+                quotes = r.json().get('quotes', {}).get('quote', [])
+                if isinstance(quotes, dict):
+                    quotes = [quotes]
+                for q in quotes:
+                    sym = q.get('symbol', '')
+                    if sym:
+                        chunk_results[sym] = q
+                return chunk_results, None
+            if r.status_code == 403:
+                return {}, f"Tradier quotes HTTP 403 - check API key for user '{user_id}'"
+            return {}, f"Tradier quotes HTTP {r.status_code}: {r.text[:100]}"
+        except Exception as e:
+            return {}, f"Tradier quotes exception: {e}"
+
+    workers = min(max_workers, len(chunks))
+    with ThreadPoolExecutor(max_workers=workers) as executor:
+        futures = [executor.submit(fetch_chunk, chunk) for chunk in chunks]
+        for future in as_completed(futures):
+            chunk_results, err = future.result()
+            if chunk_results:
+                results.update(chunk_results)
+            if err:
+                log_alert(f"Tradier quote warning: {err}")
+                return results, err
+
+    log_alert(f"Tradier parallel quotes [{user_id}]: {len(results)}/{len(symbols)} returned")
+    return results, None
+
+
 def get_tradier_lookup_universe(user_id='shafkat'):
     """Build a broader symbol universe from Tradier lookup searches."""
     now = datetime.now()
@@ -1683,6 +1733,81 @@ def get_tradier_lookup_universe(user_id='shafkat'):
     _tradier_lookup_cache['tickers'] = result
     log_alert(f"📡 Tradier lookup universe: {len(result)} symbols")
     return result
+
+
+def get_listed_symbol_universe():
+    """Fetch listed US symbols, then use Tradier quotes to screen them."""
+    now = datetime.now()
+    if _listed_symbol_cache['ts'] and (now - _listed_symbol_cache['ts']).total_seconds() < 21600:
+        return _listed_symbol_cache['tickers']
+
+    tickers = set()
+    sources = [
+        ('nasdaq', 'https://www.nasdaqtrader.com/dynamic/SymDir/nasdaqlisted.txt'),
+        ('other', 'https://www.nasdaqtrader.com/dynamic/SymDir/otherlisted.txt'),
+    ]
+    for name, url in sources:
+        try:
+            r = requests.get(url, headers={'User-Agent':'Mozilla/5.0'}, timeout=6)
+            if r.status_code != 200:
+                log_alert(f"Listed symbols {name} HTTP {r.status_code}")
+                continue
+            lines = r.text.splitlines()
+            if not lines:
+                continue
+            headers = lines[0].split('|')
+            symbol_idx = 0
+            test_idx = headers.index('Test Issue') if 'Test Issue' in headers else -1
+            etf_idx = headers.index('ETF') if 'ETF' in headers else -1
+            for line in lines[1:]:
+                if not line or line.startswith('File Creation Time'):
+                    continue
+                parts = line.split('|')
+                if len(parts) <= symbol_idx:
+                    continue
+                if test_idx >= 0 and len(parts) > test_idx and parts[test_idx].upper() == 'Y':
+                    continue
+                if etf_idx >= 0 and len(parts) > etf_idx and parts[etf_idx].upper() == 'Y':
+                    continue
+                sym = parts[symbol_idx].strip().upper()
+                if sym and sym.isalpha() and len(sym) <= 5:
+                    tickers.add(sym)
+        except Exception as e:
+            log_alert(f"Listed symbols {name}: {e}")
+
+    result = sorted(tickers)
+    _listed_symbol_cache['ts'] = now
+    _listed_symbol_cache['tickers'] = result
+    log_alert(f"Listed symbol universe: {len(result)} symbols")
+    return result
+
+
+def filter_tradier_quote_map(quote_map, filters, source):
+    candidates = []
+    for sym, q in quote_map.items():
+        try:
+            price      = float(q.get('last') or q.get('bid') or 0)
+            prev_close = float(q.get('prevclose') or 0)
+            volume     = float(q.get('volume') or 0)
+            trades     = float(q.get('trades') or q.get('trade_count') or q.get('num_trades') or 0)
+            avg_vol    = float(q.get('average_volume') or 1) or 1
+            if price <= 0 or prev_close <= 0:
+                continue
+            pct        = ((price - prev_close) / prev_close) * 100
+            dollar_vol = price * volume
+            rvol       = round(volume / avg_vol, 1)
+            if not (filters['min_price'] <= price <= filters['max_price']): continue
+            if pct < filters['min_gap_pct']: continue
+            if dollar_vol < filters['min_dollar_vol']: continue
+            if volume < filters.get('min_volume', 0): continue
+            if trades and trades < filters.get('min_trades', 0): continue
+            candidates.append({'ticker':sym,'price':price,'prev_close':prev_close,
+                'gap_pct':round(pct,1),'volume':volume,'dollar_vol':dollar_vol,
+                'trades':trades,'bid':float(q.get('bid') or 0),'ask':float(q.get('ask') or 0),
+                'rvol':rvol,'source':source})
+        except:
+            continue
+    return candidates
 
 
 def get_tradier_movers(filters, user_id='shafkat'):
@@ -2141,6 +2266,7 @@ async def do_scan(user_id, scan_id=None):
                     if not (filters['min_price'] <= price <= filters['max_price']): continue
                     if pct < filters['min_gap_pct']:                               continue
                     if dollar_vol < filters['min_dollar_vol']:                     continue
+                    if volume < filters.get('min_volume', 0):                      continue
                     if trades and trades < filters.get('min_trades', 0):           continue
                     candidates.append({'ticker':sym,'price':price,'prev_close':prev_close,
                         'gap_pct':round(pct,1),'volume':volume,'dollar_vol':dollar_vol,
@@ -2185,6 +2311,33 @@ async def do_scan(user_id, scan_id=None):
             if len(candidates) > before:
                 scan_source = f'{scan_source}+tradier-lookup'
             log_alert(f"🔍 [{user_id}] Tradier lookup filter: {len(lookup_quotes)} quoted → {len(candidates)-before} added | error: {lookup_error or 'none'}")
+
+    if mode == 'scanopp' and len(candidates) < 20:
+        listed_universe = get_listed_symbol_universe()
+        known_symbols = {c.get('ticker') for c in candidates if c.get('ticker')}
+        existing_universe = set(universe or [])
+        extra_symbols = [
+            sym for sym in listed_universe
+            if sym not in known_symbols and sym not in existing_universe
+        ]
+        if extra_symbols:
+            status['message'] = f'Expanding ScanOpp with {len(extra_symbols)} listed symbols via Tradier...'
+            await broadcast_to_user(user_id, {'type':'scan_status','status':status})
+            await asyncio.sleep(0)
+            listed_quotes, listed_error = get_tradier_quotes_parallel(extra_symbols, user_id)
+            listed_candidates = filter_tradier_quote_map(listed_quotes, filters, 'tradier-listed')
+            if listed_candidates:
+                by_symbol = {c.get('ticker'): c for c in candidates if c.get('ticker')}
+                for c in listed_candidates:
+                    sym = c.get('ticker')
+                    if sym and (sym not in by_symbol or c.get('dollar_vol', 0) > by_symbol[sym].get('dollar_vol', 0)):
+                        by_symbol[sym] = c
+                before = len(candidates)
+                candidates = list(by_symbol.values())
+                candidates.sort(key=lambda x: x.get('gap_pct', 0), reverse=True)
+                if len(candidates) > before:
+                    scan_source = f'{scan_source}+tradier-listed'
+            log_alert(f"[{user_id}] Tradier listed filter: {len(listed_quotes)} quoted -> {len(listed_candidates)} passed | error: {listed_error or 'none'}")
 
     # Fallback: Polygon
     if not candidates:
