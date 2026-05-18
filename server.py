@@ -102,9 +102,9 @@ SCAN_MODES = {
         'min_volume':50_000,'min_rvol':0,'max_float_m':20.0,'max_mktcap_m':0,'require_news':False,
     },
     'scanopp': {
-        'label':'💡 ScanOpp', 'desc':'Price $0.50–$15, Gap 9%+, $Vol $3M+, Trades 3K+',
-        'min_price':0.50,'max_price':15.00,'min_gap':9.0,'min_dvol':3_000_000,
-        'min_volume':300_000,'min_rvol':0,'max_float_m':0,'max_mktcap_m':0,'require_news':False,
+        'label':'💡 ScanOpp', 'desc':'Price $0.50–$20, % Chg 15%+, $Vol $3M+, Trades 3K+',
+        'min_price':0.50,'max_price':20.00,'min_gap':15.0,'min_dvol':3_000_000,
+        'min_volume':0,'min_trades':3_000,'min_rvol':0,'max_float_m':0,'max_mktcap_m':0,'require_news':False,
     },
     'afterhrs': {
         'label':'AfterHrs', 'desc':'Price under $50, within 10% of VWAP, $Vol $100K+',
@@ -516,6 +516,7 @@ async def set_scan_mode(user_id: str, mode: str):
         'min_gap_pct':      m['min_gap'],
         'min_dollar_vol':   m['min_dvol'],
         'min_volume':       m['min_volume'],
+        'min_trades':       m.get('min_trades', 0),
         'min_rvol':         m['min_rvol'],
         'max_float_m':      m['max_float_m'],
         'max_market_cap_m': m['max_mktcap_m'],
@@ -1810,6 +1811,7 @@ def get_polygon_gainers(filters):
                 price      = last.get('p') or day.get('c', 0)
                 prev_close = prev.get('c', 0)
                 volume     = day.get('v', 0)
+                trades     = day.get('n', 0) or t.get('trades', 0) or 0
                 prev_vol   = prev.get('v', 1) or 1
                 if not (price and prev_close and price > 0 and prev_close > 0): continue
                 pct        = ((price - prev_close) / prev_close) * 100
@@ -1821,6 +1823,7 @@ def get_polygon_gainers(filters):
                 if pct < filters['min_gap_pct']:                               continue
                 if dollar_vol < filters['min_dollar_vol']:                     continue
                 if volume < filters.get('min_volume', 0):                      continue
+                if trades and trades < filters.get('min_trades', 0):           continue
                 if rvol < filters.get('min_rvol', 0):                          continue
 
                 candidates.append({
@@ -1830,6 +1833,7 @@ def get_polygon_gainers(filters):
                     'gap_pct':    round(float(pct), 1),
                     'volume':     float(volume),
                     'dollar_vol': float(dollar_vol),
+                    'trades':     float(trades),
                     'rvol':       rvol,
                     'source':     'polygon',
                 })
@@ -1858,6 +1862,7 @@ def get_yahoo_gainers(filters):
                 price      = q.get('regularMarketPrice', 0)
                 pct        = q.get('regularMarketChangePercent', 0)
                 vol        = q.get('regularMarketVolume', 0)
+                trades     = q.get('regularMarketTradeCount', 0) or q.get('tradeCount', 0) or 0
                 prev       = q.get('regularMarketPreviousClose', 0)
                 avg_vol    = q.get('averageDailyVolume3Month', 1) or 1
                 dollar_vol = price * vol
@@ -1868,6 +1873,7 @@ def get_yahoo_gainers(filters):
                 if pct < filters['min_gap_pct']:                               continue
                 if dollar_vol < filters['min_dollar_vol']:                     continue
                 if vol < filters.get('min_volume', 0):                         continue
+                if trades and trades < filters.get('min_trades', 0):           continue
                 if rvol < filters.get('min_rvol', 0):                          continue
 
                 candidates.append({
@@ -1877,6 +1883,7 @@ def get_yahoo_gainers(filters):
                     'gap_pct':    round(float(pct), 1),
                     'volume':     float(vol),
                     'dollar_vol': float(dollar_vol),
+                    'trades':     float(trades),
                     'rvol':       rvol,
                     'source':     'yahoo',
                 })
@@ -1896,7 +1903,7 @@ def process_ticker(stock_data, mode='morning_gap', filters=None):
         fast_scan  = mode in {'morning_gap', 'scanopp', 'afterhrs'}
 
         # Try Alpaca snapshot first for enriched data
-        snap = alpaca_get_snapshot(ticker)
+        snap = None if mode == 'scanopp' else alpaca_get_snapshot(ticker)
 
         if snap and snap.get('price', 0) > 0:
             price      = snap['price']
@@ -1915,9 +1922,10 @@ def process_ticker(stock_data, mode='morning_gap', filters=None):
             dollar_vol = stock_data['dollar_vol']
             volume     = stock_data.get('volume', 0)
             rvol       = stock_data.get('rvol', 0)
-            vwap       = 0
-            bid        = 0
-            ask        = 0
+            vwap       = stock_data.get('vwap', 0)
+            bid        = stock_data.get('bid', 0)
+            ask        = stock_data.get('ask', 0)
+        trades = stock_data.get('trades', 0)
 
         # Re-check filters with fresh Alpaca data
         if price < filters.get('min_price', 0):      return None
@@ -1925,6 +1933,7 @@ def process_ticker(stock_data, mode='morning_gap', filters=None):
         if gap_pct < filters.get('min_gap_pct', 0):  return None
         if dollar_vol < filters.get('min_dollar_vol', 0): return None
         if volume < filters.get('min_volume', 0):    return None
+        if trades and trades < filters.get('min_trades', 0): return None
         if rvol < filters.get('min_rvol', 0):         return None
         if mode == 'afterhrs':
             max_vwap_dist = filters.get('max_vwap_distance_pct', 10)
@@ -2014,6 +2023,7 @@ def process_ticker(stock_data, mode='morning_gap', filters=None):
             'gap_pct':          round(gap_pct, 1),
             'dollar_vol':       round(dollar_vol, 0),
             'volume':           round(volume, 0),
+            'trades':           round(trades, 0),
             'rvol':             round(rvol, 1),
             'vwap':             round(vwap, 2),
             'above_vwap':       above_vwap,
@@ -2086,6 +2096,7 @@ async def do_scan(user_id, scan_id=None):
                     price      = float(q.get('last') or q.get('bid') or 0)
                     prev_close = float(q.get('prevclose') or 0)
                     volume     = float(q.get('volume') or 0)
+                    trades     = float(q.get('trades') or q.get('trade_count') or q.get('num_trades') or 0)
                     avg_vol    = float(q.get('average_volume') or 1) or 1
                     if price <= 0 or prev_close <= 0: continue
                     pct        = ((price - prev_close) / prev_close) * 100
@@ -2094,8 +2105,10 @@ async def do_scan(user_id, scan_id=None):
                     if not (filters['min_price'] <= price <= filters['max_price']): continue
                     if pct < filters['min_gap_pct']:                               continue
                     if dollar_vol < filters['min_dollar_vol']:                     continue
+                    if trades and trades < filters.get('min_trades', 0):           continue
                     candidates.append({'ticker':sym,'price':price,'prev_close':prev_close,
                         'gap_pct':round(pct,1),'volume':volume,'dollar_vol':dollar_vol,
+                        'trades':trades,'bid':float(q.get('bid') or 0),'ask':float(q.get('ask') or 0),
                         'rvol':rvol,'source':'tradier'})
                 except: continue
             candidates.sort(key=lambda x: x['gap_pct'], reverse=True)
@@ -2135,6 +2148,7 @@ async def do_scan(user_id, scan_id=None):
                     price      = float(q.get('last') or q.get('bid') or 0)
                     prev_close = float(q.get('prevclose') or 0)
                     volume     = float(q.get('volume') or 0)
+                    trades     = float(q.get('trades') or q.get('trade_count') or q.get('num_trades') or 0)
                     avg_vol    = float(q.get('average_volume') or 1) or 1
                     if price <= 0 or prev_close <= 0: continue
                     pct        = ((price - prev_close) / prev_close) * 100
@@ -2144,8 +2158,10 @@ async def do_scan(user_id, scan_id=None):
                     if pct < relaxed['min_gap_pct']: continue
                     if dollar_vol < relaxed['min_dollar_vol']: continue
                     if volume < relaxed.get('min_volume', 0): continue
+                    if trades and trades < relaxed.get('min_trades', 0): continue
                     relaxed_candidates.append({'ticker':sym,'price':price,'prev_close':prev_close,
                         'gap_pct':round(pct,1),'volume':volume,'dollar_vol':dollar_vol,
+                        'trades':trades,'bid':float(q.get('bid') or 0),'ask':float(q.get('ask') or 0),
                         'rvol':rvol,'source':'tradier-relaxed'})
                 except:
                     continue

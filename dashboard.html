@@ -614,7 +614,7 @@
       <span class="tip-badge" onmouseenter="showTip(event,'scanopp')" onmouseleave="hideTip()" onclick="event.stopPropagation()">ⓘ</span>
       <span class="scan-btn-icon">💡</span>
       <span class="scan-btn-label">ScanOpp</span>
-      <span class="scan-btn-sub">$0.50–$15 · Gap 9%+ · $Vol $3M+</span>
+      <span class="scan-btn-sub">$0.50–$20 · Chg 15%+ · $Vol $3M+</span>
     </button>
   </div>
   <div class="scan-btn-wrap">
@@ -1097,7 +1097,7 @@
 
   const MODES = {
     morning_gap: { label:'🌅 MorningGap', desc:'Price $0.10–$50, Gap 5%+, $Vol $250K+, Float ≤20M' },
-    scanopp:     { label:'💡 ScanOpp',    desc:'Price $0.50–$15, Gap 9%+, $Vol $3M+, Trades 3K+' },
+    scanopp:     { label:'💡 ScanOpp',    desc:'Price $0.50–$20, % Chg 15%+, $Vol $3M+, Trades 3K+' },
     standard:    { label:'🔍 Standard',   desc:'Gap 10%+, $0.20–$20, $100K vol, RVOL 1.5x+' },
     supernova:   { label:'🚀 Supernovas', desc:'Gap 50%+ only — massive movers' },
     biotech:     { label:'🧬 Biotech',    desc:'Biotech/FDA, gap 15%+, catalyst required' },
@@ -1622,7 +1622,7 @@
       if(sub){
         if(running)sub.textContent='Click to rescan';
         else if(m==='morning_gap')sub.textContent='$0.10–$50 · Gap 5%+ · Float ≤20M';
-        else if(m==='scanopp')sub.textContent='$0.50–$15 · Gap 9%+ · $Vol $3M+';
+        else if(m==='scanopp')sub.textContent='$0.50–$20 · Chg 15%+ · $Vol $3M+';
         else sub.textContent='Under $50 · Within 10% of VWAP';
       }
     });
@@ -2375,7 +2375,7 @@
 
   const TOOLTIP_DATA={
     morning_gap:{title:'🌅 MorningGap Scanner',rows:[['Price','$0.10 – $50.00'],['% Change','+5% or more'],['Dollar Vol','$250,000+'],['Float','Under 20M shares']],desc:'Finds stocks gapping up premarket with small float for explosive moves.',best:'⏰ Best: 4:00am – 9:30am EST'},
-    scanopp:    {title:'💡 ScanOpp Scanner',   rows:[['Price','$0.50 – $15.00'],['% Change','+9% or more'],['Dollar Vol','$3,000,000+'],['Trades','3,000+']],desc:'High-liquidity momentum plays. Stricter criteria = higher quality setups.',best:'⏰ Best: Market open 9:30am EST'},
+    scanopp:    {title:'💡 ScanOpp Scanner',   rows:[['Price','$0.50 – $20.00'],['% Change','+15% or more'],['Dollar Vol','$3,000,000+'],['Trades','3,000+']],desc:'High-liquidity momentum plays matching the StockToTrade opportunity scan.',best:'⏰ Best: Market open 9:30am EST'},
     afterhrs:   {title:'🌆 AfterHrs Scanner',  rows:[['Price','Under $50.00'],['VWAP Range','Within 10% above or below'],['Dollar Vol','$100,000+']],desc:'Stocks hugging VWAP — coiled for a spike long or short in after hours.',best:'⏰ Best: 4:00pm – 8:00pm EST'},
   };
   function showTip(e,mode){
