@@ -76,11 +76,11 @@ ALPACA_PAPER_URL = 'https://paper-api.alpaca.markets/v2'
 
 # ── PER-USER STATE ──
 user_state = {
-    'shafkat': {'scan_results':[], 'alerted':set(), 'mode':'morning_gap', 'running':False,
+    'shafkat': {'scan_results':[], 'alerted':set(), 'mode':'morning_gap', 'running':False, 'scan_id':0,
                 'filters':{'min_price':0.10,'max_price':50.00,'min_gap_pct':5.0,
                            'min_dollar_vol':250000,'min_volume':50000,'min_rvol':0,
                            'max_float_m':20.0,'max_market_cap_m':0,'require_news':False}},
-    'irfan':   {'scan_results':[], 'alerted':set(), 'mode':'morning_gap', 'running':False,
+    'irfan':   {'scan_results':[], 'alerted':set(), 'mode':'morning_gap', 'running':False, 'scan_id':0,
                 'filters':{'min_price':0.10,'max_price':50.00,'min_gap_pct':5.0,
                            'min_dollar_vol':250000,'min_volume':50000,'min_rvol':0,
                            'max_float_m':20.0,'max_market_cap_m':0,'require_news':False}},
@@ -556,8 +556,8 @@ async def start_scanner(user_id: str):
     if user_id not in user_state: return {'error':'Unknown user'}
     s = user_state[user_id]
     if not s['running']:
-        s['running'] = True; s['scan_results'] = []
-        asyncio.create_task(scanner_loop(user_id))
+        s['running'] = True; s['scan_results'] = []; s['scan_id'] = s.get('scan_id', 0) + 1
+        asyncio.create_task(scanner_loop(user_id, s['scan_id']))
         log_alert(f"✅ [{user_id}] Scanner started")
         return {'status':'started','mode':s['mode']}
     return {'status':'already running','mode':s['mode']}
@@ -566,6 +566,7 @@ async def start_scanner(user_id: str):
 async def stop_scanner(user_id: str):
     if user_id not in user_state: return {'error':'Unknown user'}
     user_state[user_id]['running'] = False
+    user_state[user_id]['scan_id'] = user_state[user_id].get('scan_id', 0) + 1
     log_alert(f"⏹️ [{user_id}] Scanner stopped")
     return {'status':'stopped'}
 
@@ -2049,7 +2050,7 @@ def process_ticker(stock_data, mode='morning_gap', filters=None):
 # SCANNER LOOP
 # ============================================================
 
-async def do_scan(user_id):
+async def do_scan(user_id, scan_id=None):
     s       = user_state[user_id]
     filters = s['filters'].copy()
     mode    = s['mode']
@@ -2061,6 +2062,8 @@ async def do_scan(user_id):
 
     # Step 1: Build universe and log every source
     universe, universe_errors = get_dynamic_universe()
+    if scan_id is not None and scan_id != s.get('scan_id'):
+        return [], {'phase':'done','message':'Scan superseded by a newer request','progress':0,'total':0}
     log_alert(f"🔍 [{user_id}] Universe: {len(universe)} tickers | errors: {universe_errors or 'none'}")
 
     status['message'] = f'📡 Universe: {len(universe)} tickers — querying Tradier...'
@@ -2119,6 +2122,9 @@ async def do_scan(user_id):
             candidates = yahoo
             scan_source = 'yahoo'
 
+    if scan_id is not None and scan_id != s.get('scan_id'):
+        return [], {'phase':'done','message':'Scan superseded by a newer request','progress':0,'total':0}
+
     if not candidates:
         msg = (f"0 stocks found. Universe:{len(universe)} Tradier:{len(quote_map) if universe else 0} quoted. "
                f"Filters: price ${filters['min_price']}-${filters['max_price']} "
@@ -2139,7 +2145,7 @@ async def do_scan(user_id):
     count   = 0
 
     for stock_data in candidates:
-        if not s['running']: break
+        if not s['running'] or (scan_id is not None and scan_id != s.get('scan_id')): break
         count  += 1
         ticker  = stock_data.get('ticker', '')
         status  = {'phase':'analyzing','message':f'Checking {ticker} ({count}/{total})...','progress':count,'total':total}
@@ -2175,14 +2181,16 @@ async def do_scan(user_id):
     done_status = {'phase':'done','message':f'✅ {len(results)} setup(s) found','progress':total,'total':total}
     return results, done_status
 
-async def scanner_loop(user_id):
+async def scanner_loop(user_id, scan_id):
     s = user_state[user_id]
     log_alert(f"🔍 [{user_id}] Scanner started")
     await broadcast_to_user(user_id, {'type':'status','running':True,'mode':s['mode'],'filters':s['filters']})
 
-    while s['running']:
+    while s['running'] and scan_id == s.get('scan_id'):
         try:
-            results, done_status = await do_scan(user_id)
+            results, done_status = await do_scan(user_id, scan_id)
+            if scan_id != s.get('scan_id'):
+                break
             s['scan_results']    = results
             await broadcast_to_user(user_id, {
                 'type':'scan_results','data':results,
@@ -2193,12 +2201,13 @@ async def scanner_loop(user_id):
         except Exception as e:
             log_alert(f"⚠️ [{user_id}] Scanner error: {e}")
 
-        if s['running']:
+        if s['running'] and scan_id == s.get('scan_id'):
             interval = int(os.getenv('SCAN_INTERVAL', 30))
             await asyncio.sleep(interval)
 
-    log_alert(f"⏹️ [{user_id}] Scanner stopped")
-    await broadcast_to_user(user_id, {'type':'status','running':False,'mode':s['mode']})
+    if scan_id == s.get('scan_id'):
+        log_alert(f"⏹️ [{user_id}] Scanner stopped")
+        await broadcast_to_user(user_id, {'type':'status','running':False,'mode':s['mode']})
 
 # ============================================================
 # WEBSOCKET
