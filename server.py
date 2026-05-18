@@ -32,8 +32,8 @@ EMAIL_TO           = os.getenv('EMAIL_TO', '')
 # ── User auth — passwords stored as SHA-256 hashes, never in plaintext ──
 import hashlib
 USER_PASSWORDS = {
-    'shafkat': os.getenv('SHAFKAT_PW_HASH', '00c19523772ea30a3755c6fa1c5642a93e4e56e8dbcf977420ad2d4395448f5c'),
-    'irfan':   os.getenv('IRFAN_PW_HASH',   '6f596603a921a50a83c118911b9774b95a5fb081600b14429a34f3e66ee84176'),
+    'shafkat': os.getenv('SHAFKAT_PW_HASH', '129ef4d4d253025255c711b03e5c60d42cfca2c96c3ac0e7fceed863388993b2'),
+    'irfan':   os.getenv('IRFAN_PW_HASH',   '21f33947723fe5fa593228e0729ad6f108cedfff663bb87b7abf9288f23928fe'),
 }
 
 # Tradier — Shafkat's keys (production real-time + sandbox paper trading)
@@ -2175,7 +2175,7 @@ def process_ticker(stock_data, mode='morning_gap', filters=None):
         exchange     = info.get('exchange', '')
         market_cap_m = info.get('market_cap_m', 0)
 
-        if exchange and not any(ex in exchange.upper() for ex in ['NASDAQ','NYSE','AMEX','BATS','CBOE']):
+        if exchange and not any(ex in exchange.upper() for ex in ['NASDAQ','NYSE','NEW YORK STOCK EXCHANGE','AMEX','BATS','CBOE','ARCA']):
             return None
 
         max_mktcap = filters.get('max_market_cap_m', 0)
