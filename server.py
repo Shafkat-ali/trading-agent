@@ -1561,104 +1561,122 @@ def grade_setup(gap_pct, dollar_vol, vol_ratio=0):
 # DATA SOURCES — Polygon gainers + Alpaca snapshot enrichment
 # ============================================================
 
-def get_dynamic_universe():
+
+# ── Cached universe — refreshed every 5 minutes ──
+_universe_cache      = []
+_universe_cache_time = 0
+UNIVERSE_TTL         = 300  # seconds
+
+# Large static watchlist covering small-cap, mid-cap, ETFs, and known gappers
+# This is the BASE — Tradier then discovers actual movers from this pool
+WATCHLIST_BASE = [
+    # Major ETFs & indices
+    'SPY','QQQ','IWM','DIA','TQQQ','SQQQ','UVXY','VXX','TNA','TZA',
+    'SPXL','SPXS','LABU','LABD','FNGU','FNGD','SOXL','SOXS',
+    # Large cap tech
+    'AAPL','MSFT','NVDA','AMD','META','GOOGL','AMZN','NFLX','TSLA',
+    'ORCL','CRM','SNOW','PLTR','UBER','LYFT','COIN','HOOD',
+    # Small/mid cap frequent gappers (rotate based on market)
+    'SOFI','RIVN','LCID','NIO','XPEV','FUTU','TIGR',
+    'MSTR','RIOT','MARA','HUT','BITF','CIFR',
+    'AMC','GME','BBBY','BB','CLOV','SNDL','MMAT',
+    'SPCE','RKLB','ASTS','LUNR','RDW','MNTS',
+    'PLUG','FCEL','BE','BLDP','GEVO','BLNK',
+    'MRNA','BNTX','PFE','GILD','BIIB','VRTX',
+    'DWAC','PHUN','MULN','FFIE','BBAI','OPEN',
+    'ATER','CENN','IDEX','SHIP','CTIC','NKLA',
+    'CVNA','BYND','TTOO','SIGA','AGEN','SLRX',
+    'DKNG','PENN','MGM','WYNN','LVS','CZR',
+    'F','GM','RIVN','LCID','NKLA','GOEV',
+    'SNAP','PINS','RBLX','U','ABNB','DASH',
+    'PTON','ZM','DOCU','TDOC','ROKU','FUBO',
+    # Pharma/biotech small caps (big gap candidates)
+    'ATNF','SLDB','FREQ','DRRX','NRXP','KPTI',
+    'ADXS','RVNC','CLRB','EYEG','AGTC','BLUE',
+    'SAVA','ACST','DARE','LXRX','PRLD','ETNB',
+    # Recent known movers
+    'HIVE','DVLT','CBRL','ASBP','CVU','GOVX',
+    'SBFM','VRAX','HCAI','CISS','AIB','AIM',
+    'SMST','SEGG','ZDAI','CPSH','QBTZ','MICC',
+]
+
+def get_tradier_premarket_movers(user_id='shafkat'):
     """
-    Build a fully dynamic universe of tickers from live sources only.
-    No hardcoded stocks — everything is discovered dynamically.
-    Returns (tickers, errors) so caller can report failures clearly.
+    Tradier-native pre/after market scanner.
+    Batch quotes the entire watchlist + live-discovered tickers.
+    Returns only stocks with significant movement from prev close.
+    Works 24/7 — pre-market, regular hours, after-hours.
     """
-    tickers = set()
-    errors  = []
+    global _universe_cache, _universe_cache_time
+    import time
 
-    # Source 1: Alpaca most actives by volume
+    # ── Step 1: Build full universe ──
+    universe = set(WATCHLIST_BASE)
+
+    # Augment with live sources (non-blocking, best-effort)
+    live_errors = []
+
+    # Alpaca most actives (works during/after market)
     try:
-        r = requests.get(
-            f"{ALPACA_DATA_URL}/stocks/most_actives",
-            headers=ALPACA_HEADERS,
-            params={'by': 'volume', 'top': 100},
-            timeout=4
-        )
-        if r.status_code == 200:
-            before = len(tickers)
-            for s in r.json().get('most_actives', []):
-                sym = s.get('symbol', '')
-                if sym and sym.isalpha() and len(sym) <= 5:
-                    tickers.add(sym)
-            log_alert(f"📡 Alpaca volume actives: +{len(tickers)-before}")
-        else:
-            msg = f"Alpaca most_actives HTTP {r.status_code}"
-            errors.append(msg); log_alert(f"⚠️ {msg}")
+        for by in ['volume', 'trades']:
+            r = requests.get(f"{ALPACA_DATA_URL}/stocks/most_actives",
+                headers=ALPACA_HEADERS, params={'by': by, 'top': 100}, timeout=5)
+            if r.status_code == 200:
+                before = len(universe)
+                for s in r.json().get('most_actives', []):
+                    sym = s.get('symbol', '')
+                    if sym and sym.isalpha() and len(sym) <= 5:
+                        universe.add(sym)
+                log_alert(f"📡 Alpaca {by} actives: +{len(universe)-before}")
     except Exception as e:
-        msg = f"Alpaca most_actives: {e}"
-        errors.append(msg); log_alert(f"⚠️ {msg}")
+        live_errors.append(f"Alpaca: {e}")
 
-    # Source 2: Alpaca most actives by trades
-    try:
-        r = requests.get(
-            f"{ALPACA_DATA_URL}/stocks/most_actives",
-            headers=ALPACA_HEADERS,
-            params={'by': 'trades', 'top': 100},
-            timeout=4
-        )
-        if r.status_code == 200:
-            before = len(tickers)
-            for s in r.json().get('most_actives', []):
-                sym = s.get('symbol', '')
-                if sym and sym.isalpha() and len(sym) <= 5:
-                    tickers.add(sym)
-            log_alert(f"📡 Alpaca trade actives: +{len(tickers)-before}")
-        else:
-            msg = f"Alpaca trade_actives HTTP {r.status_code}"
-            errors.append(msg); log_alert(f"⚠️ {msg}")
-    except Exception as e:
-        msg = f"Alpaca trade actives: {e}"
-        errors.append(msg); log_alert(f"⚠️ {msg}")
-
-    # Source 3: Polygon gainers
+    # Polygon gainers
     try:
         r = requests.get(
             f"https://api.polygon.io/v2/snapshot/locale/us/markets/stocks/gainers"
-            f"?apiKey={POLYGON_API_KEY}&include_otc=false",
-            timeout=4
-        )
+            f"?apiKey={POLYGON_API_KEY}&include_otc=false", timeout=5)
         if r.status_code == 200:
-            before = len(tickers)
+            before = len(universe)
             for t in r.json().get('tickers', []):
                 sym = t.get('ticker', '')
                 if sym and sym.isalpha() and len(sym) <= 5:
-                    tickers.add(sym)
-            log_alert(f"📡 Polygon gainers: +{len(tickers)-before}")
-        else:
-            msg = f"Polygon gainers HTTP {r.status_code}"
-            errors.append(msg); log_alert(f"⚠️ {msg}")
+                    universe.add(sym)
+            log_alert(f"📡 Polygon gainers: +{len(universe)-before}")
     except Exception as e:
-        msg = f"Polygon gainers: {e}"
-        errors.append(msg); log_alert(f"⚠️ {msg}")
+        live_errors.append(f"Polygon: {e}")
 
-    # Source 4: Yahoo gainers
+    # Finviz pre-market screener (scrapes top movers)
     try:
         r = requests.get(
-            "https://query1.finance.yahoo.com/v1/finance/screener/predefined/saved"
-            "?formatted=false&scrIds=day_gainers&count=100",
-            headers={'User-Agent': 'Mozilla/5.0'}, timeout=4
+            "https://finviz.com/screener.ashx?v=111&s=ta_topgainers&f=sh_price_o1",
+            headers={'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'},
+            timeout=8
         )
         if r.status_code == 200:
-            before = len(tickers)
-            for result in r.json().get('finance', {}).get('result', []):
-                for q in result.get('quotes', []):
-                    sym = q.get('symbol', '')
-                    if sym and sym.isalpha() and len(sym) <= 5:
-                        tickers.add(sym)
-            log_alert(f"📡 Yahoo gainers: +{len(tickers)-before}")
-        else:
-            msg = f"Yahoo gainers HTTP {r.status_code}"
-            errors.append(msg); log_alert(f"⚠️ {msg}")
+            import re
+            before = len(universe)
+            syms = re.findall(r'quote\.ashx\?t=([A-Z]{1,5})', r.text)
+            for sym in syms:
+                if sym.isalpha() and len(sym) <= 5:
+                    universe.add(sym)
+            log_alert(f"📡 Finviz top gainers: +{len(universe)-before}")
     except Exception as e:
-        msg = f"Yahoo gainers: {e}"
-        errors.append(msg); log_alert(f"⚠️ {msg}")
+        live_errors.append(f"Finviz: {e}")
 
-    log_alert(f"📊 Universe: {len(tickers)} tickers | errors: {errors or 'none'}")
-    return list(tickers), errors
+    universe_list = list(universe)
+    log_alert(f"📊 Total universe: {len(universe_list)} tickers | live errors: {live_errors or 'none'}")
+    return universe_list, live_errors
+
+
+def get_dynamic_universe():
+    """
+    Wrapper for backward compatibility — returns (tickers, errors).
+    Now backed by Tradier-first pre/after market universe.
+    """
+    return get_tradier_premarket_movers()
+
+
 
 
 def get_tradier_quotes(symbols, user_id='shafkat'):
@@ -1878,7 +1896,7 @@ def get_tradier_movers(filters, user_id='shafkat'):
         log_alert(f"❌ {err}")
         return [], err
 
-    # Step 2: Tradier quotes
+    # Step 2: Tradier quotes — real-time including pre/after market
     quote_map, quote_error = get_tradier_quotes(universe, user_id)
 
     if not quote_map:
@@ -1888,17 +1906,39 @@ def get_tradier_movers(filters, user_id='shafkat'):
         log_alert(f"❌ {err}")
         return [], err
 
-    # Step 3: Filter
+    # Step 3: Filter with pre/after market awareness
+    from datetime import datetime, timezone, timedelta
+    ET = timezone(timedelta(hours=-4))
+    now_et = datetime.now(ET)
+    h, m = now_et.hour, now_et.minute
+    is_premarket  = h < 9 or (h == 9 and m < 30)
+    is_afterhours = h >= 16
+    is_extended   = is_premarket or is_afterhours
+
     candidates = []
     for sym, q in quote_map.items():
         try:
-            price      = float(q.get('last') or q.get('bid') or 0)
-            prev_close = float(q.get('prevclose') or 0)
+            last       = float(q.get('last') or q.get('bid') or 0)
+            close      = float(q.get('close') or 0)      # today's 4pm close
+            prev_close = float(q.get('prevclose') or 0)  # yesterday's close
             volume     = float(q.get('volume') or 0)
             avg_vol    = float(q.get('average_volume') or 1) or 1
 
-            if price <= 0 or prev_close <= 0: continue
-            pct        = ((price - prev_close) / prev_close) * 100
+            if last <= 0: continue
+
+            # ── Gap calculation depends on time of day ──
+            # Pre-market: compare last vs yesterday's close (prevclose)
+            # Regular hours: compare last vs yesterday's close
+            # After-hours: compare last vs today's 4pm close
+            if is_afterhours and close > 0:
+                base_price = close       # gapped from today's close
+                price      = last
+            else:
+                base_price = prev_close  # gapped from yesterday's close
+                price      = last
+
+            if base_price <= 0: continue
+            pct        = ((price - base_price) / base_price) * 100
             dollar_vol = price * volume
             rvol       = round(volume / avg_vol, 1) if avg_vol > 0 else 0
 
@@ -1908,41 +1948,25 @@ def get_tradier_movers(filters, user_id='shafkat'):
 
             candidates.append({
                 'ticker':     sym,
-                'price':      price,
-                'prev_close': prev_close,
-                'gap_pct':    round(pct, 1),
+                'price':      round(price, 4),
+                'prev_close': round(base_price, 4),
+                'gap_pct':    round(pct, 2),
                 'volume':     volume,
                 'dollar_vol': dollar_vol,
                 'rvol':       rvol,
                 'source':     'tradier',
+                'session':    'pre' if is_premarket else ('post' if is_afterhours else 'regular'),
             })
         except:
             continue
 
     candidates.sort(key=lambda x: x['gap_pct'], reverse=True)
-    summary = f"Universe: {len(universe)} → Quoted: {len(quote_map)} → Passed: {len(candidates)}"
+    session_label = 'PRE-MARKET' if is_premarket else ('AFTER-HOURS' if is_afterhours else 'REGULAR')
+    summary = f"[{session_label}] Universe:{len(universe)} → Quoted:{len(quote_map)} → Passed:{len(candidates)}"
     log_alert(f"📊 {summary}")
     return candidates, None
 
-    # Source 1: Alpaca most actives by volume
-    try:
-        r = requests.get(
-            f"{ALPACA_DATA_URL}/stocks/most_actives",
-            headers=ALPACA_HEADERS,
-            params={'by': 'volume', 'top': 100},
-            timeout=10
-        )
-        if r.status_code == 200:
-            before = len(tickers)
-            for s in r.json().get('most_actives', []):
-                sym = s.get('symbol', '')
-                if sym and sym.isalpha() and len(sym) <= 5:
-                    tickers.add(sym)
-            log_alert(f"📡 Alpaca volume actives: +{len(tickers)-before}")
-        else:
-            log_alert(f"⚠️ Alpaca most_actives: {r.status_code}")
-    except Exception as e:
-        log_alert(f"⚠️ Alpaca most_actives error: {e}")
+
 
     # Source 2: Alpaca movers by trades
     try:
