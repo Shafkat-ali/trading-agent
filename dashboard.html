@@ -1924,6 +1924,10 @@ button:hover{background:#1a3a6a;}button.on{border-color:var(--c);color:var(--c);
 </style></head><body>
 <div class="hdr">
   <div style="display:flex;flex-direction:column;gap:1px;"><span class="t" id="tTitle">${tk}</span><span class="co" id="tCo"></span></div>
+  <div style="display:flex;flex-direction:column;gap:1px;margin-left:6px;">
+    <span id="livePrice" style="font-size:.85rem;font-weight:800;color:#00ff88;">$--</span>
+    <span id="liveChg"   style="font-size:.58rem;color:#6a8aaa;">--%</span>
+  </div>
   <select class="rng" id="rng" onchange="onRange(this.value)">${rangeOpts}</select>
   <select id="tf" onchange="loadChart()">${tfOpts}</select>
   <button onclick="loadChart()">↻</button>
@@ -1964,7 +1968,25 @@ async function loadChart(){
     else{document.getElementById('badge').textContent='No data — market may be closed';}
   }catch(e){document.getElementById('badge').textContent='Error: '+e.message;}
   poll=setInterval(async()=>{
-    try{const res=await fetch(url),data=await res.json(),bars=data.bars||[];if(bars.length)render(bars);}catch(e){}
+    try{
+      const res=await fetch(url),data=await res.json(),bars=data.bars||[];
+      if(!bars.length||!chart)return;
+      // Only update last candle — don't re-render (preserves zoom/pan)
+      const lb=bars[bars.length-1];
+      const t=Math.floor(new Date(lb.time.includes('T')?lb.time:lb.time.replace(' ','T')).getTime()/1000);
+      if(window._cs) window._cs.update({time:t,open:lb.open,high:lb.high,low:lb.low,close:lb.close});
+      // Update price display
+      const priceEl=document.getElementById('livePrice');
+      const chgEl=document.getElementById('liveChg');
+      if(priceEl) priceEl.textContent='$'+lb.close.toFixed(4);
+      if(chgEl&&bars.length>1){
+        const first=bars[0];
+        const chg=((lb.close-first.open)/first.open*100).toFixed(2);
+        chgEl.textContent=(chg>=0?'+':'')+chg+'%';
+        chgEl.style.color=chg>=0?'#00c853':'#ff4444';
+      }
+      document.getElementById('badge').textContent='⟳ 2s · '+new Date().toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit',second:'2-digit',timeZone:'America/New_York'});
+    }catch(e){}
   },2000);
 }
 function render(bars){
@@ -1979,6 +2001,7 @@ function render(bars){
   chart=LightweightCharts.createChart(mc,{width:mc.clientWidth,height:mc.clientHeight,layout:{backgroundColor:'#060a12',textColor:'#8aa0c0'},grid:{vertLines:{color:'#0f1a2e'},horzLines:{color:'#0f1a2e'}},timeScale:{timeVisible:true,secondsVisible:false,borderColor:'#1a2a4a',localization:{timeFormatter:t=>{const d=new Date(t*1000);return d.toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit',hour12:true,timeZone:'America/New_York'});}}},rightPriceScale:{borderColor:'#1a2a4a',scaleMarginTop:0.08,scaleMarginBottom:ind.Vol?0.2:0.05},crosshair:{mode:1},handleScroll:{mouseWheel:true,pressedMouseMove:true},handleScale:{mouseWheel:true,pinch:true}});
   const cs=chart.addCandlestickSeries({upColor:'#00c853',downColor:'#ff1744',borderUpColor:'#00c853',borderDownColor:'#ff1744',wickUpColor:'#00c853',wickDownColor:'#ff1744'});
   cs.setData(s.map(b=>({time:b.t,open:b.o,high:b.h,low:b.l,close:b.c})));
+  window._cs=cs;  // store ref for live poll updates
   const vw=s.filter(b=>b.vw>0).map(b=>({time:b.t,value:b.vw}));
   if(vw.length){chart.addLineSeries({color:'#ffd700',lineWidth:2,priceLineVisible:false,title:'VWAP'}).setData(vw);}
   if(ind.EMA&&cl.length>=20){
@@ -1991,6 +2014,18 @@ function render(bars){
   if(ind.MACD&&cl.length>=26){const me=document.getElementById('macdEl');macdC=LightweightCharts.createChart(me,{width:me.clientWidth,height:me.clientHeight,layout:{backgroundColor:'#040810',textColor:'#5a7a9a'},grid:{vertLines:{color:'#0a1020'},horzLines:{color:'#0a1020'}},timeScale:{visible:false},rightPriceScale:{borderColor:'#1a2a4a'},crosshair:{mode:1},handleScroll:false,handleScale:false});const{ml,sig,h}=macd(cl);macdC.addHistogramSeries({priceLineVisible:false}).setData(ti.map((t,j)=>({time:t,value:h[j],color:h[j]>=0?'rgba(0,200,83,.6)':'rgba(255,23,68,.6)'})));macdC.addLineSeries({color:'#00d4ff',lineWidth:1,priceLineVisible:false}).setData(ti.map((t,j)=>({time:t,value:ml[j]})));macdC.addLineSeries({color:'#ff9100',lineWidth:1,priceLineVisible:false}).setData(ti.map((t,j)=>({time:t,value:sig[j]})));macdC.timeScale().fitContent();chart.timeScale().subscribeVisibleLogicalRangeChange(r=>{if(r&&macdC)macdC.timeScale().setVisibleLogicalRange(r);});}
   new ResizeObserver(()=>{if(chart)chart.resize(mc.clientWidth,mc.clientHeight);if(rsiC){const e=document.getElementById('rsiEl');rsiC.resize(e.clientWidth,e.clientHeight);}if(macdC){const e=document.getElementById('macdEl');macdC.resize(e.clientWidth,e.clientHeight);}}).observe(document.body);
   const last=s[s.length-1];
+  // Set initial price from last bar
+  if(s.length){
+    const lb=s[s.length-1],fb=s[0];
+    const priceEl=document.getElementById('livePrice');
+    const chgEl=document.getElementById('liveChg');
+    if(priceEl) priceEl.textContent='$'+lb.c.toFixed(4);
+    if(chgEl){
+      const chg=((lb.c-fb.o)/fb.o*100).toFixed(2);
+      chgEl.textContent=(chg>=0?'+':'')+chg+'%';
+      chgEl.style.color=chg>=0?'#00c853':'#ff4444';
+    }
+  }
   document.getElementById('badge').textContent='⟳ 2s · '+bars.length+' bars · '+new Date().toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit',second:'2-digit',timeZone:'America/New_York'});
   // Fetch company name
   fetch(API+'/api/stock/profile/'+TK).then(r=>r.json()).then(d=>{if(d.name)document.getElementById('tCo').textContent=d.name;}).catch(()=>{});
@@ -2162,7 +2197,19 @@ loadChart();
     const interval = getPollInterval(tf);
     document.getElementById('popupPollBadge').textContent = `⟳ ${interval/1000}s`;
     popupPollTimer = setInterval(async()=>{
-      await popupRenderChart(ticker, url, true);
+      // Update only last candle — don't full re-render (preserves zoom)
+      try{
+        const r=await fetch(url);
+        const d=await r.json();
+        const bars=d.bars||[];
+        if(!bars.length||!popupChartInstance)return;
+        const lb=bars[bars.length-1];
+        const t=Math.floor(new Date(lb.time.includes('T')?lb.time:lb.time.replace(' ','T')).getTime()/1000);
+        if(popupChartInstance._candles)
+          popupChartInstance._candles.update({time:t,open:lb.open,high:lb.high,low:lb.low,close:lb.close});
+        const lu=document.getElementById('popupLastUpdate');
+        if(lu) lu.textContent=new Date().toLocaleTimeString('en-US',{hour12:true,hour:'numeric',minute:'2-digit',second:'2-digit',timeZone:'America/New_York'});
+      }catch(e){}
     }, interval);
   }
 
