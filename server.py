@@ -113,10 +113,10 @@ SCAN_MODES = {
         'min_volume':0,'min_trades':3_000,'min_rvol':0,'max_float_m':0,'max_mktcap_m':0,'require_news':False,
     },
     'afterhrs': {
-        'label':'AfterHrs', 'desc':'Price $0.20-$10, AH move 5%-35%, AH volume 100K+, 5-min surge 3x+, Spread <=5%',
-        'min_price':0.20,'max_price':10.00,'min_gap':5.0,'min_dvol':100_000,
-        'min_volume':100_000,'min_rvol':0,'max_float_m':0,'max_mktcap_m':0,'require_news':False,
-        'max_gap_pct':35.0,'max_spread_pct':5.0,'min_ah_volume':100_000,'min_volume_surge':3.0,
+        'label':'AfterHrs', 'desc':'Price $0.10-$10, AH move 1%-50%, AH volume 10K+, 5-min surge 1.5x+, Spread <=10%',
+        'min_price':0.10,'max_price':10.00,'min_gap':1.0,'min_dvol':25_000,
+        'min_volume':10_000,'min_rvol':0,'max_float_m':0,'max_mktcap_m':0,'require_news':False,
+        'max_gap_pct':50.0,'max_spread_pct':10.0,'min_ah_volume':10_000,'min_volume_surge':1.5,
     },
     'standard': {
         'label':'🔍 Standard', 'desc':'Gap 10%+, $0.20–$20, $100K vol, RVOL 1.5x+',
