@@ -2013,6 +2013,8 @@ function render(bars){
   if(ind.RSI&&cl.length>=14){const re=document.getElementById('rsiEl');rsiC=LightweightCharts.createChart(re,{width:re.clientWidth,height:re.clientHeight,layout:{backgroundColor:'#040810',textColor:'#5a7a9a'},grid:{vertLines:{color:'#0a1020'},horzLines:{color:'#0a1020'}},timeScale:{visible:false},rightPriceScale:{borderColor:'#1a2a4a'},crosshair:{mode:1},handleScroll:false,handleScale:false});const rv=rsi(cl),rl=rsiC.addLineSeries({color:'#a78bfa',lineWidth:1,priceLineVisible:false});rl.setData(ti.map((t,j)=>rv[j]!==null?{time:t,value:rv[j]}:null).filter(Boolean));rsiC.addLineSeries({color:'rgba(255,68,68,.4)',lineWidth:1,lineStyle:2,priceLineVisible:false}).setData([{time:ti[0],value:70},{time:ti[ti.length-1],value:70}]);rsiC.addLineSeries({color:'rgba(0,200,83,.4)',lineWidth:1,lineStyle:2,priceLineVisible:false}).setData([{time:ti[0],value:30},{time:ti[ti.length-1],value:30}]);rsiC.timeScale().fitContent();chart.timeScale().subscribeVisibleLogicalRangeChange(r=>{if(r&&rsiC)rsiC.timeScale().setVisibleLogicalRange(r);});}
   if(ind.MACD&&cl.length>=26){const me=document.getElementById('macdEl');macdC=LightweightCharts.createChart(me,{width:me.clientWidth,height:me.clientHeight,layout:{backgroundColor:'#040810',textColor:'#5a7a9a'},grid:{vertLines:{color:'#0a1020'},horzLines:{color:'#0a1020'}},timeScale:{visible:false},rightPriceScale:{borderColor:'#1a2a4a'},crosshair:{mode:1},handleScroll:false,handleScale:false});const{ml,sig,h}=macd(cl);macdC.addHistogramSeries({priceLineVisible:false}).setData(ti.map((t,j)=>({time:t,value:h[j],color:h[j]>=0?'rgba(0,200,83,.6)':'rgba(255,23,68,.6)'})));macdC.addLineSeries({color:'#00d4ff',lineWidth:1,priceLineVisible:false}).setData(ti.map((t,j)=>({time:t,value:ml[j]})));macdC.addLineSeries({color:'#ff9100',lineWidth:1,priceLineVisible:false}).setData(ti.map((t,j)=>({time:t,value:sig[j]})));macdC.timeScale().fitContent();chart.timeScale().subscribeVisibleLogicalRangeChange(r=>{if(r&&macdC)macdC.timeScale().setVisibleLogicalRange(r);});}
   new ResizeObserver(()=>{if(chart)chart.resize(mc.clientWidth,mc.clientHeight);if(rsiC){const e=document.getElementById('rsiEl');rsiC.resize(e.clientWidth,e.clientHeight);}if(macdC){const e=document.getElementById('macdEl');macdC.resize(e.clientWidth,e.clientHeight);}}).observe(document.body);
+  // Session shading
+  addSessionShading(mc, bars, chart);
   const last=s[s.length-1];
   // Set initial price from last bar
   if(s.length){
@@ -2029,6 +2031,62 @@ function render(bars){
   document.getElementById('badge').textContent='⟳ 2s · '+bars.length+' bars · '+new Date().toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit',second:'2-digit',timeZone:'America/New_York'});
   // Fetch company name
   fetch(API+'/api/stock/profile/'+TK).then(r=>r.json()).then(d=>{if(d.name)document.getElementById('tCo').textContent=d.name;}).catch(()=>{});
+}
+
+// ── Session shading using canvas overlay ──
+const SESSION_COLORS = {
+  pre:     'rgba(255,200,0,0.08)',
+  regular: 'rgba(0,200,100,0.04)',
+  post:    'rgba(80,130,255,0.09)',
+};
+
+function addSessionShading(chartEl, bars, chartObj){
+  if(!bars||!bars.length) return;
+  // Build session list from bar times
+  const parseT=t=>Math.floor(new Date(t.includes('T')?t:t.replace(' ','T')).getTime()/1000);
+  const sessions=[];
+  let cur=null,start=null;
+  bars.forEach(b=>{
+    const t=parseT(b.time);
+    // Parse ET time from timestamp (Tradier returns local ET)
+    const d=new Date(t*1000);
+    const h=d.getUTCHours()-4, m=d.getUTCMinutes(), mins=h*60+m;
+    const s=mins>=4*60&&mins<9*60+30?'pre':mins>=9*60+30&&mins<16*60?'regular':'post';
+    if(s!==cur){if(cur&&start!==null)sessions.push({s:cur,t0:start,t1:t});cur=s;start=t;}
+  });
+  if(cur)sessions.push({s:cur,t0:start,t1:parseT(bars[bars.length-1].time)+120});
+
+  // Create canvas overlay
+  let canvas=chartEl.querySelector('.sess-canvas');
+  if(!canvas){
+    canvas=document.createElement('canvas');
+    canvas.className='sess-canvas';
+    canvas.style.cssText='position:absolute;top:0;left:0;pointer-events:none;z-index:1;opacity:1;';
+    chartEl.style.position='relative';
+    chartEl.appendChild(canvas);
+  }
+
+  function drawShading(){
+    if(!chartObj)return;
+    const rect=chartEl.getBoundingClientRect();
+    canvas.width=rect.width; canvas.height=rect.height;
+    const ctx=canvas.getContext('2d');
+    ctx.clearRect(0,0,canvas.width,canvas.height);
+    sessions.forEach(({s,t0,t1})=>{
+      try{
+        const x0=chartObj.timeScale().timeToCoordinate(t0);
+        const x1=chartObj.timeScale().timeToCoordinate(t1);
+        if(x0===null||x1===null)return;
+        ctx.fillStyle=SESSION_COLORS[s]||'rgba(255,255,255,0.03)';
+        ctx.fillRect(Math.min(x0,x1),0,Math.abs(x1-x0),canvas.height);
+      }catch(e){}
+    });
+  }
+
+  drawShading();
+  chartObj.timeScale().subscribeVisibleTimeRangeChange(()=>drawShading());
+  chartObj.subscribeCrosshairMove(()=>drawShading());
+  new ResizeObserver(drawShading).observe(chartEl);
 }
 loadChart();
 <\/script></body></html>`);
@@ -2299,6 +2357,26 @@ loadChart();
       }
 
       chart.timeScale().fitContent();
+
+      // Session shading
+      (function(){
+        const sessions=[];let cur=null,startT=null;
+        sorted.forEach(b=>{
+          const d=new Date(b.t*1000);
+          const h=d.getUTCHours()-4,m=d.getUTCMinutes(),mins=h*60+m;
+          const s=mins>=240&&mins<570?'pre':mins>=570&&mins<960?'regular':'post';
+          if(s!==cur){if(cur&&startT)sessions.push({s:cur,t0:startT,t1:b.t});cur=s;startT=b.t;}
+        });
+        if(cur)sessions.push({s:cur,t0:startT,t1:sorted[sorted.length-1].t+120});
+        const colors={pre:'rgba(255,200,0,0.08)',regular:'rgba(0,200,100,0.04)',post:'rgba(80,130,255,0.09)'};
+        let cv=chartDiv.querySelector('.sess-cv');
+        if(!cv){cv=document.createElement('canvas');cv.className='sess-cv';cv.style.cssText='position:absolute;top:0;left:0;pointer-events:none;z-index:1;';chartDiv.style.position='relative';chartDiv.appendChild(cv);}
+        function draw(){if(!chart)return;const r=chartDiv.getBoundingClientRect();cv.width=r.width;cv.height=r.height;const ctx=cv.getContext('2d');ctx.clearRect(0,0,cv.width,cv.height);sessions.forEach(({s,t0,t1})=>{try{const x0=chart.timeScale().timeToCoordinate(t0),x1=chart.timeScale().timeToCoordinate(t1);if(x0===null||x1===null)return;ctx.fillStyle=colors[s]||'rgba(255,255,255,0.03)';ctx.fillRect(Math.min(x0,x1),0,Math.abs(x1-x0),cv.height);}catch(e){}});}
+        draw();
+        chart.timeScale().subscribeVisibleTimeRangeChange(draw);
+        chart.subscribeCrosshairMove(draw);
+        new ResizeObserver(draw).observe(chartDiv);
+      })();
 
       // RSI sub-chart
       if(popupInd.RSI && closes.length>=14 && document.getElementById('popupRsiChart')){
@@ -3241,6 +3319,25 @@ function render(i,bars){
   }
 
   chart.timeScale().fitContent();
+
+  // Session shading for 8-panel
+  (function(){
+    const sessions=[];let cur=null,startT=null;
+    sorted.forEach(b=>{
+      const d=new Date(b.t*1000);
+      const h=d.getUTCHours()-4,m=d.getUTCMinutes(),mins=h*60+m;
+      const s=mins>=240&&mins<570?'pre':mins>=570&&mins<960?'regular':'post';
+      if(s!==cur){if(cur&&startT)sessions.push({s:cur,t0:startT,t1:b.t});cur=s;startT=b.t;}
+    });
+    if(cur&&sorted.length)sessions.push({s:cur,t0:startT,t1:sorted[sorted.length-1].t+120});
+    const colors={pre:'rgba(255,200,0,0.08)',regular:'rgba(0,200,100,0.04)',post:'rgba(80,130,255,0.09)'};
+    let cv=cw.querySelector('.sess-cv');
+    if(!cv){cv=document.createElement('canvas');cv.className='sess-cv';cv.style.cssText='position:absolute;top:0;left:0;pointer-events:none;z-index:1;';cw.style.position='relative';cw.appendChild(cv);}
+    function draw(){if(!s.chart)return;const r=cw.getBoundingClientRect();cv.width=r.width;cv.height=r.height;const ctx=cv.getContext('2d');ctx.clearRect(0,0,cv.width,cv.height);sessions.forEach(({s:sess,t0,t1})=>{try{const x0=s.chart.timeScale().timeToCoordinate(t0),x1=s.chart.timeScale().timeToCoordinate(t1);if(x0===null||x1===null)return;ctx.fillStyle=colors[sess]||'rgba(0,0,0,0)';ctx.fillRect(Math.min(x0,x1),0,Math.abs(x1-x0),cv.height);}catch(e){}});}
+    draw();
+    s.chart.timeScale().subscribeVisibleTimeRangeChange(draw);
+    s.chart.subscribeCrosshairMove(draw);
+  })();
 
   if(s.showRSI&&closes.length>=14){
     const el=document.getElementById('rsiC'+i);
