@@ -97,6 +97,7 @@ halt_cache_ts  = None
 _company_cache = {}
 _tradier_lookup_cache = {'ts': None, 'tickers': []}
 _listed_symbol_cache = {'ts': None, 'tickers': []}
+_afterhours_activity_cache = {}
 
 SCAN_MODES = {
     'morning_gap': {
@@ -110,10 +111,10 @@ SCAN_MODES = {
         'min_volume':0,'min_trades':3_000,'min_rvol':0,'max_float_m':0,'max_mktcap_m':0,'require_news':False,
     },
     'afterhrs': {
-        'label':'AfterHrs', 'desc':'Price $0.01-$50, within 10% of VWAP, $Vol $100K+, Volume 10K+',
-        'min_price':0.01,'max_price':50.00,'min_gap':-100.0,'min_dvol':100_000,
-        'min_volume':10_000,'min_rvol':0,'max_float_m':0,'max_mktcap_m':0,'require_news':False,
-        'max_vwap_distance_pct':10.0,
+        'label':'AfterHrs', 'desc':'Price $0.20-$10, AH move 5%-35%, AH volume 100K+, 5-min surge 3x+, Spread <=5%',
+        'min_price':0.20,'max_price':10.00,'min_gap':5.0,'min_dvol':100_000,
+        'min_volume':100_000,'min_rvol':0,'max_float_m':0,'max_mktcap_m':0,'require_news':False,
+        'max_gap_pct':35.0,'max_spread_pct':5.0,'min_ah_volume':100_000,'min_volume_surge':3.0,
     },
     'standard': {
         'label':'🔍 Standard', 'desc':'Gap 10%+, $0.20–$20, $100K vol, RVOL 1.5x+',
@@ -525,6 +526,10 @@ async def set_scan_mode(user_id: str, mode: str):
         'max_market_cap_m': m['max_mktcap_m'],
         'require_news':     m['require_news'],
         'max_vwap_distance_pct': m.get('max_vwap_distance_pct', 0),
+        'max_gap_pct':      m.get('max_gap_pct', 0),
+        'max_spread_pct':   m.get('max_spread_pct', 0),
+        'min_ah_volume':    m.get('min_ah_volume', 0),
+        'min_volume_surge': m.get('min_volume_surge', 0),
     }
     log_alert(f"🔄 [{user_id}] Mode: {m['label']}")
     return {'status':'ok','mode':mode,'filters':user_state[user_id]['filters']}
@@ -1866,18 +1871,73 @@ def filter_tradier_quote_map(quote_map, filters, source):
             pct        = ((price - prev_close) / prev_close) * 100
             dollar_vol = price * volume
             rvol       = round(volume / avg_vol, 1)
+            bid        = float(q.get('bid') or 0)
+            ask        = float(q.get('ask') or 0)
+            max_gap    = filters.get('max_gap_pct', 0)
+            max_spread = filters.get('max_spread_pct', 0)
             if not (filters['min_price'] <= price <= filters['max_price']): continue
             if pct < filters['min_gap_pct']: continue
+            if max_gap and pct > max_gap: continue
             if dollar_vol < filters['min_dollar_vol']: continue
             if volume < filters.get('min_volume', 0): continue
             if trades and trades < filters.get('min_trades', 0): continue
+            if max_spread:
+                if bid <= 0 or ask <= 0: continue
+                spread_pct = ((ask - bid) / ((ask + bid) / 2)) * 100
+                if spread_pct > max_spread: continue
             candidates.append({'ticker':sym,'price':price,'prev_close':prev_close,
                 'gap_pct':round(pct,1),'volume':volume,'dollar_vol':dollar_vol,
-                'trades':trades,'bid':float(q.get('bid') or 0),'ask':float(q.get('ask') or 0),
+                'trades':trades,'bid':bid,'ask':ask,
                 'rvol':rvol,'source':source})
         except:
             continue
     return candidates
+
+
+def get_afterhours_activity(ticker, user_id='shafkat'):
+    """Measure after-hours volume and current 5-minute volume surge from 1-minute bars."""
+    now = datetime.now()
+    cache = _afterhours_activity_cache.get(ticker)
+    if cache and (now - cache['ts']).total_seconds() < 60:
+        return cache['data']
+
+    start = now.replace(hour=16, minute=0, second=0, microsecond=0)
+    if now < start:
+        start = (now - timedelta(days=1)).replace(hour=16, minute=0, second=0, microsecond=0)
+
+    try:
+        r = requests.get(
+            f"{TRADIER_API_URL}/markets/timesales",
+            headers=get_tradier_headers(user_id),
+            params={
+                'symbol': ticker,
+                'interval': '1min',
+                'start': start.strftime('%Y-%m-%d %H:%M'),
+                'end': now.strftime('%Y-%m-%d %H:%M'),
+                'session_filter': 'all',
+            },
+            timeout=4
+        )
+        if r.status_code != 200:
+            return {'ah_volume': 0, 'surge': 0}
+        series = r.json().get('series') or {}
+        raw = series.get('data', []) if series else []
+        if isinstance(raw, dict):
+            raw = [raw]
+        volumes = [int(float(b.get('volume') or 0)) for b in raw if float(b.get('volume') or 0) > 0]
+        if not volumes:
+            return {'ah_volume': 0, 'surge': 0}
+
+        ah_volume = sum(volumes)
+        last5 = sum(volumes[-5:])
+        prior = volumes[:-5]
+        prior_avg_5min = (sum(prior) / max(1, len(prior) / 5)) if prior else max(1, last5)
+        surge = round(last5 / max(prior_avg_5min, 1), 2)
+        data = {'ah_volume': ah_volume, 'surge': surge}
+        _afterhours_activity_cache[ticker] = {'ts': now, 'data': data}
+        return data
+    except:
+        return {'ah_volume': 0, 'surge': 0}
 
 
 def get_tradier_movers(filters, user_id='shafkat'):
@@ -2140,7 +2200,7 @@ def process_ticker(stock_data, mode='morning_gap', filters=None):
         fast_scan  = mode in {'morning_gap', 'scanopp', 'afterhrs'}
 
         # Try Alpaca snapshot first for enriched data
-        snap = None if mode in {'morning_gap', 'scanopp'} else alpaca_get_snapshot(ticker)
+        snap = None if mode in {'morning_gap', 'scanopp', 'afterhrs'} else alpaca_get_snapshot(ticker)
 
         if snap and snap.get('price', 0) > 0:
             price      = snap['price']
@@ -2168,16 +2228,30 @@ def process_ticker(stock_data, mode='morning_gap', filters=None):
         if price < filters.get('min_price', 0):      return None
         if price > filters.get('max_price', 9999):   return None
         if gap_pct < filters.get('min_gap_pct', 0):  return None
+        if filters.get('max_gap_pct', 0) and gap_pct > filters.get('max_gap_pct', 0): return None
         if dollar_vol < filters.get('min_dollar_vol', 0): return None
         if volume < filters.get('min_volume', 0):    return None
         if trades and trades < filters.get('min_trades', 0): return None
         if rvol < filters.get('min_rvol', 0):         return None
         if mode == 'afterhrs':
-            max_vwap_dist = filters.get('max_vwap_distance_pct', 10)
-            if vwap <= 0:
+            max_spread = filters.get('max_spread_pct', 0)
+            if max_spread:
+                if bid <= 0 or ask <= 0:
+                    return None
+                spread_pct = ((ask - bid) / ((ask + bid) / 2)) * 100
+                if spread_pct > max_spread:
+                    return None
+            activity = get_afterhours_activity(ticker)
+            ah_volume = activity.get('ah_volume', 0)
+            surge = activity.get('surge', 0)
+            if filters.get('min_ah_volume', 0) and ah_volume < filters.get('min_ah_volume', 0):
                 return None
-            vwap_dist = abs((price - vwap) / vwap * 100)
-            if vwap_dist > max_vwap_dist:
+            if filters.get('min_volume_surge', 0) and surge < filters.get('min_volume_surge', 0):
+                return None
+            volume = ah_volume
+            dollar_vol = price * volume
+            rvol = surge
+            if dollar_vol < filters.get('min_dollar_vol', 0):
                 return None
 
         grade, notes             = grade_setup(gap_pct, dollar_vol, rvol)
@@ -2339,14 +2413,21 @@ async def do_scan(user_id, scan_id=None):
                     pct        = ((price - prev_close) / prev_close) * 100
                     dollar_vol = price * volume
                     rvol       = round(volume / avg_vol, 1)
+                    bid        = float(q.get('bid') or 0)
+                    ask        = float(q.get('ask') or 0)
                     if not (filters['min_price'] <= price <= filters['max_price']): continue
                     if pct < filters['min_gap_pct']:                               continue
+                    if filters.get('max_gap_pct', 0) and pct > filters.get('max_gap_pct', 0): continue
                     if dollar_vol < filters['min_dollar_vol']:                     continue
                     if volume < filters.get('min_volume', 0):                      continue
                     if trades and trades < filters.get('min_trades', 0):           continue
+                    if filters.get('max_spread_pct', 0):
+                        if bid <= 0 or ask <= 0:                                   continue
+                        spread_pct = ((ask - bid) / ((ask + bid) / 2)) * 100
+                        if spread_pct > filters.get('max_spread_pct', 0):          continue
                     candidates.append({'ticker':sym,'price':price,'prev_close':prev_close,
                         'gap_pct':round(pct,1),'volume':volume,'dollar_vol':dollar_vol,
-                        'trades':trades,'bid':float(q.get('bid') or 0),'ask':float(q.get('ask') or 0),
+                        'trades':trades,'bid':bid,'ask':ask,
                         'rvol':rvol,'source':'tradier'})
                 except: continue
             candidates.sort(key=lambda x: x['gap_pct'], reverse=True)
@@ -2388,7 +2469,7 @@ async def do_scan(user_id, scan_id=None):
                 scan_source = f'{scan_source}+tradier-lookup'
             log_alert(f"🔍 [{user_id}] Tradier lookup filter: {len(lookup_quotes)} quoted → {len(candidates)-before} added | error: {lookup_error or 'none'}")
 
-    listed_expansion_targets = {'morning_gap': 100, 'scanopp': 20}
+    listed_expansion_targets = {'morning_gap': 100, 'scanopp': 20, 'afterhrs': 60}
     listed_expansion_target = listed_expansion_targets.get(mode, 0)
     if listed_expansion_target and len(candidates) < listed_expansion_target:
         listed_universe = get_listed_symbol_universe()
@@ -2514,7 +2595,7 @@ async def do_scan(user_id, scan_id=None):
         return [], done_status
 
     if mode == 'afterhrs':
-        candidate_limit = 25
+        candidate_limit = 60
     elif mode == 'morning_gap':
         candidate_limit = 125
     else:
