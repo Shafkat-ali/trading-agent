@@ -1936,16 +1936,35 @@ def get_afterhours_activity(ticker, user_id='shafkat'):
         raw = series.get('data', []) if series else []
         if isinstance(raw, dict):
             raw = [raw]
-        volumes = [int(float(b.get('volume') or 0)) for b in raw if float(b.get('volume') or 0) > 0]
-        if not volumes:
+        bars = []
+        for b in raw:
+            try:
+                vol = int(float(b.get('volume') or 0))
+                close = float(b.get('close') or 0)
+                open_ = float(b.get('open') or close or 0)
+                if vol > 0 and close > 0:
+                    bars.append({'volume': vol, 'open': open_, 'close': close})
+            except:
+                continue
+        if not bars:
             return {'ah_volume': 0, 'surge': 0}
 
-        ah_volume = sum(volumes)
+        volumes = [b['volume'] for b in bars]
+        start_price = bars[0]['open'] or bars[0]['close']
+        last_price = bars[-1]['close']
         last5 = sum(volumes[-5:])
         prior = volumes[:-5]
         prior_avg_5min = (sum(prior) / max(1, len(prior) / 5)) if prior else max(1, last5)
+        ah_volume = sum(volumes)
+        move_pct = ((last_price - start_price) / start_price * 100) if start_price > 0 else 0
         surge = round(last5 / max(prior_avg_5min, 1), 2)
-        data = {'ah_volume': ah_volume, 'surge': surge}
+        data = {
+            'ah_volume': ah_volume,
+            'surge': surge,
+            'start_price': round(start_price, 4),
+            'last_price': round(last_price, 4),
+            'move_pct': round(move_pct, 2),
+        }
         _afterhours_activity_cache[ticker] = {'ts': now, 'data': data}
         return data
     except:
@@ -2236,6 +2255,21 @@ def process_ticker(stock_data, mode='morning_gap', filters=None):
             ask        = stock_data.get('ask', 0)
         trades = stock_data.get('trades', 0)
 
+        if mode == 'afterhrs':
+            activity = get_afterhours_activity(ticker)
+            ah_price = activity.get('last_price', 0)
+            ah_start_price = activity.get('start_price', 0)
+            ah_volume = activity.get('ah_volume', 0)
+            surge = activity.get('surge', 0)
+            if ah_price <= 0 or ah_start_price <= 0:
+                return None
+            price = ah_price
+            prev_close = ah_start_price
+            gap_pct = activity.get('move_pct', 0)
+            volume = ah_volume
+            dollar_vol = price * volume
+            rvol = surge
+
         # Re-check filters with fresh Alpaca data
         if price < filters.get('min_price', 0):      return None
         if price > filters.get('max_price', 9999):   return None
@@ -2253,16 +2287,10 @@ def process_ticker(stock_data, mode='morning_gap', filters=None):
                 spread_pct = ((ask - bid) / ((ask + bid) / 2)) * 100
                 if spread_pct > max_spread:
                     return None
-            activity = get_afterhours_activity(ticker)
-            ah_volume = activity.get('ah_volume', 0)
-            surge = activity.get('surge', 0)
-            if filters.get('min_ah_volume', 0) and ah_volume < filters.get('min_ah_volume', 0):
+            if filters.get('min_ah_volume', 0) and volume < filters.get('min_ah_volume', 0):
                 return None
-            if filters.get('min_volume_surge', 0) and surge < filters.get('min_volume_surge', 0):
+            if filters.get('min_volume_surge', 0) and rvol < filters.get('min_volume_surge', 0):
                 return None
-            volume = ah_volume
-            dollar_vol = price * volume
-            rvol = surge
             if dollar_vol < filters.get('min_dollar_vol', 0):
                 return None
 
@@ -2515,6 +2543,9 @@ async def do_scan(user_id, scan_id=None):
                 if len(candidates) > before:
                     scan_source = f'{scan_source}+{mode}-tradier-listed'
             log_alert(f"[{user_id}] {mode} Tradier listed filter: {len(listed_quotes)} quoted -> {len(listed_candidates)} passed | error: {listed_error or 'none'}")
+
+    if mode == 'afterhrs':
+        log_alert(f"[{user_id}] AfterHrs pricing source: Tradier quotes for broad scan; Tradier 1min time-sales for final AH price/move")
 
     # Fallback: Polygon
     if not candidates:
