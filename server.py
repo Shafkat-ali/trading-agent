@@ -1897,13 +1897,13 @@ def filter_tradier_quote_map(quote_map, filters, source):
 def get_afterhours_activity(ticker, user_id='shafkat'):
     """Measure after-hours volume and current 5-minute volume surge from 1-minute bars."""
     now = datetime.now()
+    ah_start = now.replace(hour=16, minute=0, second=0, microsecond=0)
+    if now < ah_start:
+        return {'ah_volume': 0, 'surge': 0}
+
     cache = _afterhours_activity_cache.get(ticker)
     if cache and (now - cache['ts']).total_seconds() < 60:
         return cache['data']
-
-    start = now.replace(hour=16, minute=0, second=0, microsecond=0)
-    if now < start:
-        start = (now - timedelta(days=1)).replace(hour=16, minute=0, second=0, microsecond=0)
 
     try:
         r = requests.get(
@@ -1912,11 +1912,11 @@ def get_afterhours_activity(ticker, user_id='shafkat'):
             params={
                 'symbol': ticker,
                 'interval': '1min',
-                'start': start.strftime('%Y-%m-%d %H:%M'),
+                'start': ah_start.strftime('%Y-%m-%d %H:%M'),
                 'end': now.strftime('%Y-%m-%d %H:%M'),
                 'session_filter': 'all',
             },
-            timeout=4
+            timeout=1.5
         )
         if r.status_code != 200:
             return {'ah_volume': 0, 'surge': 0}
@@ -2373,6 +2373,12 @@ async def do_scan(user_id, scan_id=None):
     mode    = s['mode']
     label   = SCAN_MODES.get(mode, {}).get('label', mode)
 
+    ah_start = datetime.now().replace(hour=16, minute=0, second=0, microsecond=0)
+    if mode == 'afterhrs' and datetime.now() < ah_start:
+        msg = 'AfterHrs Ignition uses Tradier and starts checking today after 4:00 PM ET.'
+        log_alert(f"[{user_id}] {msg}")
+        return [], {'phase':'done','message':msg,'progress':0,'total':0}
+
     status = {'phase':'fetching','message':f'📡 Building universe...','progress':0,'total':0}
     await broadcast_to_user(user_id, {'type':'scan_status','status':status})
     await asyncio.sleep(0)
@@ -2595,7 +2601,7 @@ async def do_scan(user_id, scan_id=None):
         return [], done_status
 
     if mode == 'afterhrs':
-        candidate_limit = 60
+        candidate_limit = 20
     elif mode == 'morning_gap':
         candidate_limit = 125
     else:
@@ -2608,7 +2614,8 @@ async def do_scan(user_id, scan_id=None):
     total = len(candidates)
     log_alert(f"📊 [{user_id}] {total} candidates from {scan_source}")
 
-    status = {'phase':'analyzing','message':f'Enriching {total} with Alpaca data...','progress':0,'total':total}
+    enrich_source = 'Tradier time-sales' if mode == 'afterhrs' else 'Alpaca data'
+    status = {'phase':'analyzing','message':f'Enriching {total} with {enrich_source}...','progress':0,'total':total}
     await broadcast_to_user(user_id, {'type':'scan_status','status':status})
     await asyncio.sleep(0)
 
