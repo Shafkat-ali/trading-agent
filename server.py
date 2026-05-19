@@ -627,6 +627,9 @@ async def get_stock_quote(ticker: str, user: str = "shafkat"):
                 now_et = datetime.now(ET)
                 h = now_et.hour
                 is_extended = (h < 9 or (h == 9 and now_et.minute < 30) or h >= 16)
+                timesales_price = get_tradier_latest_timesales_price(ticker, user) if is_extended else 0
+                if timesales_price > 0:
+                    last = timesales_price
 
                 # During after-hours:
                 # 'close' = today's 4pm regular session close
@@ -1969,6 +1972,44 @@ def get_afterhours_activity(ticker, user_id='shafkat'):
         return data
     except:
         return {'ah_volume': 0, 'surge': 0}
+
+
+def get_tradier_latest_timesales_price(ticker, user_id='shafkat'):
+    """Latest extended-hours price from Tradier 1-minute time-sales."""
+    now = datetime.now()
+    if now.hour >= 16:
+        start = now.replace(hour=16, minute=0, second=0, microsecond=0)
+    elif now.hour < 9 or (now.hour == 9 and now.minute < 30):
+        start = now.replace(hour=4, minute=0, second=0, microsecond=0)
+    else:
+        return 0
+
+    try:
+        r = requests.get(
+            f"{TRADIER_API_URL}/markets/timesales",
+            headers=get_tradier_headers(user_id),
+            params={
+                'symbol': ticker,
+                'interval': '1min',
+                'start': start.strftime('%Y-%m-%d %H:%M'),
+                'end': now.strftime('%Y-%m-%d %H:%M'),
+                'session_filter': 'all',
+            },
+            timeout=2
+        )
+        if r.status_code != 200:
+            return 0
+        series = r.json().get('series') or {}
+        raw = series.get('data', []) if series else []
+        if isinstance(raw, dict):
+            raw = [raw]
+        for b in reversed(raw):
+            price = float(b.get('close') or 0)
+            if price > 0:
+                return price
+    except:
+        return 0
+    return 0
 
 
 def get_tradier_movers(filters, user_id='shafkat'):

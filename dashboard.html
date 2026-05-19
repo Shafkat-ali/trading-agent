@@ -2438,19 +2438,16 @@ loadChart();
         const regClose = d.rc || d.c;  // today's 4pm close (or last if not available)
 
         if(d.is_extended && d.after_hours_price && d.rc > 0){
-          // AFTER HOURS: main=today's close, badge=after-hrs price
+          // AFTER HOURS: main=live after-hours/current price, badge=move vs 4pm close
           const ahChg = d.after_hours_change || 0;
           const ahSign = ahChg >= 0 ? '+' : '';
-          // Main price = today's regular session close
-          document.getElementById('popupPrice').textContent = `$${d.rc.toFixed(4)}`;
-          const dayChg = ((d.rc - d.pc)/d.pc*100).toFixed(2);
+          document.getElementById('popupPrice').textContent = `$${d.c.toFixed(4)}`;
+          const dayChg = ((d.c - d.pc)/d.pc*100).toFixed(2);
           document.getElementById('popupChange').textContent = `${dayChg>0?'+':''}${dayChg}%`;
           document.getElementById('popupChange').style.color = dayChg>=0?'#00ff88':'#ff4444';
-          // Prev day close
-          if(pcEl) pcEl.textContent = `Prev $${d.pc.toFixed(4)}`;
-          // After-hrs badge
+          if(pcEl) pcEl.textContent = `Prev Day $${d.pc.toFixed(4)}`;
           if(ahEl){
-            ahEl.textContent = `After hrs $${d.after_hours_price.toFixed(4)} ${ahSign}${ahChg.toFixed(2)}%`;
+            ahEl.textContent = `After hrs ${ahSign}${ahChg.toFixed(2)}% vs 4pm $${d.rc.toFixed(4)}`;
             ahEl.style.color = ahChg >= 0 ? '#00c853' : '#ff4444';
             ahEl.style.display = 'inline';
           }
@@ -2460,7 +2457,7 @@ loadChart();
           document.getElementById('popupPrice').textContent = `$${d.c.toFixed(4)}`;
           document.getElementById('popupChange').textContent = `${chg>0?'+':''}${chg}%`;
           document.getElementById('popupChange').style.color = chg>=0?'#00ff88':'#ff4444';
-          if(pcEl) pcEl.textContent = `Prev $${d.pc.toFixed(4)}`;
+          if(pcEl) pcEl.textContent = `Prev Day $${d.pc.toFixed(4)}`;
           if(ahEl) ahEl.style.display = 'none';
         }
 
@@ -2479,7 +2476,7 @@ loadChart();
         }
         document.getElementById('popupHigh').textContent=`H: $${d.h?.toFixed(2)||'--'}`;
         document.getElementById('popupLow').textContent=`L: $${d.l?.toFixed(2)||'--'}`;
-        const src=d.source==='alpaca'?'Alpaca ⚡':'Finnhub';
+        const src=d.source==='tradier'?'Tradier':(d.source==='alpaca'?'Alpaca':'Finnhub');
         document.getElementById('quoteUpdated').textContent=
           `${src} · ${new Date().toLocaleTimeString('en-US',{hour12:true,timeZone:'America/New_York'})} EST`;
       }
