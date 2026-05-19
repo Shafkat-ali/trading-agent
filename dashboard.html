@@ -1879,33 +1879,125 @@
   }
 
   // ── TICKER POPUP CHART — Tradier + live polling ──
+  let popupChartInstance  = null;
+  let popupPollTimer      = null;
+  let popupCurrentTicker  = null;
+  let popupCurrentTf      = '1Min';
 
   function refreshPopupChart(ticker){
     if(popupPollTimer){ clearInterval(popupPollTimer); popupPollTimer=null; }
-    popupLoadChart(ticker || document.getElementById('popupTicker')?.textContent);
+    popupLoadChart(ticker || popupCurrentTicker);
   }
 
   function popoutPopupChart(ticker){
-    const tk = ticker || document.getElementById('popupTicker')?.textContent || '';
+    const tk    = ticker || popupCurrentTicker || '';
     if(!tk) return;
     const range = document.getElementById('popupRange')?.value || '2D';
     const tf    = document.getElementById('popupTf')?.value    || '1Min';
+    const apiUrl = API_URL;
+    const RANGES_MAP = {'1D':1,'2D':2,'5D':5,'10D':10,'15D':15,'1M':30,'3M':90,'6M':180,'1Y':365};
+    const AUTO_TF_MAP = {'1D':'1Min','2D':'1Min','5D':'1Min','10D':'1Min','15D':'1Min','1M':'5Min','3M':'1Day','6M':'1Day','1Y':'1Day'};
     const w = window.open('', '_blank');
-    if(!w){ return; }
-    w.document.write(buildChartsPage());
+    if(!w) return;
+    const rangeOpts = ['1D','2D','5D','10D','15D','1M','3M','6M','1Y']
+      .map(r=>`<option value="${r}"${r===range?' selected':''}>${r}</option>`).join('');
+    const tfOpts = [['1Min','1m'],['5Min','5m'],['15Min','15m'],['1Day','1D']]
+      .map(([v,l])=>`<option value="${v}"${v===tf?' selected':''}>${l}</option>`).join('');
+    w.document.write(`<!DOCTYPE html><html><head><meta charset="UTF-8">
+<title>${tk} — Live Chart</title>
+<script src="https://unpkg.com/lightweight-charts@3.8.0/dist/lightweight-charts.standalone.production.js"><\/script>
+<style>
+*{margin:0;padding:0;box-sizing:border-box;}body{background:#060a12;font-family:-apple-system,sans-serif;height:100vh;display:flex;flex-direction:column;overflow:hidden;cursor:crosshair;}
+.hdr{display:flex;align-items:center;gap:6px;padding:7px 14px;background:#080e1e;border-bottom:2px solid #1a2a4a;flex-shrink:0;}
+.t{font-size:.95rem;font-weight:800;color:#ffd700;min-width:60px;}
+.co{font-size:.58rem;color:#4a8aff;}
+select{background:#060a12;border:1px solid #2a3a5a;border-radius:4px;color:#a0b8d0;font-size:.65rem;padding:3px 5px;cursor:pointer;}
+.rng{color:#ffd700;font-weight:700;}
+button{background:#0f1a2e;border:1px solid #2a3a5a;border-radius:4px;font-size:.58rem;padding:3px 9px;cursor:pointer;color:#a0b8d0;}
+button:hover{background:#1a3a6a;}button.on{border-color:var(--c);color:var(--c);}
+.badge{font-size:.55rem;color:#3a5a7a;margin-left:auto;}
+.chart-wrap{flex:1;min-height:0;display:flex;flex-direction:column;}
+.mc{flex:1;min-height:0;}
+.sub{height:85px;flex-shrink:0;border-top:1px solid #1a2a4a;position:relative;display:none;}
+.sub-lbl{position:absolute;top:2px;left:5px;font-size:.48rem;color:#4a6a8a;pointer-events:none;z-index:10;}
+.sub-inner{width:100%;height:100%;}
+</style></head><body>
+<div class="hdr">
+  <div style="display:flex;flex-direction:column;gap:1px;"><span class="t" id="tTitle">${tk}</span><span class="co" id="tCo"></span></div>
+  <select class="rng" id="rng" onchange="onRange(this.value)">${rangeOpts}</select>
+  <select id="tf" onchange="loadChart()">${tfOpts}</select>
+  <button onclick="loadChart()">↻</button>
+  <button class="on" id="bVol"  style="--c:#4a8aff" onclick="tog('Vol')">Vol</button>
+  <button         id="bEMA"  style="--c:#ff9100" onclick="tog('EMA')">EMA</button>
+  <button         id="bRSI"  style="--c:#a78bfa" onclick="tog('RSI')">RSI</button>
+  <button         id="bMACD" style="--c:#00d4ff" onclick="tog('MACD')">MACD</button>
+  <span class="badge" id="badge">⏳</span>
+</div>
+<div class="chart-wrap">
+  <div class="mc" id="mc"></div>
+  <div class="sub" id="rsiWrap"><div class="sub-lbl">RSI(14)</div><div class="sub-inner" id="rsiEl"></div></div>
+  <div class="sub" id="macdWrap"><div class="sub-lbl">MACD(12,26,9)</div><div class="sub-inner" id="macdEl"></div></div>
+</div>
+<script>
+const API='${apiUrl}',TK='${tk}';
+const RM=${JSON.stringify(RANGES_MAP)},AM=${JSON.stringify(AUTO_TF_MAP)};
+const ind={Vol:true,EMA:false,RSI:false,MACD:false};
+let chart=null,rsiC=null,macdC=null,poll=null;
+function pT(t){return Math.floor(new Date(t.includes('T')?t:t.replace(' ','T')).getTime()/1000);}
+function ema(d,p){const k=2/(p+1);let e=null;return d.map(v=>{if(e===null)e=v;else e=v*k+e*(1-k);return e;});}
+function rsi(c,p=14){return c.map((_,i)=>{if(i<p)return null;let g=0,l=0;for(let j=i-p+1;j<=i;j++){const d=c[j]-c[j-1];if(d>0)g+=d;else l-=d;}return 100-100/(1+(g/p)/((l/p)||1e-6));});}
+function macd(c){const f=ema(c,12),s=ema(c,26),ml=f.map((v,i)=>v-s[i]),sig=ema(ml,9);return{ml,sig,h:ml.map((v,i)=>v-sig[i])};}
+function tog(k){ind[k]=!ind[k];document.getElementById('b'+k).classList.toggle('on',ind[k]);
+  if(k==='RSI')document.getElementById('rsiWrap').style.display=ind.RSI?'block':'none';
+  if(k==='MACD')document.getElementById('macdWrap').style.display=ind.MACD?'block':'none';
+  loadChart();}
+function onRange(r){const t=AM[r]||'1Min';document.getElementById('tf').value=t;loadChart();}
+async function loadChart(){
+  if(poll){clearInterval(poll);poll=null;}
+  const r=document.getElementById('rng').value,t=document.getElementById('tf').value;
+  const d=RM[r]||2,s=new Date();s.setDate(s.getDate()-d);
+  const url=API+'/api/stock/bars/'+TK+'?timeframe='+t+'&days='+d+'&start='+s.toISOString().split('T')[0];
+  document.getElementById('badge').textContent='⏳ Loading...';
+  try{
+    const res=await fetch(url),data=await res.json(),bars=data.bars||[];
+    if(bars.length){render(bars);}
+    else{document.getElementById('badge').textContent='No data — market may be closed';}
+  }catch(e){document.getElementById('badge').textContent='Error: '+e.message;}
+  poll=setInterval(async()=>{
+    try{const res=await fetch(url),data=await res.json(),bars=data.bars||[];if(bars.length)render(bars);}catch(e){}
+  },2000);
+}
+function render(bars){
+  const mc=document.getElementById('mc');
+  if(chart){try{chart.remove();}catch(e){}}
+  if(rsiC){try{rsiC.remove();}catch(e){}}
+  if(macdC){try{macdC.remove();}catch(e){}}
+  chart=rsiC=macdC=null;
+  mc.innerHTML='';document.getElementById('rsiEl').innerHTML='';document.getElementById('macdEl').innerHTML='';
+  const s=bars.map(b=>({t:pT(b.time),o:b.open,h:b.high,l:b.low,c:b.close,v:b.volume||0,vw:b.vwap||0})).filter(b=>b.t>0).sort((a,b)=>a.t-b.t);
+  const cl=s.map(b=>b.c),ti=s.map(b=>b.t);
+  chart=LightweightCharts.createChart(mc,{width:mc.clientWidth,height:mc.clientHeight,layout:{backgroundColor:'#060a12',textColor:'#8aa0c0'},grid:{vertLines:{color:'#0f1a2e'},horzLines:{color:'#0f1a2e'}},timeScale:{timeVisible:true,secondsVisible:false,borderColor:'#1a2a4a',localization:{timeFormatter:t=>{const d=new Date(t*1000);return d.toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit',hour12:true,timeZone:'America/New_York'});}}},rightPriceScale:{borderColor:'#1a2a4a',scaleMarginTop:0.08,scaleMarginBottom:ind.Vol?0.2:0.05},crosshair:{mode:1},handleScroll:{mouseWheel:true,pressedMouseMove:true},handleScale:{mouseWheel:true,pinch:true}});
+  const cs=chart.addCandlestickSeries({upColor:'#00c853',downColor:'#ff1744',borderUpColor:'#00c853',borderDownColor:'#ff1744',wickUpColor:'#00c853',wickDownColor:'#ff1744'});
+  cs.setData(s.map(b=>({time:b.t,open:b.o,high:b.h,low:b.l,close:b.c})));
+  const vw=s.filter(b=>b.vw>0).map(b=>({time:b.t,value:b.vw}));
+  if(vw.length){chart.addLineSeries({color:'#ffd700',lineWidth:2,priceLineVisible:false,title:'VWAP'}).setData(vw);}
+  if(ind.EMA&&cl.length>=20){
+    chart.addLineSeries({color:'#ff9100',lineWidth:1,priceLineVisible:false,title:'EMA9'}).setData(ti.map((t,i)=>({time:t,value:ema(cl,9)[i]})));
+    chart.addLineSeries({color:'#ff4a4a',lineWidth:1,priceLineVisible:false,title:'EMA20'}).setData(ti.map((t,i)=>({time:t,value:ema(cl,20)[i]})));
+  }
+  if(ind.Vol){const vs=chart.addHistogramSeries({priceFormat:{type:'volume'},priceScaleId:'vol'});chart.priceScale('vol').applyOptions({scaleMarginTop:0.8,scaleMarginBottom:0});vs.setData(s.map(b=>({time:b.t,value:b.v,color:b.c>=b.o?'rgba(0,200,83,.35)':'rgba(255,23,68,.35)'})));}
+  chart.timeScale().fitContent();
+  if(ind.RSI&&cl.length>=14){const re=document.getElementById('rsiEl');rsiC=LightweightCharts.createChart(re,{width:re.clientWidth,height:re.clientHeight,layout:{backgroundColor:'#040810',textColor:'#5a7a9a'},grid:{vertLines:{color:'#0a1020'},horzLines:{color:'#0a1020'}},timeScale:{visible:false},rightPriceScale:{borderColor:'#1a2a4a'},crosshair:{mode:1},handleScroll:false,handleScale:false});const rv=rsi(cl),rl=rsiC.addLineSeries({color:'#a78bfa',lineWidth:1,priceLineVisible:false});rl.setData(ti.map((t,j)=>rv[j]!==null?{time:t,value:rv[j]}:null).filter(Boolean));rsiC.addLineSeries({color:'rgba(255,68,68,.4)',lineWidth:1,lineStyle:2,priceLineVisible:false}).setData([{time:ti[0],value:70},{time:ti[ti.length-1],value:70}]);rsiC.addLineSeries({color:'rgba(0,200,83,.4)',lineWidth:1,lineStyle:2,priceLineVisible:false}).setData([{time:ti[0],value:30},{time:ti[ti.length-1],value:30}]);rsiC.timeScale().fitContent();chart.timeScale().subscribeVisibleLogicalRangeChange(r=>{if(r&&rsiC)rsiC.timeScale().setVisibleLogicalRange(r);});}
+  if(ind.MACD&&cl.length>=26){const me=document.getElementById('macdEl');macdC=LightweightCharts.createChart(me,{width:me.clientWidth,height:me.clientHeight,layout:{backgroundColor:'#040810',textColor:'#5a7a9a'},grid:{vertLines:{color:'#0a1020'},horzLines:{color:'#0a1020'}},timeScale:{visible:false},rightPriceScale:{borderColor:'#1a2a4a'},crosshair:{mode:1},handleScroll:false,handleScale:false});const{ml,sig,h}=macd(cl);macdC.addHistogramSeries({priceLineVisible:false}).setData(ti.map((t,j)=>({time:t,value:h[j],color:h[j]>=0?'rgba(0,200,83,.6)':'rgba(255,23,68,.6)'})));macdC.addLineSeries({color:'#00d4ff',lineWidth:1,priceLineVisible:false}).setData(ti.map((t,j)=>({time:t,value:ml[j]})));macdC.addLineSeries({color:'#ff9100',lineWidth:1,priceLineVisible:false}).setData(ti.map((t,j)=>({time:t,value:sig[j]})));macdC.timeScale().fitContent();chart.timeScale().subscribeVisibleLogicalRangeChange(r=>{if(r&&macdC)macdC.timeScale().setVisibleLogicalRange(r);});}
+  new ResizeObserver(()=>{if(chart)chart.resize(mc.clientWidth,mc.clientHeight);if(rsiC){const e=document.getElementById('rsiEl');rsiC.resize(e.clientWidth,e.clientHeight);}if(macdC){const e=document.getElementById('macdEl');macdC.resize(e.clientWidth,e.clientHeight);}}).observe(document.body);
+  const last=s[s.length-1];
+  document.getElementById('badge').textContent='⟳ 2s · '+bars.length+' bars · '+new Date().toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit',second:'2-digit',timeZone:'America/New_York'});
+  // Fetch company name
+  fetch(API+'/api/stock/profile/'+TK).then(r=>r.json()).then(d=>{if(d.name)document.getElementById('tCo').textContent=d.name;}).catch(()=>{});
+}
+loadChart();
+<\/script></body></html>`);
     w.document.close();
-    // After page loads, pre-fill and load the ticker
-    w.addEventListener('load', ()=>{
-      try{
-        const tkEl = w.document.getElementById('tk0');
-        const rngEl = w.document.getElementById('rngSel0');
-        const tfEl  = w.document.getElementById('tf0');
-        if(tkEl) tkEl.value = tk;
-        if(rngEl) rngEl.value = range;
-        if(tfEl)  tfEl.value  = tf;
-        if(w.state && w.load) w.load(0);
-      }catch(e){}
-    });
   }
 
   const popupInd = {Vol:true, EMA:false, RSI:false, MACD:false};
@@ -1928,9 +2020,7 @@
     const ticker = document.getElementById('popupTicker')?.textContent;
     if(ticker && ticker !== '--') popupLoadChart(ticker);
   }
-  let popupPollTimer     = null;
-  let popupCurrentTicker = null;
-  let popupCurrentTf     = '5Min';
+  // Poll interval — 2 seconds for all timeframes
 
   // Poll interval by timeframe (ms) — aggressive for small caps
   function getPollInterval(tf){
