@@ -1879,7 +1879,35 @@
   }
 
   // ── TICKER POPUP CHART — Tradier + live polling ──
-  let popupChartInstance = null;
+
+  function refreshPopupChart(ticker){
+    if(popupPollTimer){ clearInterval(popupPollTimer); popupPollTimer=null; }
+    popupLoadChart(ticker || document.getElementById('popupTicker')?.textContent);
+  }
+
+  function popoutPopupChart(ticker){
+    const tk = ticker || document.getElementById('popupTicker')?.textContent || '';
+    if(!tk) return;
+    const range = document.getElementById('popupRange')?.value || '2D';
+    const tf    = document.getElementById('popupTf')?.value    || '1Min';
+    const w = window.open('', '_blank');
+    if(!w){ return; }
+    w.document.write(buildChartsPage());
+    w.document.close();
+    // After page loads, pre-fill and load the ticker
+    w.addEventListener('load', ()=>{
+      try{
+        const tkEl = w.document.getElementById('tk0');
+        const rngEl = w.document.getElementById('rngSel0');
+        const tfEl  = w.document.getElementById('tf0');
+        if(tkEl) tkEl.value = tk;
+        if(rngEl) rngEl.value = range;
+        if(tfEl)  tfEl.value  = tf;
+        if(w.state && w.load) w.load(0);
+      }catch(e){}
+    });
+  }
+
   const popupInd = {Vol:true, EMA:false, RSI:false, MACD:false};
   function togglePopupInd(ind){
     popupInd[ind] = !popupInd[ind];
@@ -1953,6 +1981,14 @@
         <button id="popupIndEMA"  onclick="togglePopupInd('EMA')"  style="background:#0f1a2e;border:1px solid #1a2a4a;border-radius:3px;color:#4a6a8a;font-size:.5rem;padding:1px 5px;cursor:pointer;">EMA</button>
         <button id="popupIndRSI"  onclick="togglePopupInd('RSI')"  style="background:#0f1a2e;border:1px solid #1a2a4a;border-radius:3px;color:#4a6a8a;font-size:.5rem;padding:1px 5px;cursor:pointer;">RSI</button>
         <button id="popupIndMACD" onclick="togglePopupInd('MACD')" style="background:#0f1a2e;border:1px solid #1a2a4a;border-radius:3px;color:#4a6a8a;font-size:.5rem;padding:1px 5px;cursor:pointer;">MACD</button>
+      </div>
+      <div style="display:flex;gap:4px;margin-left:auto;">
+        <button onclick="refreshPopupChart('${ticker}')" title="Refresh chart now"
+          style="background:#0f1a2e;border:1px solid #2a3a5a;border-radius:4px;color:#a0c4ff;font-size:.55rem;padding:2px 7px;cursor:pointer;"
+          onmouseover="this.style.background='#1a3a6a'" onmouseout="this.style.background='#0f1a2e'">↻ Refresh</button>
+        <button onclick="popoutPopupChart('${ticker}')" title="Open in full screen"
+          style="background:#0f1a2e;border:1px solid #2a3a5a;border-radius:4px;color:#a0c4ff;font-size:.55rem;padding:2px 7px;cursor:pointer;"
+          onmouseover="this.style.background='#1a3a6a'" onmouseout="this.style.background='#0f1a2e'">⤢ Pop out</button>
       </div>
     `;
     container.appendChild(ctrl);
@@ -2627,6 +2663,7 @@ button.ld:hover{background:#4a8aff;color:#fff;}
 <div class="hdr">
   <span class="hdr-title">📊 Chart Workspace — 8 Panels</span>
   <span class="hdr-hint">Enter ticker → range → Load &nbsp;|&nbsp; Vol / EMA / RSI / MACD toggle per panel</span>
+  <button onclick="refreshAll()" style="margin-left:auto;background:#1a3a6a;border:1px solid #2a4a8a;border-radius:5px;color:#a0c4ff;font-size:.6rem;padding:3px 12px;cursor:pointer;" title="Reload all charts">↻ Refresh All</button>
 </div>
 <div class="grid" id="grid"></div>
 
@@ -2950,6 +2987,7 @@ function init(){
           <option value="1Day">1D<\/option>
         <\/select>
         <button class="ld" onclick="load(\${i})">Load<\/button>
+        <button class="ld" onclick="load(\${i})" title="Refresh this chart" style="background:#0f1a2e;border-color:#2a3a5a;color:#6a9aaa;">↻<\/button>
         <button class="expand-btn" onclick="expandCell(\${i})" title="Expand to full screen">⤢<\/button>
         <div class="inds">
           <button class="ind-btn on" id="iVol\${i}" style="--c:#4a8aff" onclick="toggle(\${i},'Vol')">Vol<\/button>
@@ -3149,6 +3187,13 @@ function render(i,bars){
 }
 
 // Store candle series ref for update
+function refreshAll(){
+  for(let i=0;i<8;i++){
+    const tk=(document.getElementById('tk'+i)?.value||'').trim().toUpperCase();
+    if(tk) load(i);
+  }
+}
+
 function stopAllPolls(){
   for(let i=0;i<8;i++){
     if(state[i]?.pollTimer){clearInterval(state[i].pollTimer);state[i].pollTimer=null;}
