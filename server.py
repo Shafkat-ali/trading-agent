@@ -28,6 +28,8 @@ ALPACA_SECRET_KEY  = os.getenv('ALPACA_SECRET_KEY',  'F8tASs56AzAorfKqYkNYEVgEH7
 EMAIL_ADDRESS      = os.getenv('EMAIL_ADDRESS', '')
 EMAIL_PASSWORD     = os.getenv('EMAIL_PASSWORD', '')
 EMAIL_TO           = os.getenv('EMAIL_TO', '')
+EMAIL_ALERTS_ENABLED = os.getenv('EMAIL_ALERTS_ENABLED', 'false').lower() in {'1','true','yes','on'}
+email_alerts_available = True
 
 # ── User auth — passwords stored as SHA-256 hashes, never in plaintext ──
 import hashlib
@@ -185,7 +187,16 @@ VALID_EXCHANGES  = {'NASDAQ','NYSE','AMEX','NYSE ARCA','NYSE MKT','BATS','CBOE'}
 # ============================================================
 
 def send_email(subject, body):
+    global email_alerts_available
+    if not EMAIL_ALERTS_ENABLED or not email_alerts_available:
+        return
+    if not EMAIL_ADDRESS or not EMAIL_PASSWORD or not EMAIL_TO:
+        email_alerts_available = False
+        log_alert("Email alerts disabled: EMAIL_ADDRESS, EMAIL_PASSWORD, or EMAIL_TO is missing")
+        return
+
     def _send():
+        global email_alerts_available
         try:
             msg = MIMEMultipart()
             msg['From'] = EMAIL_ADDRESS; msg['To'] = EMAIL_TO; msg['Subject'] = subject
@@ -194,7 +205,8 @@ def send_email(subject, body):
             s.login(EMAIL_ADDRESS, EMAIL_PASSWORD)
             s.sendmail(EMAIL_ADDRESS, EMAIL_TO, msg.as_string()); s.quit()
         except Exception as e:
-            log_alert(f"⚠️ Email failed: {e}")
+            email_alerts_available = False
+            log_alert(f"Email alerts disabled after SMTP failure: {e}")
     threading.Thread(target=_send, daemon=True).start()
 
 def log_alert(message):
@@ -2718,8 +2730,18 @@ async def scanner_loop(user_id, scan_id):
                 'count':len(results),'alerts':alert_log[:20],
                 'scan_status':done_status,'mode':s['mode'],'filters':s['filters'],
             })
+            s['running'] = False
         except Exception as e:
-            log_alert(f"⚠️ [{user_id}] Scanner error: {e}")
+            msg = f"Scanner error: {e}"
+            log_alert(f"⚠️ [{user_id}] {msg}")
+            s['running'] = False
+            await broadcast_to_user(user_id, {
+                'type':'scan_results','data':s.get('scan_results', []),
+                'time':datetime.now().strftime('%H:%M:%S'),
+                'count':len(s.get('scan_results', [])),'alerts':alert_log[:20],
+                'scan_status':{'phase':'error','message':msg,'progress':0,'total':0},
+                'mode':s['mode'],'filters':s['filters'],
+            })
 
         if s['running'] and scan_id == s.get('scan_id'):
             interval = int(os.getenv('SCAN_INTERVAL', 30))

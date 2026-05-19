@@ -2611,12 +2611,22 @@ loadChart();
       fill.style.width='40%';
     }
     if(status.phase==='done'){
+      isRunning=false;
+      isPaused=false;
+      stopPolling();
+      updateStatusUI(false);
+      updateScanBtns(null);
       cnt.textContent=`✅ ${status.total||0} scanned`;
       cnt.style.display='inline';
       if(isLoading&&!allResults.length)showEmptyScanResult(status);
       setTimeout(hideProgress,4000);
     }
     if(status.phase==='error'){
+      isRunning=false;
+      isPaused=false;
+      stopPolling();
+      updateStatusUI(false);
+      updateScanBtns(null);
       fill.style.background='#ff1744';
       fill.style.width='100%';
       cnt.textContent='❌ Error';
