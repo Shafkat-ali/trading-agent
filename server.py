@@ -627,9 +627,22 @@ async def get_stock_quote(ticker: str, user: str = "shafkat"):
                 now_et = datetime.now(ET)
                 h = now_et.hour
                 is_extended = (h < 9 or (h == 9 and now_et.minute < 30) or h >= 16)
+                live_source = 'tradier_quote'
+                mid = ((bid + ask) / 2) if bid > 0 and ask > 0 else 0
                 timesales_price = get_tradier_latest_timesales_price(ticker, user) if is_extended else 0
-                if timesales_price > 0:
-                    last = timesales_price
+                if is_extended:
+                    if timesales_price > 0:
+                        # Tradier quote.last is often stale pre-market; timesales is better,
+                        # but reject an old/odd print if it is far away from live bid/ask.
+                        if mid > 0 and abs(timesales_price - mid) > max(0.03, mid * 0.08):
+                            last = mid
+                            live_source = 'tradier_bidask_mid'
+                        else:
+                            last = timesales_price
+                            live_source = 'tradier_timesales'
+                    elif mid > 0:
+                        last = mid
+                        live_source = 'tradier_bidask_mid'
 
                 # During after-hours:
                 # 'close' = today's 4pm regular session close
@@ -658,6 +671,7 @@ async def get_stock_quote(ticker: str, user: str = "shafkat"):
                     'after_hours_price':  after_hours_price,
                     'after_hours_change': after_hours_change,
                     'is_extended': is_extended,
+                    'live_source': live_source,
                     'source': 'tradier',
                 }
     except Exception as e:
@@ -1976,7 +1990,9 @@ def get_afterhours_activity(ticker, user_id='shafkat'):
 
 def get_tradier_latest_timesales_price(ticker, user_id='shafkat'):
     """Latest extended-hours price from Tradier 1-minute time-sales."""
-    now = datetime.now()
+    from datetime import timezone
+    ET = timezone(timedelta(hours=-4))
+    now = datetime.now(ET).replace(tzinfo=None)
     if now.hour >= 16:
         start = now.replace(hour=16, minute=0, second=0, microsecond=0)
     elif now.hour < 9 or (now.hour == 9 and now.minute < 30):
