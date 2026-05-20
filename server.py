@@ -1370,6 +1370,108 @@ def _fetch_polymarket_market_data(limit=80):
 async def get_polymarket_markets(limit: int = 80):
     return await asyncio.to_thread(_fetch_polymarket_market_data, max(10, min(limit, 120)))
 
+HEATMAP_UNIVERSE = [
+    ('AAPL','Technology',10),('MSFT','Technology',10),('NVDA','Technology',10),('AVGO','Technology',6),
+    ('ORCL','Technology',4),('AMD','Technology',4),('ADBE','Technology',3),('CRM','Technology',3),
+    ('CSCO','Technology',3),('INTC','Technology',2),('QCOM','Technology',3),('TXN','Technology',3),
+    ('AMZN','Consumer Cyclical',9),('TSLA','Consumer Cyclical',7),('HD','Consumer Cyclical',4),
+    ('MCD','Consumer Cyclical',3),('NKE','Consumer Cyclical',2),('SBUX','Consumer Cyclical',2),
+    ('LOW','Consumer Cyclical',3),('BKNG','Consumer Cyclical',3),('ABNB','Consumer Cyclical',2),
+    ('META','Communication',8),('GOOGL','Communication',8),('GOOG','Communication',6),('NFLX','Communication',4),
+    ('DIS','Communication',3),('CMCSA','Communication',2),('VZ','Communication',2),('T','Communication',2),
+    ('JPM','Financial',6),('BAC','Financial',4),('WFC','Financial',3),('GS','Financial',3),('MS','Financial',3),
+    ('V','Financial',5),('MA','Financial',5),('AXP','Financial',3),('C','Financial',2),('BLK','Financial',3),
+    ('UNH','Healthcare',6),('LLY','Healthcare',8),('JNJ','Healthcare',5),('MRK','Healthcare',4),('ABBV','Healthcare',4),
+    ('PFE','Healthcare',2),('TMO','Healthcare',3),('ABT','Healthcare',3),('ISRG','Healthcare',3),('AMGN','Healthcare',3),
+    ('XOM','Energy',6),('CVX','Energy',5),('COP','Energy',3),('SLB','Energy',2),('EOG','Energy',2),
+    ('OXY','Energy',2),('MPC','Energy',2),('PSX','Energy',2),
+    ('COST','Consumer Defensive',5),('WMT','Consumer Defensive',5),('PG','Consumer Defensive',4),('KO','Consumer Defensive',3),
+    ('PEP','Consumer Defensive',3),('PM','Consumer Defensive',3),('MO','Consumer Defensive',2),('TGT','Consumer Defensive',2),
+    ('CAT','Industrial',4),('GE','Industrial',4),('HON','Industrial',3),('UPS','Industrial',3),('BA','Industrial',3),
+    ('DE','Industrial',3),('LMT','Industrial',3),('RTX','Industrial',3),
+    ('LIN','Materials',4),('SHW','Materials',3),('APD','Materials',2),('FCX','Materials',2),('NEM','Materials',2),
+    ('ECL','Materials',2),
+    ('NEE','Utilities',3),('SO','Utilities',2),('DUK','Utilities',2),('AEP','Utilities',2),('SRE','Utilities',2),
+    ('PLD','Real Estate',3),('AMT','Real Estate',3),('EQIX','Real Estate',3),('SPG','Real Estate',2),
+    ('SPY','Index ETFs',7),('QQQ','Index ETFs',7),('IWM','Index ETFs',4),('DIA','Index ETFs',3),('SMH','Index ETFs',4),('XBI','Index ETFs',2),
+]
+
+def _heat_num(value, default=0.0):
+    try:
+        if value in (None, ''):
+            return default
+        return float(value)
+    except:
+        return default
+
+def _heat_quote_card(sym, sector, weight, quote):
+    last = _heat_num(quote.get('last') or quote.get('trade') or quote.get('close'))
+    prev = _heat_num(quote.get('prevclose') or quote.get('prev_close') or quote.get('open'))
+    pct = _heat_num(quote.get('change_percentage'))
+    if abs(pct) > 50:
+        pct = pct / 100
+    if not pct and last and prev:
+        pct = ((last - prev) / prev) * 100
+    change = _heat_num(quote.get('change'))
+    if not change and last and prev:
+        change = last - prev
+    return {
+        'symbol': sym,
+        'sector': sector,
+        'weight': weight,
+        'price': round(last, 4),
+        'prev_close': round(prev, 4),
+        'change': round(change, 4),
+        'change_pct': round(pct, 2),
+        'volume': int(_heat_num(quote.get('volume'))),
+        'description': quote.get('description') or sym,
+    }
+
+def _fetch_market_heatmap(user_id='shafkat'):
+    symbols = [row[0] for row in HEATMAP_UNIVERSE]
+    quotes, error = get_tradier_quotes_parallel(symbols, user_id, max_workers=4)
+    cells = []
+    for sym, sector, weight in HEATMAP_UNIVERSE:
+        q = quotes.get(sym)
+        if q:
+            cells.append(_heat_quote_card(sym, sector, weight, q))
+        else:
+            cells.append({
+                'symbol': sym, 'sector': sector, 'weight': weight, 'price': 0,
+                'prev_close': 0, 'change': 0, 'change_pct': 0, 'volume': 0,
+                'description': sym,
+            })
+    sector_rows = {}
+    for cell in cells:
+        sector_rows.setdefault(cell['sector'], []).append(cell)
+    sectors = []
+    for sector, rows in sector_rows.items():
+        weight_sum = sum(r['weight'] for r in rows) or 1
+        avg = sum(r['change_pct'] * r['weight'] for r in rows) / weight_sum
+        sectors.append({
+            'name': sector,
+            'change_pct': round(avg, 2),
+            'weight': weight_sum,
+            'stocks': sorted(rows, key=lambda r: r['weight'], reverse=True),
+        })
+    sectors.sort(key=lambda s: s['weight'], reverse=True)
+    market_weight = sum(s['weight'] for s in sectors) or 1
+    market_change = sum(s['change_pct'] * s['weight'] for s in sectors) / market_weight
+    return {
+        'source': 'Tradier live quotes',
+        'updated': datetime.now().strftime('%Y-%m-%d %I:%M:%S %p'),
+        'market_change_pct': round(market_change, 2),
+        'count': len(cells),
+        'sectors': sectors,
+        'error': error,
+    }
+
+@app.get("/api/market/heatmap")
+async def get_market_heatmap(user: str = 'shafkat'):
+    if user not in user_state:
+        user = 'shafkat'
+    return await asyncio.to_thread(_fetch_market_heatmap, user)
+
 @app.get("/api/stock/search/{ticker}")
 async def search_ticker(ticker: str):
     try:
@@ -3159,6 +3261,119 @@ POLYMARKET_PAGE_HTML = """
 @app.get("/polymarket")
 async def serve_polymarket():
     return HTMLResponse(POLYMARKET_PAGE_HTML)
+
+HEATMAP_PAGE_HTML = """
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Market Heat Map</title>
+  <style>
+    *{box-sizing:border-box;margin:0;padding:0}
+    body{min-height:100vh;background:#050914;color:#eef6ff;font-family:Segoe UI,Arial,sans-serif;overflow:hidden}
+    .top{height:64px;background:linear-gradient(135deg,#08111f,#0b1f32);border-bottom:1px solid #1f3552;display:flex;align-items:center;justify-content:space-between;padding:12px 18px;gap:14px}
+    .title h1{font-size:1.15rem;font-weight:900;letter-spacing:.2px}
+    .title p{font-size:.64rem;color:#6f8caf;letter-spacing:1.4px;text-transform:uppercase;margin-top:3px}
+    .stats{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+    .pill{background:#0d1828;border:1px solid #223a5c;border-radius:999px;padding:7px 11px;font-size:.68rem;color:#bdd6f4;font-weight:700}
+    .pill b{color:#fff}
+    .btn{background:#112945;border:1px solid #2c4d78;color:#cce7ff;border-radius:8px;padding:8px 12px;font-size:.72rem;font-weight:800;cursor:pointer}
+    .btn:hover{filter:brightness(1.15)}
+    .wrap{height:calc(100vh - 64px);padding:10px;display:flex;flex-direction:column;gap:8px}
+    .legend{display:flex;align-items:center;gap:8px;font-size:.65rem;color:#8ba9ca;justify-content:flex-end}
+    .sw{width:34px;height:12px;border-radius:3px}.red{background:#a2172f}.flat{background:#26364c}.green{background:#0da35b}
+    .map{flex:1;min-height:0;display:grid;grid-template-columns:repeat(4,minmax(0,1fr));grid-auto-rows:minmax(160px,1fr);gap:7px}
+    .sector{background:#091421;border:1px solid #1b304d;border-radius:8px;overflow:hidden;display:flex;flex-direction:column;min-height:0}
+    .sector-head{display:flex;align-items:center;justify-content:space-between;padding:7px 8px;border-bottom:1px solid rgba(255,255,255,.06);font-size:.7rem;font-weight:900;color:#dcecff;background:rgba(255,255,255,.025)}
+    .sector-head span:last-child{font-family:Consolas,monospace}
+    .stocks{flex:1;min-height:0;display:flex;flex-wrap:wrap;gap:3px;padding:5px;align-content:stretch}
+    .stock{position:relative;border:1px solid rgba(255,255,255,.11);border-radius:4px;min-width:54px;min-height:42px;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:3px;color:#f7fbff;overflow:hidden}
+    .stock.big{min-width:96px;min-height:68px}
+    .sym{font-weight:900;font-size:.78rem;line-height:1}
+    .chg{font-size:.66rem;font-family:Consolas,monospace;margin-top:4px}
+    .px{font-size:.52rem;color:rgba(255,255,255,.72);margin-top:2px}
+    .loading,.error{height:100%;display:flex;align-items:center;justify-content:center;background:#091421;border:1px solid #1b304d;border-radius:10px;color:#9bb8d6}
+    .error{color:#ffd0d8;border-color:#7f1d2d}
+    @media(max-width:1100px){body{overflow:auto}.wrap{height:auto}.map{grid-template-columns:repeat(2,minmax(0,1fr));height:auto}.sector{min-height:260px}}
+    @media(max-width:650px){.top{height:auto;align-items:flex-start;flex-direction:column}.wrap{height:auto}.map{grid-template-columns:1fr}.stats{width:100%}.btn{flex:1}.sector{min-height:300px}}
+  </style>
+</head>
+<body>
+  <header class="top">
+    <div class="title">
+      <h1>Market Heat Map</h1>
+      <p>Live sector strength from Tradier quotes</p>
+    </div>
+    <div class="stats">
+      <div class="pill">Market: <b id="marketPct">--</b></div>
+      <div class="pill">Stocks: <b id="stockCount">--</b></div>
+      <div class="pill">Updated: <b id="updated">--</b></div>
+      <button class="btn" onclick="loadMap()">Refresh</button>
+      <button class="btn" onclick="window.close()">Close</button>
+    </div>
+  </header>
+  <main class="wrap">
+    <div class="legend"><span>-3% or worse</span><span class="sw red"></span><span class="sw flat"></span><span class="sw green"></span><span>+3% or better</span></div>
+    <section class="map" id="map"><div class="loading">Loading live market heat map...</div></section>
+  </main>
+  <script>
+    function colorFor(p){
+      p=Number(p||0);
+      const mag=Math.min(Math.abs(p)/3,1);
+      if(p>0){
+        const g=Math.round(70+130*mag), r=Math.round(12+10*(1-mag)), b=Math.round(48+35*(1-mag));
+        return `rgb(${r},${g},${b})`;
+      }
+      if(p<0){
+        const r=Math.round(80+105*mag), g=Math.round(28+20*(1-mag)), b=Math.round(42+30*(1-mag));
+        return `rgb(${r},${g},${b})`;
+      }
+      return 'rgb(38,54,76)';
+    }
+    function fmt(p){p=Number(p||0);return (p>0?'+':'')+p.toFixed(2)+'%'}
+    function price(p){p=Number(p||0);return p?'$'+p.toFixed(p<10?2:2):'--'}
+    function stockCell(s){
+      const grow=Math.max(1, Math.min(10, Number(s.weight||1)));
+      const big=grow>=6?' big':'';
+      return `<div class="stock${big}" title="${s.description||s.symbol} ${fmt(s.change_pct)}" style="background:${colorFor(s.change_pct)};flex:${grow} 1 ${44+grow*8}px">
+        <div class="sym">${s.symbol}</div><div class="chg">${fmt(s.change_pct)}</div><div class="px">${price(s.price)}</div>
+      </div>`;
+    }
+    function sectorBlock(sec){
+      return `<section class="sector" style="grid-row:span ${sec.weight>22?2:1}">
+        <div class="sector-head"><span>${sec.name}</span><span style="color:${sec.change_pct>=0?'#22e38a':'#ff5d78'}">${fmt(sec.change_pct)}</span></div>
+        <div class="stocks">${(sec.stocks||[]).map(stockCell).join('')}</div>
+      </section>`;
+    }
+    async function loadMap(){
+      const map=document.getElementById('map');
+      map.innerHTML='<div class="loading">Loading live market heat map...</div>';
+      try{
+        const params=new URLSearchParams(location.search);
+        const user=params.get('user')||localStorage.getItem('activeUserId')||'shafkat';
+        const r=await fetch('/api/market/heatmap?user='+encodeURIComponent(user)+'&t='+Date.now());
+        const d=await r.json();
+        document.getElementById('marketPct').textContent=fmt(d.market_change_pct);
+        document.getElementById('marketPct').style.color=Number(d.market_change_pct)>=0?'#22e38a':'#ff5d78';
+        document.getElementById('stockCount').textContent=d.count||0;
+        document.getElementById('updated').textContent=d.updated||'--';
+        if(d.error)console.warn('Heat map warning',d.error);
+        map.innerHTML=(d.sectors||[]).length ? d.sectors.map(sectorBlock).join('') : '<div class="error">No live quote data returned.</div>';
+      }catch(e){
+        map.innerHTML='<div class="error">Could not load live heat map data.</div>';
+      }
+    }
+    loadMap();
+    setInterval(loadMap, 30000);
+  </script>
+</body>
+</html>
+"""
+
+@app.get("/heatmap")
+async def serve_heatmap():
+    return HTMLResponse(HEATMAP_PAGE_HTML)
 
 @app.get("/")
 async def serve_dashboard():
