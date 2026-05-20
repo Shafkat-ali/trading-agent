@@ -70,7 +70,7 @@
     .brand-text h1{font-size:1.05rem;font-weight:800;background:linear-gradient(90deg,#ffd700,#00d4ff,#00ff88);-webkit-background-clip:text;-webkit-text-fill-color:transparent;letter-spacing:.3px;}
     .brand-text p{font-size:.54rem;color:#3a5a7a;text-transform:uppercase;letter-spacing:1.8px;margin-top:1px;}
 
-    .search-bar{display:flex;align-items:center;gap:4px;background:#0f1729;border:1px solid #1e2d4a;border-radius:6px;padding:4px 8px;transition:border-color .2s;}
+    .search-bar{display:flex;align-items:center;gap:4px;background:#0f1729;border:1px solid #1e2d4a;border-radius:6px;padding:4px 8px;transition:border-color .2s;min-width:310px;}
     .search-bar:focus-within{border-color:#ffd700;}
     .search-input{background:transparent;border:none;outline:none;color:#e0e6f0;font-size:.74rem;width:125px;}
     .search-input::placeholder{color:#3a5a7a;}
@@ -433,12 +433,12 @@
 
     /* LIGHT LAYOUT THEME — app shell only; chart canvases keep their dark chart options */
     .theme-toggle{
-      display:flex;align-items:center;gap:5px;background:#0f1729;border:1px solid #1e2d4a;
-      border-radius:999px;color:#a0b8d0;font-size:.6rem;font-weight:700;padding:4px 8px;
-      transition:all .2s;white-space:nowrap;
+      display:flex;align-items:center;gap:4px;background:#13213a;border:1px solid #35517e;
+      border-radius:999px;color:#c7d7f2;font-size:.58rem;font-weight:800;padding:3px 7px;
+      transition:all .2s;white-space:nowrap;margin-left:4px;
     }
     .theme-toggle:hover{border-color:#ffd700;color:#ffd700;background:#142040;}
-    .theme-toggle-knob{width:18px;height:18px;border-radius:50%;display:flex;align-items:center;justify-content:center;background:#1e2d4a;font-size:.62rem;}
+    .theme-toggle-knob{width:16px;height:16px;border-radius:50%;display:flex;align-items:center;justify-content:center;background:#1e2d4a;font-size:.58rem;}
     body.light-theme{background:#f4f7fb;color:#172033;}
     body.light-theme .header{background:linear-gradient(135deg,#ffffff,#edf4ff);border-bottom-color:#cfd9ea;box-shadow:0 1px 10px rgba(15,23,42,.08);}
     body.light-theme .brand-text h1{background:linear-gradient(90deg,#0f172a,#0369a1,#059669);-webkit-background-clip:text;-webkit-text-fill-color:transparent;}
@@ -689,11 +689,11 @@
       onkeydown="if(event.key==='Enter')searchTicker()">
     <button class="search-btn" onclick="searchTicker()">Analyze</button>
     <span class="search-loading" id="searchLoading">⏳</span>
+    <button class="theme-toggle" id="themeToggle" onclick="toggleLayoutTheme()" title="Toggle light or dark layout">
+      <span class="theme-toggle-knob" id="themeToggleIcon">☾</span>
+      <span id="themeToggleText">Dark</span>
+    </button>
   </div>
-  <button class="theme-toggle" id="themeToggle" onclick="toggleLayoutTheme()" title="Toggle light or dark layout">
-    <span class="theme-toggle-knob" id="themeToggleIcon">☾</span>
-    <span id="themeToggleText">Dark</span>
-  </button>
   <div class="header-right">
     <div class="active-user-badge" onclick="switchUser()">
       <div class="user-mini-avatar" id="headerAvatar"></div>
