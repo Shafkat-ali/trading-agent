@@ -431,6 +431,109 @@
     ::-webkit-scrollbar-track{background:#080c18}
     ::-webkit-scrollbar-thumb{background:#1e2d4a;border-radius:2px}
 
+    /* LIGHT LAYOUT THEME — app shell only; chart canvases keep their dark chart options */
+    .theme-toggle{
+      display:flex;align-items:center;gap:5px;background:#0f1729;border:1px solid #1e2d4a;
+      border-radius:999px;color:#a0b8d0;font-size:.6rem;font-weight:700;padding:4px 8px;
+      transition:all .2s;white-space:nowrap;
+    }
+    .theme-toggle:hover{border-color:#ffd700;color:#ffd700;background:#142040;}
+    .theme-toggle-knob{width:18px;height:18px;border-radius:50%;display:flex;align-items:center;justify-content:center;background:#1e2d4a;font-size:.62rem;}
+    body.light-theme{background:#f4f7fb;color:#172033;}
+    body.light-theme .header{background:linear-gradient(135deg,#ffffff,#edf4ff);border-bottom-color:#cfd9ea;box-shadow:0 1px 10px rgba(15,23,42,.08);}
+    body.light-theme .brand-text h1{background:linear-gradient(90deg,#0f172a,#0369a1,#059669);-webkit-background-clip:text;-webkit-text-fill-color:transparent;}
+    body.light-theme .brand-text p,
+    body.light-theme .clock,
+    body.light-theme .switch-btn,
+    body.light-theme .scan-btn-sub,
+    body.light-theme .stat-label,
+    body.light-theme .last-scan,
+    body.light-theme .metric-label,
+    body.light-theme .trade-label,
+    body.light-theme .popup-trade-label,
+    body.light-theme .screener-company,
+    body.light-theme .mode-desc-text,
+    body.light-theme .filter-stat-label,
+    body.light-theme .refresh-quote,
+    body.light-theme .vwap-note{color:#64748b!important;}
+    body.light-theme .search-bar,
+    body.light-theme .active-user-badge,
+    body.light-theme .status-pill,
+    body.light-theme .theme-toggle,
+    body.light-theme .scan-start-btn,
+    body.light-theme .setup-card,
+    body.light-theme .right-panel,
+    body.light-theme .filter-category,
+    body.light-theme .filter-stat,
+    body.light-theme .news-tab-item,
+    body.light-theme .alert-item,
+    body.light-theme .popup-box,
+    body.light-theme .popup-header,
+    body.light-theme .pattern-section,
+    body.light-theme .popup-section,
+    body.light-theme .popup-trade-plan,
+    body.light-theme .popup-trade-item,
+    body.light-theme .chart-container,
+    body.light-theme .news-section,
+    body.light-theme .chart-cell,
+    body.light-theme .chart-cell-header{
+      background:#ffffff!important;border-color:#d7e0ef!important;color:#172033!important;
+      box-shadow:0 1px 8px rgba(15,23,42,.04);
+    }
+    body.light-theme .controls,
+    body.light-theme .scan-progress-bar,
+    body.light-theme .tab-header{background:#eef4fb!important;border-color:#d7e0ef!important;}
+    body.light-theme .search-input,
+    body.light-theme .filter-input,
+    body.light-theme .chart-ticker-input{
+      color:#172033!important;background:#f8fafc!important;border-color:#cbd5e1!important;
+    }
+    body.light-theme .search-input::placeholder{color:#94a3b8;}
+    body.light-theme .scan-btn-label,
+    body.light-theme .ticker,
+    body.light-theme .user-name,
+    body.light-theme .active-user-name,
+    body.light-theme .results-title,
+    body.light-theme .popup-ticker,
+    body.light-theme .popup-section-title,
+    body.light-theme .screener-symbol{color:#0f172a!important;}
+    body.light-theme .metric,
+    body.light-theme .trade-item,
+    body.light-theme .catalyst-row,
+    body.light-theme .criteria-item,
+    body.light-theme .pattern-desc,
+    body.light-theme .loading-bar,
+    body.light-theme .progress-track{background:#f1f5f9!important;border-color:#d7e0ef!important;}
+    body.light-theme .setup-card.grade-aplus,
+    body.light-theme .setup-card.grade-a,
+    body.light-theme .setup-card.grade-b{background:linear-gradient(135deg,#ffffff,#ecfdf5)!important;}
+    body.light-theme .setup-card.grade-c{background:linear-gradient(135deg,#ffffff,#fffbeb)!important;}
+    body.light-theme .setup-card.grade-d{background:linear-gradient(135deg,#ffffff,#fff1f2)!important;}
+    body.light-theme .right-panel,
+    body.light-theme .tab-content{background:#f8fafc!important;}
+    body.light-theme .screener-item,
+    body.light-theme .mode-btn,
+    body.light-theme .reset-btn,
+    body.light-theme .news-refresh-btn,
+    body.light-theme .panel-toggle-tab,
+    body.light-theme #panelRestoreBtn{
+      background:#ffffff!important;border-color:#d7e0ef!important;color:#475569!important;
+    }
+    body.light-theme .screener-item:hover,
+    body.light-theme .mode-btn:hover,
+    body.light-theme .panel-toggle-tab:hover{background:#eaf2ff!important;border-color:#93c5fd!important;}
+    body.light-theme .tab-btn{color:#64748b!important;}
+    body.light-theme .tab-btn.active{color:#0369a1!important;background:#e0f2fe!important;border-bottom-color:#0284c7!important;}
+    body.light-theme .progress-label,
+    body.light-theme .company-info,
+    body.light-theme .alert-msg,
+    body.light-theme .popup-company,
+    body.light-theme .spread-row{color:#475569!important;}
+    body.light-theme .results-watermark,
+    body.light-theme .no-results-logos{opacity:.08;}
+    body.light-theme ::-webkit-scrollbar-track{background:#e2e8f0}
+    body.light-theme ::-webkit-scrollbar-thumb{background:#94a3b8}
+
     @media(max-width:768px){
       .main{grid-template-columns:1fr;height:auto}
       .right-panel{display:none}
@@ -587,6 +690,10 @@
     <button class="search-btn" onclick="searchTicker()">Analyze</button>
     <span class="search-loading" id="searchLoading">⏳</span>
   </div>
+  <button class="theme-toggle" id="themeToggle" onclick="toggleLayoutTheme()" title="Toggle light or dark layout">
+    <span class="theme-toggle-knob" id="themeToggleIcon">☾</span>
+    <span id="themeToggleText">Dark</span>
+  </button>
   <div class="header-right">
     <div class="active-user-badge" onclick="switchUser()">
       <div class="user-mini-avatar" id="headerAvatar"></div>
@@ -973,6 +1080,22 @@
     ['wmUyghur','nrUyghur'].forEach(id => { const el=document.getElementById(id); if(el){el.src=UYGHUR_LOGO;el.onerror=()=>el.style.display='none';} });
   }
   setLogos();
+
+  function applyLayoutTheme(theme){
+    const isLight = theme === 'light';
+    document.body.classList.toggle('light-theme', isLight);
+    const icon=document.getElementById('themeToggleIcon');
+    const text=document.getElementById('themeToggleText');
+    if(icon) icon.textContent = isLight ? '☀' : '☾';
+    if(text) text.textContent = isLight ? 'Light' : 'Dark';
+    localStorage.setItem('layoutTheme', isLight ? 'light' : 'dark');
+  }
+
+  function toggleLayoutTheme(){
+    applyLayoutTheme(document.body.classList.contains('light-theme') ? 'dark' : 'light');
+  }
+
+  applyLayoutTheme(localStorage.getItem('layoutTheme') || 'dark');
 
   // ── TERMINAL BOOT SEQUENCE ──
   const BOOT_LINES = [
@@ -3679,3 +3802,6 @@ const DEFAULT_TF      = '5Min';
 </script>
 </body>
 </html>
+
+
+
