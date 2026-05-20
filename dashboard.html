@@ -72,6 +72,9 @@
     .header{background:linear-gradient(135deg,#080c18,#0f1525);border-bottom:1px solid #1a2a4a;padding:9px 18px;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:100;gap:10px;flex-wrap:wrap;}
     .brand-text h1{font-size:1.05rem;font-weight:800;background:linear-gradient(90deg,#ffd700,#00d4ff,#00ff88);-webkit-background-clip:text;-webkit-text-fill-color:transparent;letter-spacing:.3px;}
     .brand-text p{font-size:.54rem;color:#3a5a7a;text-transform:uppercase;letter-spacing:1.8px;margin-top:1px;}
+    .poly-launch{display:flex;align-items:center;gap:7px;background:linear-gradient(135deg,#0a4da3,#11a7ff);border:1px solid rgba(125,211,252,.6);border-radius:999px;color:#eaf7ff;font-size:.68rem;font-weight:900;padding:7px 13px;box-shadow:0 0 18px rgba(14,165,233,.20);white-space:nowrap;}
+    .poly-launch:hover{transform:translateY(-1px);filter:brightness(1.12);}
+    .poly-dot{width:8px;height:8px;border-radius:50%;background:#7dd3fc;box-shadow:0 0 10px #7dd3fc;}
 
     .search-bar{display:flex;align-items:center;gap:4px;background:#0f1729;border:1px solid #1e2d4a;border-radius:6px;padding:4px 8px;transition:border-color .2s;min-width:310px;}
     .search-bar:focus-within{border-color:#ffd700;}
@@ -527,6 +530,7 @@
     body.light-theme .panel-toggle-tab:hover{background:#eaf2ff!important;border-color:#93c5fd!important;}
     body.light-theme .tab-btn{color:#64748b!important;}
     body.light-theme .tab-btn.active{color:#0369a1!important;background:#e0f2fe!important;border-bottom-color:#0284c7!important;}
+    body.light-theme .poly-launch{background:linear-gradient(135deg,#0ea5e9,#2563eb)!important;color:#fff!important;border-color:#93c5fd!important;}
     body.light-theme .progress-label,
     body.light-theme .company-info,
     body.light-theme .alert-msg,
@@ -689,6 +693,10 @@
     <h1>Payda × UyghurKid Capital Trading Agent</h1>
     <p>Real-Time • Small Cap • Sykes Method • Pre/After Market</p>
   </div>
+  <button class="poly-launch" onclick="openPolymarketPage()" title="Open Polymarket stock and market data radar">
+    <span class="poly-dot"></span>
+    Polymarket
+  </button>
   <div class="search-bar">
     <span style="font-size:.72rem;color:#4a6a8a">🔍</span>
     <input class="search-input" id="searchInput" type="text" placeholder="Search ticker..."
@@ -1099,6 +1107,10 @@
 
   function toggleLayoutTheme(){
     applyLayoutTheme(document.body.classList.contains('light-theme') ? 'dark' : 'light');
+  }
+
+  function openPolymarketPage(){
+    window.open('/polymarket', '_blank', 'noopener');
   }
 
   applyLayoutTheme(localStorage.getItem('layoutTheme') || 'dark');

@@ -9,6 +9,7 @@ import smtplib
 import threading
 import csv
 import io
+import json
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
@@ -50,6 +51,7 @@ TRADIER_SANDBOX_ACCT_IRFAN  = os.getenv('TRADIER_SANDBOX_ACCT_IRFAN', 'VA4248897
 
 TRADIER_API_URL     = 'https://api.tradier.com/v1'
 TRADIER_SANDBOX_URL = 'https://sandbox.tradier.com/v1'
+POLYMARKET_GAMMA_URL = 'https://gamma-api.polymarket.com'
 
 # Headers per user — each gets their own Tradier account
 TRADIER_HEADERS       = {'Authorization': f'Bearer {TRADIER_TOKEN}',              'Accept': 'application/json'}
@@ -100,6 +102,7 @@ _company_cache = {}
 _tradier_lookup_cache = {'ts': None, 'tickers': []}
 _listed_symbol_cache = {'ts': None, 'tickers': []}
 _afterhours_activity_cache = {}
+_polymarket_cache = {'ts': None, 'data': None}
 
 SCAN_MODES = {
     'morning_gap': {
@@ -1221,6 +1224,151 @@ async def get_sec_news():
         return {'news': tagged}
     except Exception as e:
         return {'news': [], 'error': str(e)}
+
+POLYMARKET_TERMS = [
+    'stock', 'stocks', 'nasdaq', 's&p', 'sp500', 'dow', 'russell', 'market', 'markets',
+    'ipo', 'earnings', 'fed', 'rate cut', 'interest rates', 'inflation', 'cpi', 'ppi',
+    'recession', 'unemployment', 'jobs report', 'tariff', 'oil', 'treasury',
+    'nvidia', 'nvda', 'tesla', 'tsla', 'apple', 'aapl', 'microsoft', 'msft',
+    'amazon', 'amzn', 'google', 'alphabet', 'googl', 'meta', 'palantir', 'pltr',
+    'bitcoin', 'btc', 'crypto', 'dollar', 'vix',
+]
+
+POLYMARKET_SYMBOLS = {
+    'NVDA', 'TSLA', 'AAPL', 'MSFT', 'AMZN', 'GOOGL', 'GOOG', 'META', 'PLTR',
+    'AMD', 'SMCI', 'MSTR', 'COIN', 'GME', 'AMC', 'DJT', 'SPY', 'QQQ', 'IWM',
+}
+
+def _poly_text(value):
+    if value is None:
+        return ''
+    if isinstance(value, (dict, list)):
+        return json.dumps(value)
+    return str(value)
+
+def _poly_list(value):
+    if value is None:
+        return []
+    if isinstance(value, list):
+        return value
+    if isinstance(value, str):
+        try:
+            parsed = json.loads(value)
+            return parsed if isinstance(parsed, list) else []
+        except:
+            return []
+    return []
+
+def _poly_float(value, default=0.0):
+    try:
+        if value in (None, ''):
+            return default
+        return float(value)
+    except:
+        return default
+
+def _poly_market_url(slug):
+    return f"https://polymarket.com/event/{slug}" if slug else "https://polymarket.com"
+
+def _poly_relevance(event, market):
+    text = ' '.join([
+        _poly_text(event.get('title') or event.get('question') or event.get('slug')),
+        _poly_text(event.get('description')),
+        _poly_text(event.get('category')),
+        _poly_text(event.get('tags')),
+        _poly_text(market.get('question') or market.get('title')),
+        _poly_text(market.get('description')),
+    ]).lower()
+    matched = []
+    for term in POLYMARKET_TERMS:
+        if term in text:
+            matched.append(term)
+    for sym in POLYMARKET_SYMBOLS:
+        if sym.lower() in text:
+            matched.append(sym)
+    score = len(set(matched))
+    volume = _poly_float(market.get('volume24hr') or market.get('volume_24hr') or event.get('volume24hr') or event.get('volume_24hr'))
+    liquidity = _poly_float(market.get('liquidity') or event.get('liquidity'))
+    score += min(4, int(volume // 25000)) + min(3, int(liquidity // 50000))
+    return score, sorted(set(matched))[:8]
+
+def _fetch_polymarket_market_data(limit=80):
+    global _polymarket_cache
+    now = datetime.now()
+    if _polymarket_cache['data'] and _polymarket_cache['ts'] and (now - _polymarket_cache['ts']).seconds < 90:
+        return _polymarket_cache['data']
+
+    params = {
+        'active': 'true',
+        'closed': 'false',
+        'limit': 100,
+        'offset': 0,
+        'order': 'volume_24hr',
+        'ascending': 'false',
+    }
+    cards = {}
+    errors = []
+    offsets = [0, 100, 200]
+
+    for offset in offsets:
+        try:
+            params['offset'] = offset
+            r = requests.get(f"{POLYMARKET_GAMMA_URL}/events", params=params, timeout=12)
+            if r.status_code != 200:
+                errors.append(f"events HTTP {r.status_code}")
+                continue
+            events = r.json()
+            if isinstance(events, dict):
+                events = events.get('data') or events.get('events') or []
+            for event in events:
+                markets = event.get('markets') or []
+                if not markets:
+                    markets = [event]
+                for market in markets:
+                    score, matched = _poly_relevance(event, market)
+                    if score <= 0:
+                        continue
+                    outcomes = _poly_list(market.get('outcomes'))
+                    prices = [_poly_float(p) for p in _poly_list(market.get('outcomePrices'))]
+                    yes_price = prices[0] if prices else _poly_float(market.get('lastTradePrice') or market.get('bestBid'))
+                    no_price = prices[1] if len(prices) > 1 else (1 - yes_price if yes_price else 0)
+                    card = {
+                        'id': str(market.get('id') or market.get('conditionId') or event.get('id') or ''),
+                        'event_id': str(event.get('id') or ''),
+                        'title': event.get('title') or event.get('question') or market.get('question') or 'Polymarket event',
+                        'question': market.get('question') or event.get('title') or '',
+                        'slug': event.get('slug') or market.get('slug') or '',
+                        'url': _poly_market_url(event.get('slug') or market.get('slug')),
+                        'category': event.get('category') or market.get('category') or 'Market',
+                        'end_date': market.get('endDate') or event.get('endDate') or '',
+                        'volume': _poly_float(market.get('volume') or event.get('volume')),
+                        'volume_24hr': _poly_float(market.get('volume24hr') or market.get('volume_24hr') or event.get('volume24hr') or event.get('volume_24hr')),
+                        'liquidity': _poly_float(market.get('liquidity') or event.get('liquidity')),
+                        'yes_price': round(yes_price, 4),
+                        'no_price': round(no_price, 4),
+                        'outcomes': outcomes[:4],
+                        'matched': matched,
+                        'score': score,
+                        'image': market.get('image') or event.get('image') or event.get('icon') or '',
+                    }
+                    cards[card['id'] or card['slug'] or card['question']] = card
+        except Exception as e:
+            errors.append(str(e))
+
+    items = sorted(cards.values(), key=lambda x: (x['score'], x['volume_24hr'], x['volume']), reverse=True)[:limit]
+    data = {
+        'markets': items,
+        'count': len(items),
+        'source': 'Polymarket Gamma public API',
+        'updated': datetime.now().strftime('%Y-%m-%d %I:%M:%S %p'),
+        'errors': errors[:5],
+    }
+    _polymarket_cache = {'ts': now, 'data': data}
+    return data
+
+@app.get("/api/polymarket/markets")
+async def get_polymarket_markets(limit: int = 80):
+    return await asyncio.to_thread(_fetch_polymarket_market_data, max(10, min(limit, 120)))
 
 @app.get("/api/stock/search/{ticker}")
 async def search_ticker(ticker: str):
@@ -2865,6 +3013,152 @@ async def websocket_endpoint(websocket: WebSocket):
     except WebSocketDisconnect:
         if websocket in user_clients.get(user_id, []):
             user_clients[user_id].remove(websocket)
+
+POLYMARKET_PAGE_HTML = """
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Polymarket Trading Radar</title>
+  <style>
+    *{box-sizing:border-box;margin:0;padding:0}
+    body{min-height:100vh;background:#061b3d;color:#e8f3ff;font-family:Segoe UI,Arial,sans-serif}
+    .top{position:sticky;top:0;z-index:20;background:linear-gradient(135deg,#071f49,#0b4fa2 58%,#0ea5e9);border-bottom:1px solid rgba(255,255,255,.18);padding:18px 24px;display:flex;align-items:center;justify-content:space-between;gap:18px;box-shadow:0 12px 32px rgba(1,12,32,.35)}
+    .brand h1{font-size:1.35rem;letter-spacing:.2px;font-weight:900}
+    .brand p{font-size:.72rem;color:#b7d9ff;letter-spacing:1.8px;text-transform:uppercase;margin-top:4px}
+    .actions{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+    .search{background:rgba(4,20,50,.65);border:1px solid rgba(162,207,255,.32);border-radius:9px;color:#fff;padding:9px 11px;min-width:260px;outline:none}
+    .search:focus{border-color:#7dd3fc;box-shadow:0 0 0 3px rgba(14,165,233,.18)}
+    .btn{border:1px solid rgba(162,207,255,.35);background:#0b65d8;color:#fff;border-radius:8px;padding:9px 13px;font-weight:800;cursor:pointer}
+    .btn:hover{filter:brightness(1.12)}
+    .wrap{padding:22px;max-width:1500px;margin:0 auto}
+    .summary{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px;margin-bottom:16px}
+    .tile{background:rgba(6,29,67,.78);border:1px solid rgba(147,197,253,.18);border-radius:10px;padding:14px;box-shadow:0 10px 28px rgba(0,0,0,.18)}
+    .tile .label{font-size:.65rem;color:#8fc7ff;text-transform:uppercase;letter-spacing:1.3px}
+    .tile .val{font-size:1.45rem;font-weight:900;margin-top:5px;color:#fff}
+    .filters{display:flex;gap:8px;flex-wrap:wrap;margin:10px 0 18px}
+    .chip{border:1px solid rgba(147,197,253,.25);background:rgba(6,29,67,.72);color:#bfe3ff;border-radius:999px;padding:7px 11px;font-size:.74rem;font-weight:700;cursor:pointer}
+    .chip.active{background:#13a8ff;color:#001a33;border-color:#7dd3fc}
+    .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(310px,1fr));gap:14px}
+    .card{background:linear-gradient(180deg,rgba(6,29,67,.96),rgba(4,16,40,.98));border:1px solid rgba(147,197,253,.20);border-radius:12px;padding:14px;min-height:235px;display:flex;flex-direction:column;gap:10px;box-shadow:0 12px 32px rgba(0,0,0,.24)}
+    .card:hover{border-color:#38bdf8;transform:translateY(-1px)}
+    .card-head{display:flex;gap:10px;align-items:flex-start}
+    .thumb{width:42px;height:42px;border-radius:9px;background:#0b65d8;object-fit:cover;flex-shrink:0}
+    .title{font-size:.94rem;line-height:1.25;font-weight:900}
+    .question{font-size:.77rem;line-height:1.35;color:#bfd6ef}
+    .prob{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+    .prob-box{background:rgba(2,11,28,.66);border:1px solid rgba(147,197,253,.16);border-radius:8px;padding:9px;text-align:center}
+    .prob-label{font-size:.62rem;color:#8abbe8;text-transform:uppercase}
+    .prob-val{font-size:1.05rem;font-weight:900;margin-top:2px}
+    .yes{color:#38f8a5}.no{color:#ff6b8b}
+    .meta{display:grid;grid-template-columns:repeat(3,1fr);gap:6px}
+    .mini{background:rgba(2,11,28,.45);border-radius:7px;padding:7px}
+    .mini span{display:block;font-size:.54rem;color:#7fb4e8;text-transform:uppercase}
+    .mini b{display:block;font-size:.75rem;margin-top:2px}
+    .tags{display:flex;gap:5px;flex-wrap:wrap;min-height:22px}
+    .tag{font-size:.58rem;border:1px solid rgba(14,165,233,.26);background:rgba(14,165,233,.10);color:#8bdcff;border-radius:999px;padding:3px 7px}
+    .open{margin-top:auto;text-decoration:none;text-align:center;border-radius:8px;padding:8px;background:#0ea5e9;color:#00152d;font-weight:900}
+    .empty,.err{background:rgba(4,16,40,.78);border:1px solid rgba(147,197,253,.18);border-radius:12px;padding:24px;text-align:center;color:#b7d9ff}
+    .err{border-color:rgba(255,107,139,.45);color:#ffd2dc}
+    @media(max-width:780px){.top{align-items:flex-start;flex-direction:column}.summary{grid-template-columns:1fr 1fr}.search{min-width:0;width:100%}.actions{width:100%}.btn{flex:1}.grid{grid-template-columns:1fr}}
+  </style>
+</head>
+<body>
+  <header class="top">
+    <div class="brand">
+      <h1>Polymarket Trading Radar</h1>
+      <p>Stocks - indexes - IPO - earnings - macro catalysts</p>
+    </div>
+    <div class="actions">
+      <input class="search" id="search" placeholder="Search markets, tickers, macro..." oninput="render()">
+      <button class="btn" onclick="loadMarkets(true)">Refresh</button>
+      <button class="btn" onclick="window.close()">Close</button>
+    </div>
+  </header>
+  <main class="wrap">
+    <section class="summary">
+      <div class="tile"><div class="label">Markets Found</div><div class="val" id="count">--</div></div>
+      <div class="tile"><div class="label">24h Volume</div><div class="val" id="v24">--</div></div>
+      <div class="tile"><div class="label">Liquidity</div><div class="val" id="liq">--</div></div>
+      <div class="tile"><div class="label">Updated</div><div class="val" id="updated" style="font-size:.92rem">--</div></div>
+    </section>
+    <div class="filters" id="filters"></div>
+    <section class="grid" id="grid"><div class="empty">Loading Polymarket stock and market-related data...</div></section>
+  </main>
+  <script>
+    let markets=[], active='all';
+    const chips=[
+      ['all','All'],['stock','Stocks'],['ipo','IPO'],['earnings','Earnings'],
+      ['fed','Fed/Rates'],['inflation','Inflation'],['recession','Recession'],['crypto','Crypto/Market']
+    ];
+    function money(n){n=Number(n||0);if(n>=1e6)return '$'+(n/1e6).toFixed(1)+'M';if(n>=1e3)return '$'+(n/1e3).toFixed(0)+'K';return '$'+n.toFixed(0)}
+    function pct(n){n=Number(n||0);return n ? Math.round(n*100)+'%' : '--'}
+    function esc(s){return String(s||'').replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]))}
+    function chipMatch(m){
+      if(active==='all')return true;
+      const text=[m.title,m.question,m.category,(m.matched||[]).join(' ')].join(' ').toLowerCase();
+      if(active==='crypto')return /crypto|bitcoin|btc|market/.test(text);
+      if(active==='fed')return /fed|rate|treasury|interest/.test(text);
+      return text.includes(active);
+    }
+    function renderFilters(){
+      document.getElementById('filters').innerHTML=chips.map(([id,label])=>`<button class="chip ${active===id?'active':''}" onclick="active='${id}';renderFilters();render();">${label}</button>`).join('');
+    }
+    function render(){
+      const q=document.getElementById('search').value.trim().toLowerCase();
+      const rows=markets.filter(m=>chipMatch(m)).filter(m=>{
+        if(!q)return true;
+        return [m.title,m.question,m.category,(m.matched||[]).join(' ')].join(' ').toLowerCase().includes(q);
+      });
+      document.getElementById('grid').innerHTML=rows.length?rows.map(m=>`
+        <article class="card">
+          <div class="card-head">
+            ${m.image?`<img class="thumb" src="${esc(m.image)}" alt="">`:`<div class="thumb"></div>`}
+            <div><div class="title">${esc(m.title)}</div><div class="question">${esc(m.question)}</div></div>
+          </div>
+          <div class="prob">
+            <div class="prob-box"><div class="prob-label">Yes</div><div class="prob-val yes">${pct(m.yes_price)}</div></div>
+            <div class="prob-box"><div class="prob-label">No</div><div class="prob-val no">${pct(m.no_price)}</div></div>
+          </div>
+          <div class="meta">
+            <div class="mini"><span>24h Vol</span><b>${money(m.volume_24hr)}</b></div>
+            <div class="mini"><span>Total Vol</span><b>${money(m.volume)}</b></div>
+            <div class="mini"><span>Liquidity</span><b>${money(m.liquidity)}</b></div>
+          </div>
+          <div class="tags">${(m.matched||[]).slice(0,6).map(t=>`<span class="tag">${esc(t)}</span>`).join('')}</div>
+          <a class="open" href="${esc(m.url)}" target="_blank" rel="noopener">Open on Polymarket</a>
+        </article>`).join(''):'<div class="empty">No matching Polymarket markets in this view.</div>';
+    }
+    async function loadMarkets(force=false){
+      const grid=document.getElementById('grid');
+      grid.innerHTML='<div class="empty">Loading Polymarket stock and market-related data...</div>';
+      try{
+        const r=await fetch('/api/polymarket/markets?limit=90'+(force?'&t='+Date.now():''));
+        const d=await r.json();
+        markets=d.markets||[];
+        const v24=markets.reduce((a,m)=>a+Number(m.volume_24hr||0),0);
+        const liq=markets.reduce((a,m)=>a+Number(m.liquidity||0),0);
+        document.getElementById('count').textContent=markets.length;
+        document.getElementById('v24').textContent=money(v24);
+        document.getElementById('liq').textContent=money(liq);
+        document.getElementById('updated').textContent=d.updated||'--';
+        if(d.errors&&d.errors.length)console.warn('Polymarket warnings',d.errors);
+        render();
+      }catch(e){
+        grid.innerHTML='<div class="err">Could not load Polymarket data. Check server logs or internet access.</div>';
+      }
+    }
+    renderFilters();
+    loadMarkets();
+  </script>
+</body>
+</html>
+"""
+
+@app.get("/polymarket")
+async def serve_polymarket():
+    return HTMLResponse(POLYMARKET_PAGE_HTML)
 
 @app.get("/")
 async def serve_dashboard():
