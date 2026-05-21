@@ -106,6 +106,50 @@
     .scanning-bar.hidden{display:none;}
     @keyframes scan{0%{background-position:0%}100%{background-position:300%}}
 
+    /* WORKSPACE TABS */
+    .workspace-tabs{height:34px;background:#080d18;border-bottom:1px solid #1a2035;display:flex;align-items:flex-end;gap:2px;padding:0 14px;overflow-x:auto;overflow-y:hidden;scrollbar-width:none;}
+    .workspace-tabs::-webkit-scrollbar{display:none;}
+    .workspace-tab{height:29px;min-width:118px;max-width:210px;background:#101827;border:1px solid #1e2d4a;border-bottom:none;border-radius:7px 7px 0 0;color:#8fa6c7;font-size:.68rem;font-weight:800;display:flex;align-items:center;gap:7px;padding:0 10px;white-space:nowrap;transition:all .18s;}
+    .workspace-tab:hover{background:#17243a;color:#d8e8ff;border-color:#2b4772;}
+    .workspace-tab.active{height:33px;background:#162942;color:#fff;border-color:#2f5c91;box-shadow:inset 0 2px 0 #2fc7ff;}
+    .workspace-tab-icon{font-size:.78rem;line-height:1;}
+    .workspace-tab-title{overflow:hidden;text-overflow:ellipsis;}
+    .workspace-tab-close{margin-left:auto;color:#5f789e;font-size:.72rem;padding:0 2px;}
+    .workspace-tab-close:hover{color:#ff8080;}
+    .workspace-tab-add{min-width:38px;max-width:38px;justify-content:center;font-size:1rem;color:#b6c7df;}
+    .workspace-placeholder{height:calc(100vh - 149px);display:flex;align-items:center;justify-content:center;background:#0a0e1a;color:#6f86aa;border-top:1px solid #111a2c;text-align:center;padding:24px;}
+    .workspace-placeholder.hidden{display:none;}
+    .workspace-placeholder-box{max-width:420px;background:#0f1729;border:1px solid #1e2d4a;border-radius:10px;padding:22px;box-shadow:0 12px 36px rgba(0,0,0,.22);}
+    .workspace-placeholder-title{font-size:.9rem;color:#dceaff;font-weight:900;margin-bottom:7px;}
+    .workspace-placeholder-copy{font-size:.68rem;line-height:1.5;color:#6f86aa;}
+    .workspace-view.hidden{display:none!important;}
+    .scanner-workspace{min-height:calc(100vh - 149px);}
+    .ticker-workspace{height:calc(100vh - 149px);display:flex;flex-direction:column;background:#08101d;color:#dce8f8;padding:14px;overflow:auto;}
+    .ticker-workspace.hidden{display:none!important;}
+    .ticker-shell{background:#0f1729;border:1px solid #1e2d4a;border-radius:10px;min-height:260px;padding:18px;display:flex;flex-direction:column;gap:14px;}
+    .ticker-shell-head{display:flex;align-items:flex-start;justify-content:space-between;gap:14px;border-bottom:1px solid #1a2035;padding-bottom:12px;}
+    .ticker-shell-symbol{font-size:2rem;font-weight:900;color:#fff;line-height:1;}
+    .ticker-shell-price{font-size:1.35rem;font-weight:900;color:#00ff88;text-align:right;}
+    .ticker-shell-sub{font-size:.75rem;color:#7fa2ca;margin-top:6px;font-weight:700;}
+    .ticker-shell-note{font-size:.72rem;color:#6f86aa;line-height:1.55;background:#0a1220;border:1px solid #1a2035;border-radius:8px;padding:12px;}
+    .ticker-shell-actions{display:flex;gap:8px;flex-wrap:wrap;}
+    .ticker-shell-btn{border:1px solid #2a4a78;background:#132745;color:#bfe1ff;border-radius:7px;padding:7px 11px;font-size:.68rem;font-weight:800;cursor:pointer;}
+    .ticker-shell-btn:hover{filter:brightness(1.12);}
+    .ticker-tab-layout{display:flex;flex-direction:column;gap:12px;}
+    .ticker-tab-top{background:#0f1729;border:1px solid #1e2d4a;border-radius:10px;overflow:hidden;}
+    .ticker-tab-top .popup-header{position:sticky;top:0;z-index:20;background:#0f1729;}
+    .ticker-tab-grid{display:grid;grid-template-columns:minmax(300px,.9fr) minmax(420px,1.4fr);gap:12px;}
+    .ticker-tab-stack{display:flex;flex-direction:column;gap:12px;min-width:0;}
+    .ticker-tab-chart{background:#080c18;border-radius:8px;border:1px solid #1a2035;overflow:hidden;min-height:430px;}
+    .ticker-tab-chart-body{height:350px;position:relative;}
+    .ticker-tab-subchart{height:78px;position:relative;border-top:1px solid #1a2a4a;display:none;}
+    .ticker-tab-subchart-label{position:absolute;top:2px;left:5px;font-size:.46rem;color:#4a6a8a;z-index:5;pointer-events:none;}
+    .ticker-tab-subchart-inner{width:100%;height:100%;}
+    .external-workspace{height:calc(100vh - 149px);background:#060a12;display:flex;flex-direction:column;overflow:hidden;}
+    .external-workspace.hidden{display:none!important;}
+    .external-tab-frame{width:100%;height:100%;border:0;background:#060a12;flex:1;min-height:0;}
+    @media(max-width:1100px){.ticker-tab-grid{grid-template-columns:1fr}.ticker-tab-chart-body{height:320px}}
+
     /* CONTROLS */
     .controls{padding:7px 14px;display:flex;gap:8px;flex-wrap:wrap;background:#0d1220;border-bottom:1px solid #1a2035;align-items:center;}
 
@@ -155,7 +199,7 @@
     @keyframes ind{0%{transform:translateX(-200%)}100%{transform:translateX(450%)}}
 
     /* MAIN */
-    .main{display:flex;height:calc(100vh - 115px);min-height:0;}
+    .main{display:flex;height:calc(100vh - 149px);min-height:0;}
     .main .results-panel{flex:1;min-width:0;min-height:0;overflow-y:auto;display:flex;flex-direction:column;}
 
     /* RESULTS PANEL — logos watermark */
@@ -204,6 +248,9 @@
     .ticker-info{display:flex;align-items:center;gap:4px;flex-wrap:wrap;}
     .ticker{font-size:.88rem;font-weight:800;color:#fff;}
     .gap-pct{font-size:.85rem;font-weight:700;color:#00ff88;}
+    .card-actions{display:flex;align-items:center;gap:6px;}
+    .quick-view-btn{border:1px solid #2a4a78;background:#10213a;color:#9ec7ff;border-radius:5px;padding:3px 6px;font-size:.5rem;font-weight:800;cursor:pointer;line-height:1;white-space:nowrap;}
+    .quick-view-btn:hover{background:#17345d;color:#fff;border-color:#4c7dc0;}
 
     /* COMPANY INFO — centered, bigger, bold */
     .company-info{
@@ -235,13 +282,13 @@
     .entry-val{color:#00d4ff}.stop-val{color:#ff4444}.t-val{color:#00ff88}
     .skip-banner{background:rgba(255,23,68,.09);border:1px solid #ff1744;border-radius:3px;padding:2px 4px;font-size:.58rem;color:#ff5252;margin-top:3px;text-align:center;}
 
-    /* RIGHT PANEL */
-    .right-panel{background:#0d1220;border-left:1px solid #1a2035;display:flex;flex-direction:column;overflow:hidden;position:relative;transition:width .25s ease,min-width .25s ease;}
+    /* LEGACY RIGHT PANEL - kept hidden so older scanner helpers still have their DOM targets */
+    .right-panel{display:none!important;background:#0d1220;border-left:1px solid #1a2035;flex-direction:column;overflow:hidden;position:relative;transition:width .25s ease,min-width .25s ease;}
     .right-panel.collapsed{width:0!important;min-width:0!important;border-left:none;overflow:hidden;}
     .panel-toggle-tab{background:#0d1220;border:1px solid #1a2035;border-radius:4px 4px 0 0;padding:3px 8px;cursor:pointer;font-size:.5rem;color:#4a6a8a;display:flex;align-items:center;gap:3px;transition:all .2s;white-space:nowrap;align-self:flex-start;}
     .panel-toggle-tab:hover{background:#1a2a4a;color:#a0c4ff;}
     /* Floating restore button when panel is hidden */
-    #panelRestoreBtn{position:fixed;right:0;top:50%;transform:translateY(-50%);background:#0d1220;border:1px solid #1a2035;border-right:none;border-radius:6px 0 0 6px;padding:10px 5px;cursor:pointer;color:#a0c4ff;font-size:.65rem;z-index:500;writing-mode:vertical-rl;display:none;transition:all .2s;}
+    #panelRestoreBtn{position:fixed;right:0;top:50%;transform:translateY(-50%);background:#0d1220;border:1px solid #1a2035;border-right:none;border-radius:6px 0 0 6px;padding:10px 5px;cursor:pointer;color:#a0c4ff;font-size:.65rem;z-index:500;writing-mode:vertical-rl;display:none!important;transition:all .2s;}
     #panelRestoreBtn:hover{background:#1a2a4a;color:#fff;}
     .tab-header{display:flex;border-bottom:1px solid #1a2035;}
     .tab-btn{flex:1;padding:6px 2px;background:transparent;border:none;color:#4a6a8a;font-size:.5rem;font-weight:600;cursor:pointer;transition:all .2s;text-transform:uppercase;}
@@ -250,7 +297,7 @@
     .tab-content.active{display:block;}
 
     /* SCREENER */
-    .screener-item{padding:5px 7px;background:#0f1729;border-radius:4px;margin-bottom:3px;border-left:3px solid #1e2d4a;cursor:pointer;transition:all .2s;display:flex;align-items:center;justify-content:space-between;}
+    .screener-item{padding:5px 7px;background:#0f1729;border-radius:4px;margin-bottom:3px;border-left:3px solid #1e2d4a;cursor:pointer;transition:all .2s;display:flex;align-items:center;justify-content:space-between;gap:6px;}
     .screener-item:hover{background:#142040;border-left-color:#ffd700;}
     .screener-item.aplus {border-left-color:#00c853}
     .screener-item.a     {border-left-color:#00e676}
@@ -261,6 +308,7 @@
     .screener-company{font-size:.5rem;color:#3a5a7a;margin-top:1px;}
     .screener-gap{font-size:.74rem;font-weight:700;color:#00ff88;}
     .screener-grade{font-size:.52rem;padding:1px 3px;border-radius:2px;font-weight:700;margin-top:1px;display:inline-block;}
+    .screener-actions{display:flex;align-items:center;gap:5px;text-align:right;}
     .screener-grade.aplus{background:#00c853;color:#000}
     .screener-grade.a    {background:#00e676;color:#000}
     .screener-grade.b    {background:#69f0ae;color:#000}
@@ -368,6 +416,7 @@
     .popup-header{padding:10px 15px;border-bottom:1px solid #1a2035;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;background:#0d1525;z-index:10;}
     .popup-ticker-block{display:flex;flex-direction:column;gap:2px;}
     .popup-ticker-row{display:flex;align-items:center;gap:10px;}
+    .quick-view-badge{font-size:.52rem;font-weight:900;text-transform:uppercase;letter-spacing:.08em;color:#9ec7ff;background:#10213a;border:1px solid #2a4a78;border-radius:999px;padding:3px 7px;white-space:nowrap;}
     .popup-ticker{font-size:1.5rem;font-weight:900;color:#fff;}
     .popup-price{font-size:1rem;font-weight:700;}
     .popup-change{font-size:.8rem;font-weight:600;}
@@ -490,6 +539,7 @@
       box-shadow:0 1px 8px rgba(15,23,42,.04);
     }
     body.light-theme .controls,
+    body.light-theme .workspace-tabs,
     body.light-theme .scan-progress-bar,
     body.light-theme .tab-header{background:#eef4fb!important;border-color:#d7e0ef!important;}
     body.light-theme .search-input,
@@ -522,6 +572,7 @@
     body.light-theme .tab-content{background:#f8fafc!important;}
     body.light-theme .screener-item,
     body.light-theme .mode-btn,
+    body.light-theme .workspace-tab,
     body.light-theme .reset-btn,
     body.light-theme .news-refresh-btn,
     body.light-theme .panel-toggle-tab,
@@ -530,7 +581,18 @@
     }
     body.light-theme .screener-item:hover,
     body.light-theme .mode-btn:hover,
+    body.light-theme .workspace-tab:hover,
     body.light-theme .panel-toggle-tab:hover{background:#eaf2ff!important;border-color:#93c5fd!important;}
+    body.light-theme .workspace-tab.active{background:#dbeafe!important;color:#0f172a!important;border-color:#93c5fd!important;box-shadow:inset 0 2px 0 #0284c7;}
+    body.light-theme .workspace-placeholder{background:#f4f7fb!important;color:#64748b!important;border-color:#d7e0ef!important;}
+    body.light-theme .workspace-placeholder-box{background:#ffffff!important;border-color:#d7e0ef!important;}
+    body.light-theme .workspace-placeholder-title{color:#0f172a!important;}
+    body.light-theme .ticker-workspace{background:#f4f7fb!important;color:#172033!important;}
+    body.light-theme .ticker-shell,
+    body.light-theme .ticker-shell-note,
+    body.light-theme .ticker-tab-top{background:#ffffff!important;border-color:#d7e0ef!important;color:#172033!important;}
+    body.light-theme .external-workspace{background:#f4f7fb!important;}
+    body.light-theme .ticker-shell-symbol{color:#0f172a!important;}
     body.light-theme .tab-btn{color:#64748b!important;}
     body.light-theme .tab-btn.active{color:#0369a1!important;background:#e0f2fe!important;border-bottom-color:#0284c7!important;}
     body.light-theme .poly-launch{background:linear-gradient(135deg,#0ea5e9,#2563eb)!important;color:#fff!important;border-color:#93c5fd!important;}
@@ -625,6 +687,7 @@
     <div class="popup-header">
       <div class="popup-ticker-block">
         <div class="popup-ticker-row">
+          <span class="quick-view-badge">Quick View</span>
           <span class="popup-ticker" id="popupTicker">--</span>
           <span class="popup-price"  id="popupPrice" style="color:#00ff88">$--</span>
           <span class="popup-change" id="popupChange"></span>
@@ -730,6 +793,10 @@
   </div>
 </div>
 
+<div class="workspace-tabs" id="workspaceTabs"></div>
+
+<div class="workspace-view scanner-workspace" id="scannerWorkspace">
+
 <!-- CONTROLS -->
 <div class="controls">
   <div class="scan-btn-wrap">
@@ -766,8 +833,8 @@
     <button onclick="openLogModal()" title="View scan log"
       style="background:#0f1729;border:1px solid #1e2d4a;border-radius:5px;color:#4a6a8a;font-size:.52rem;padding:3px 8px;cursor:pointer;transition:all .2s;"
       onmouseover="this.style.color='#a0c4ff'" onmouseout="this.style.color='#4a6a8a'">📝 Log</button>
-    <button id="panelToggleBtn" onclick="toggleRightPanel()" title="Show right panel"
-      style="background:#0f1729;border:1px solid #1e2d4a;border-radius:5px;color:#4a6a8a;font-size:.52rem;padding:3px 8px;cursor:pointer;transition:all .2s;"
+    <button id="panelToggleBtn" onclick="toggleRightPanel()" title="Legacy panel"
+      style="display:none;background:#0f1729;border:1px solid #1e2d4a;border-radius:5px;color:#4a6a8a;font-size:.52rem;padding:3px 8px;cursor:pointer;transition:all .2s;"
       onmouseover="this.style.color='#a0c4ff'" onmouseout="this.style.color='#4a6a8a'">▶ Show</button>
   </div>
 </div>
@@ -1086,6 +1153,19 @@
   </div>
 </div>
 
+</div>
+
+<div class="workspace-placeholder hidden" id="workspacePlaceholder">
+  <div class="workspace-placeholder-box">
+    <div class="workspace-placeholder-title" id="workspacePlaceholderTitle">New Workspace Tab</div>
+    <div class="workspace-placeholder-copy">The tab shell is ready. Ticker workspaces, scanner migration, and internal Heat Map/Polymarket tabs come in the next phases.</div>
+  </div>
+</div>
+
+<div class="ticker-workspace hidden" id="tickerWorkspace"></div>
+
+<div class="external-workspace hidden" id="externalWorkspace"></div>
+
 <script>
   const API_URL     = `${location.protocol}//${location.host}`;
   const PAYDA_LOGO  = 'https://raw.githubusercontent.com/Shafkat-ali/trading-agent/main/payda.png';
@@ -1118,15 +1198,430 @@
   }
 
   function openPolymarketPage(){
-    window.open('/polymarket', '_blank', 'noopener');
+    openExternalWorkspaceTab('polymarket','Polymarket','🔵','/polymarket');
   }
 
   function openHeatMapPage(){
     const uid = currentUser?.id || 'shafkat';
-    window.open(`/heatmap?user=${encodeURIComponent(uid)}`, '_blank', 'noopener');
+    openExternalWorkspaceTab('heatmap','Market Heat Map','🟩',`/heatmap?user=${encodeURIComponent(uid)}`);
+  }
+
+  let workspaceTabs=[
+    {id:'scanner',title:'Scanner+',icon:'📊',type:'scanner',closable:false},
+  ];
+  let activeWorkspaceTab='scanner';
+
+  function renderWorkspaceTabs(){
+    const bar=document.getElementById('workspaceTabs');
+    if(!bar)return;
+    bar.innerHTML=workspaceTabs.map(tab=>`
+      <button class="workspace-tab ${tab.id===activeWorkspaceTab?'active':''}" onclick="activateWorkspaceTab('${tab.id}')">
+        <span class="workspace-tab-icon">${tab.icon||''}</span>
+        <span class="workspace-tab-title">${tab.title}</span>
+        ${tab.closable?`<span class="workspace-tab-close" onclick="closeWorkspaceTab(event,'${tab.id}')">×</span>`:''}
+      </button>
+    `).join('')+
+    `<button class="workspace-tab workspace-tab-add" onclick="addBlankWorkspaceTab()" title="New workspace tab">+</button>`;
+  }
+
+  function activateWorkspaceTab(tabId){
+    const tab=workspaceTabs.find(t=>t.id===tabId);
+    if(!tab)return;
+    activeWorkspaceTab=tabId;
+    renderWorkspaceTabs();
+    applyWorkspaceView();
+  }
+
+  function closeWorkspaceTab(event,tabId){
+    event.stopPropagation();
+    if(tickerTabState[tabId]){
+      if(tickerTabState[tabId].quoteTimer)clearInterval(tickerTabState[tabId].quoteTimer);
+      ['chart','rsiChart','macdChart'].forEach(k=>{if(tickerTabState[tabId][k]){try{tickerTabState[tabId][k].remove();}catch(e){}}});
+      delete tickerTabState[tabId];
+    }
+    workspaceTabs=workspaceTabs.filter(t=>t.id!==tabId||!t.closable);
+    if(activeWorkspaceTab===tabId)activeWorkspaceTab='scanner';
+    renderWorkspaceTabs();
+    applyWorkspaceView();
+  }
+
+  function addBlankWorkspaceTab(){
+    const id=`blank-${Date.now()}`;
+    workspaceTabs.push({id:id,title:'New Tab',icon:'＋',type:'blank',closable:true});
+    activeWorkspaceTab=id;
+    renderWorkspaceTabs();
+    applyWorkspaceView();
+  }
+
+  function applyWorkspaceView(){
+    const tab=workspaceTabs.find(t=>t.id===activeWorkspaceTab)||workspaceTabs[0];
+    const isScanner=tab.type==='scanner';
+    const isTicker=tab.type==='ticker';
+    const isExternal=tab.type==='external';
+    const scannerWorkspace=document.getElementById('scannerWorkspace');
+    const tickerWorkspace=document.getElementById('tickerWorkspace');
+    const externalWorkspace=document.getElementById('externalWorkspace');
+    const restore=document.getElementById('panelRestoreBtn');
+    const placeholder=document.getElementById('workspacePlaceholder');
+    const placeholderTitle=document.getElementById('workspacePlaceholderTitle');
+    if(scannerWorkspace)scannerWorkspace.classList.toggle('hidden',!isScanner);
+    if(tickerWorkspace)tickerWorkspace.classList.toggle('hidden',!isTicker);
+    if(externalWorkspace)externalWorkspace.classList.toggle('hidden',!isExternal);
+    if(restore){
+      restore.style.display='none';
+    }
+    if(isTicker)renderTickerWorkspace(tab);
+    if(isExternal)renderExternalWorkspace(tab);
+    if(placeholder){
+      placeholder.classList.toggle('hidden',isScanner||isTicker||isExternal);
+      if(placeholderTitle)placeholderTitle.textContent=tab.title||'New Workspace Tab';
+    }
+  }
+
+  function openExternalWorkspaceTab(id,title,icon,url){
+    let tab=workspaceTabs.find(t=>t.id===id);
+    if(!tab){
+      tab={id,title,icon,type:'external',closable:true,url};
+      workspaceTabs.push(tab);
+    }else{
+      tab.url=url;
+    }
+    activeWorkspaceTab=id;
+    renderWorkspaceTabs();
+    applyWorkspaceView();
+  }
+
+  function renderExternalWorkspace(tab){
+    const host=document.getElementById('externalWorkspace');
+    if(!host)return;
+    const existing=host.querySelector('iframe');
+    if(existing?.dataset.tabId===tab.id&&existing?.getAttribute('src')===tab.url)return;
+    host.innerHTML=`<iframe class="external-tab-frame" data-tab-id="${tab.id}" src="${tab.url}" title="${tab.title}"></iframe>`;
+  }
+
+  function openTickerTab(ticker, setup=null){
+    ticker=(ticker||'').toUpperCase();
+    if(!ticker)return;
+    const id=`ticker-${ticker}`;
+    let tab=workspaceTabs.find(t=>t.id===id);
+    if(!tab){
+      tab={id:id,title:ticker,icon:'🟡',type:'ticker',closable:true,ticker:ticker,setup:setup||allResults.find(r=>r.ticker===ticker)||null};
+      workspaceTabs.push(tab);
+    }else if(setup){
+      tab.setup=setup;
+    }
+    activeWorkspaceTab=id;
+    renderWorkspaceTabs();
+    applyWorkspaceView();
+  }
+
+  function renderTickerWorkspace(tab){
+    const host=document.getElementById('tickerWorkspace');
+    if(!host)return;
+    const setup=tab.setup||allResults.find(r=>r.ticker===tab.ticker)||{};
+    const chg=Number(setup.gap_pct||0);
+    const chgText=setup.gap_pct!==undefined?`${chg>=0?'+':''}${chg.toFixed(2)}%`:'--';
+    const company=[setup.company_name,setup.exchange,setup.industry].filter(Boolean).join(' · ');
+    const domId=tab.id.replace(/[^a-zA-Z0-9_-]/g,'_');
+    const criteria=(setup.pattern_criteria||[]).length
+      ?(setup.pattern_criteria||[]).map(c=>{
+          let cls='';
+          if(c.startsWith('✅')||c.startsWith('PASS:'))cls='pass';
+          else if(c.startsWith('⚠️')||c.startsWith('WARN:'))cls='warn';
+          else if(c.startsWith('🚨')||c.startsWith('RISK:'))cls='risk';
+          return`<div class="criteria-item ${cls}">${c}</div>`;
+        }).join('')
+      :'<div class="criteria-item">No criteria available</div>';
+    host.innerHTML=`
+      <div class="ticker-tab-layout" id="${domId}Root">
+        <div class="ticker-tab-top">
+          <div class="popup-header">
+            <div class="popup-ticker-block">
+              <div class="popup-ticker-row">
+                <span class="popup-ticker">${tab.ticker}</span>
+                <span class="popup-price" id="${domId}Price" style="color:#00ff88">${setup.price?`$${Number(setup.price).toFixed(4)}`:'$--'}</span>
+                <span class="popup-change" id="${domId}Change" style="color:${chg>=0?'#00ff88':'#ff4444'}">${chgText}</span>
+                <span id="${domId}PrevClose" style="font-size:.6rem;color:#6a8aaa;margin-left:6px;font-weight:500;"></span>
+                <span id="${domId}AfterHours" style="display:none;font-size:.65rem;color:#ffd700;margin-left:6px;font-weight:600;"></span>
+              </div>
+              <div class="popup-company">${company}</div>
+            </div>
+            <div class="ticker-shell-actions">
+              <button class="ticker-shell-btn" onclick="openStockPopup('${tab.ticker}')">Quick View</button>
+              <button class="ticker-shell-btn" onclick="activateWorkspaceTab('scanner')">Scanner+</button>
+            </div>
+          </div>
+        </div>
+
+        <div class="ticker-tab-grid">
+          <div class="ticker-tab-stack">
+            <div class="pattern-section">
+              <div class="pattern-header">
+                <div class="popup-section-title" style="margin-bottom:0">🎯 Expert Pattern Analysis</div>
+                <span class="pattern-name-big">${setup.pattern||'No Clear Pattern'}</span>
+              </div>
+              <div class="pattern-desc">${setup.pattern_desc||'No pattern analysis'}</div>
+              <div class="pattern-criteria">${criteria}</div>
+            </div>
+
+            <div class="popup-trade-plan">
+              <div class="popup-trade-item"><div class="popup-trade-val entry-val">$${setup.entry_low||'--'}–$${setup.entry_high||'--'}</div><div class="popup-trade-label">Entry Zone</div></div>
+              <div class="popup-trade-item"><div class="popup-trade-val stop-val">$${setup.stop_loss||'--'}</div><div class="popup-trade-label">Stop -5%</div></div>
+              <div class="popup-trade-item"><div class="popup-trade-val t-val">$${setup.target1||'--'}</div><div class="popup-trade-label">T1 +10%</div></div>
+              <div class="popup-trade-item"><div class="popup-trade-val t-val">$${setup.target2||'--'}</div><div class="popup-trade-label">T2 +20%</div></div>
+            </div>
+
+            <div class="popup-section">
+              <div class="popup-section-title">📊 Level 1 — Bid / Ask</div>
+              <div class="bid-ask-grid">
+                <div class="bid-box"><div class="ba-label">BID</div><div class="bid-val" id="${domId}Bid">--</div><div class="ba-info" id="${domId}High">H: --</div></div>
+                <div class="ask-box"><div class="ba-label">ASK</div><div class="ask-val" id="${domId}Ask">--</div><div class="ba-info" id="${domId}Low">L: --</div></div>
+              </div>
+              <div class="spread-row">Spread: <span class="spread-val" id="${domId}Spread">--</span></div>
+              <div class="refresh-quote" id="${domId}QuoteUpdated">Fetching...</div>
+            </div>
+
+            <div class="popup-section">
+              <div class="popup-section-title">📈 Key Statistics</div>
+              <div id="${domId}Stats"><div class="loading-spinner">Loading...</div></div>
+            </div>
+          </div>
+
+          <div class="ticker-tab-stack">
+            <div class="ticker-tab-chart">
+              <div class="popup-section-title" style="padding:8px 10px;margin:0;border-bottom:1px solid #1a2a4a">
+                📉 Live Chart <span class="chart-label">Tradier — Pre/After Market</span>
+              </div>
+              <div id="${domId}ChartControls"></div>
+              <div class="ticker-tab-chart-body" id="${domId}Chart"></div>
+              <div class="ticker-tab-subchart" id="${domId}RsiWrap"><div class="ticker-tab-subchart-label">RSI(14)</div><div class="ticker-tab-subchart-inner" id="${domId}RsiChart"></div></div>
+              <div class="ticker-tab-subchart" id="${domId}MacdWrap"><div class="ticker-tab-subchart-label">MACD</div><div class="ticker-tab-subchart-inner" id="${domId}MacdChart"></div></div>
+            </div>
+            <div class="news-section">
+              <div class="popup-section-title" id="${domId}NewsTitle">📰 Latest News (past 5 days)</div>
+              <div id="${domId}News"><div class="loading-spinner">Loading news...</div></div>
+            </div>
+            <div class="popup-section" id="${domId}SecSection" style="display:none">
+              <div class="popup-section-title">⚠️ SEC Filings — Danger Watch</div>
+              <div id="${domId}Sec"><div class="loading-spinner">Loading...</div></div>
+            </div>
+          </div>
+        </div>
+      </div>`;
+    hydrateTickerWorkspace(tab, domId, setup);
+  }
+
+  const tickerTabState={};
+
+  function hydrateTickerWorkspace(tab, domId, setup){
+    if(tickerTabState[tab.id]?.quoteTimer)clearInterval(tickerTabState[tab.id].quoteTimer);
+    tickerTabState[tab.id]=tickerTabState[tab.id]||{};
+    fetchQuoteInto(tab.ticker, domId);
+    fetchStatsInto(tab.ticker, domId);
+    fetchNewsInto(tab.ticker, domId);
+    fetchSecInto(tab.ticker, domId);
+    buildTickerTabChart(tab.ticker, domId, tab.id);
+    tickerTabState[tab.id].quoteTimer=setInterval(()=>fetchQuoteInto(tab.ticker, domId),5000);
+  }
+
+  async function fetchQuoteInto(ticker, domId){
+    try{
+      const r=await fetch(`${API_URL}/api/stock/quote/${ticker}?user=${currentUser?.id||'shafkat'}`);
+      const d=await r.json();
+      if(!d||!d.c||d.c<=0)return;
+      const price=document.getElementById(`${domId}Price`);
+      const change=document.getElementById(`${domId}Change`);
+      const prev=document.getElementById(`${domId}PrevClose`);
+      const ah=document.getElementById(`${domId}AfterHours`);
+      const pc=d.pc||d.c;
+      const dayChg=((d.c-pc)/pc*100);
+      if(price)price.textContent=`$${d.c.toFixed(4)}`;
+      if(change){
+        change.textContent=`${dayChg>=0?'+':''}${dayChg.toFixed(2)}%`;
+        change.style.color=dayChg>=0?'#00ff88':'#ff4444';
+      }
+      if(prev&&d.pc)prev.textContent=`Prev Day $${d.pc.toFixed(4)}`;
+      if(ah){
+        if(d.is_extended&&d.after_hours_price&&d.rc>0){
+          const ahChg=d.after_hours_change||0;
+          ah.textContent=`After hrs ${ahChg>=0?'+':''}${ahChg.toFixed(2)}% vs 4pm $${d.rc.toFixed(4)}`;
+          ah.style.color=ahChg>=0?'#00c853':'#ff4444';
+          ah.style.display='inline';
+        }else ah.style.display='none';
+      }
+      if(d.bid&&d.ask&&d.bid>0&&d.ask>0){
+        const spread=((d.ask-d.bid)/((d.ask+d.bid)/2)*100).toFixed(2);
+        document.getElementById(`${domId}Bid`).textContent=`$${d.bid.toFixed(2)}`;
+        document.getElementById(`${domId}Ask`).textContent=`$${d.ask.toFixed(2)}`;
+        document.getElementById(`${domId}Spread`).textContent=`${spread}%`;
+      }else{
+        const spread=Math.max(0.01,(d.c*0.001)).toFixed(2);
+        document.getElementById(`${domId}Bid`).textContent=`$${(d.c-parseFloat(spread)/2).toFixed(2)}`;
+        document.getElementById(`${domId}Ask`).textContent=`$${(d.c+parseFloat(spread)/2).toFixed(2)}`;
+        document.getElementById(`${domId}Spread`).textContent=`$${spread}`;
+      }
+      document.getElementById(`${domId}High`).textContent=`H: $${d.h?.toFixed(2)||'--'}`;
+      document.getElementById(`${domId}Low`).textContent=`L: $${d.l?.toFixed(2)||'--'}`;
+      const src=d.source==='tradier'?'Tradier':(d.source==='alpaca'?'Alpaca':'Finnhub');
+      document.getElementById(`${domId}QuoteUpdated`).textContent=`${src} · ${new Date().toLocaleTimeString('en-US',{hour12:true,timeZone:'America/New_York'})} EST`;
+    }catch(e){}
+  }
+
+  async function fetchStatsInto(ticker, domId){
+    try{
+      const [pr,mr]=await Promise.all([fetch(`${API_URL}/api/stock/profile/${ticker}`),fetch(`${API_URL}/api/stock/metrics/${ticker}`)]);
+      const profile=await pr.json();const metrics=await mr.json();const m=metrics.metric||{};
+      const fmt=(v,pre='',suf='')=>(v!=null&&v!==''&&v!==0)?`${pre}${typeof v==='number'?v.toLocaleString():v}${suf}`:'--';
+      const mktCap=profile.marketCapitalization?`$${(profile.marketCapitalization/1000).toFixed(2)}B`:'--';
+      const floatVal=m.float;const floatStr=floatVal?`${floatVal.toFixed(1)}M`:'--';
+      const floatCls=floatVal?(floatVal<5?'highlight':floatVal<20?'warn':''):'';
+      const shortCls=m.shortPercentFloat?(m.shortPercentFloat>20?'danger':m.shortPercentFloat>10?'warn':''):'';
+      document.getElementById(`${domId}Stats`).innerHTML=`
+        <div class="kstat-grid">
+          <div>
+            <div class="kstat-row"><span class="kstat-key">Market Cap</span><span class="kstat-val">${mktCap}</span></div>
+            <div class="kstat-row"><span class="kstat-key">Float</span><span class="kstat-val ${floatCls}">${floatStr}</span></div>
+            <div class="kstat-row"><span class="kstat-key">52W High</span><span class="kstat-val">${fmt(m['52WeekHigh'],'$')}</span></div>
+            <div class="kstat-row"><span class="kstat-key">52W Low</span><span class="kstat-val">${fmt(m['52WeekLow'],'$')}</span></div>
+            <div class="kstat-row"><span class="kstat-key">Beta</span><span class="kstat-val">${fmt(m.beta)}</span></div>
+          </div>
+          <div>
+            <div class="kstat-row"><span class="kstat-key">Short Ratio</span><span class="kstat-val ${shortCls}">${m.shortInterestRatio?m.shortInterestRatio.toFixed(2):'--'}</span></div>
+            <div class="kstat-row"><span class="kstat-key">Short % Float</span><span class="kstat-val ${shortCls}">${m.shortPercentFloat?m.shortPercentFloat.toFixed(1)+'%':'--'}</span></div>
+            <div class="kstat-row"><span class="kstat-key">Avg Vol 10D</span><span class="kstat-val">${m['10DayAverageTradingVolume']?m['10DayAverageTradingVolume'].toFixed(1)+'M':'--'}</span></div>
+            <div class="kstat-row"><span class="kstat-key">Industry</span><span class="kstat-val" style="font-size:.52rem">${profile.finnhubIndustry||'--'}</span></div>
+            <div class="kstat-row"><span class="kstat-key">Exchange</span><span class="kstat-val">${profile.exchange||'--'}</span></div>
+          </div>
+        </div>`;
+    }catch(e){document.getElementById(`${domId}Stats`).innerHTML='<div class="loading-spinner">Stats unavailable</div>';}
+  }
+
+  async function fetchNewsInto(ticker, domId){
+    try{
+      const r=await fetch(`${API_URL}/api/stock/news/${ticker}`);
+      const data=await r.json();const news=data.news||[];
+      document.getElementById(`${domId}NewsTitle`).textContent=`📰 Latest News — ${news.length} article${news.length!==1?'s':''} (past 5 days)`;
+      if(!news.length){document.getElementById(`${domId}News`).innerHTML='<div class="loading-spinner">No news in past 5 days</div>';return;}
+      document.getElementById(`${domId}News`).innerHTML=news.slice(0,10).map(n=>{
+        const date=new Date((n.datetime||0)*1000).toLocaleDateString('en-US',{month:'short',day:'numeric',hour:'2-digit',minute:'2-digit'});
+        const sent=n.sentiment||'neutral';
+        const sClass=sent==='positive'?'positive':sent==='negative'?'negative':'neutral';
+        const sLabel=sent==='positive'?'▲ Bullish':sent==='negative'?'▼ Bearish':'◆ Neutral';
+        return`<div class="popup-news-item">
+          <div class="popup-news-headline"><a href="${n.url||'#'}" target="_blank" rel="noopener">${n.headline||'No title'}</a></div>
+          <div class="popup-news-meta"><span>${date}</span><span>${n.source||''}</span><span class="news-sentiment ${sClass}">${sLabel}</span></div>
+        </div>`;
+      }).join('');
+    }catch(e){document.getElementById(`${domId}News`).innerHTML='<div class="loading-spinner">News unavailable</div>';}
+  }
+
+  async function fetchSecInto(ticker, domId){
+    try{
+      const r=await fetch(`${API_URL}/api/stock/sec/${ticker}`);
+      const data=await r.json();const danger=(data.filings||[]).filter(f=>f.danger);
+      const section=document.getElementById(`${domId}SecSection`);
+      if(!danger.length){if(section)section.style.display='none';return;}
+      section.style.display='block';
+      document.getElementById(`${domId}Sec`).innerHTML=danger.slice(0,5).map(f=>
+        `<div class="sec-danger"><strong>${f.form||'SEC'}</strong> — ${f.description||'SEC Filing'}
+        ${f.filedDate?`<span style="float:right;opacity:.7">${f.filedDate}</span>`:''}</div>`
+      ).join('');
+    }catch(e){}
+  }
+
+  const tickerTabIndicators={};
+  function tabEma(d,p){const k=2/(p+1);let e=null;return d.map(v=>{if(e===null)e=v;else e=v*k+e*(1-k);return e;});}
+  function tabRsi(c,p=14){return c.map((_,i)=>{if(i<p)return null;let g=0,l=0;for(let j=i-p+1;j<=i;j++){const d=c[j]-c[j-1];if(d>0)g+=d;else l-=d;}return 100-100/(1+(g/p)/((l/p)||1e-6));});}
+  function tabMacd(c){const f=tabEma(c,12),s=tabEma(c,26),ml=f.map((v,i)=>v-s[i]),sig=tabEma(ml,9);return{ml,sig,h:ml.map((v,i)=>v-sig[i])};}
+  async function buildTickerTabChart(ticker, domId, tabId){
+    const controls=document.getElementById(`${domId}ChartControls`);
+    const chartEl=document.getElementById(`${domId}Chart`);
+    if(!controls||!chartEl||!window.LightweightCharts)return;
+    tickerTabIndicators[tabId]=tickerTabIndicators[tabId]||{Vol:true,VWAP:false,EMA:false,RSI:false,MACD:false,range:'2D',tf:'1Min'};
+    const st=tickerTabIndicators[tabId];
+    controls.innerHTML=`
+      <div style="display:flex;align-items:center;gap:5px;padding:5px 8px;background:#0d1525;border-bottom:1px solid #1a2a4a;flex-wrap:wrap;">
+        <span style="font-size:.65rem;font-weight:800;color:#ffd700;">${ticker}</span>
+        <select id="${domId}Range" style="background:#060a12;border:1px solid #2a3a5a;border-radius:4px;color:#ffd700;font-size:.6rem;padding:2px 4px;font-weight:700;">
+          ${['1D','2D','5D','10D','15D','1M','3M','6M','1Y'].map(r=>`<option value="${r}"${st.range===r?' selected':''}>${r.replace('D',' day').replace('M',' month').replace('Y',' year')}</option>`).join('')}
+        </select>
+        <select id="${domId}Tf" style="background:#060a12;border:1px solid #2a3a5a;border-radius:4px;color:#a0b8d0;font-size:.6rem;padding:2px 4px;">
+          ${[['1Min','1m'],['5Min','5m'],['15Min','15m'],['1Day','1D']].map(([v,l])=>`<option value="${v}"${st.tf===v?' selected':''}>${l}</option>`).join('')}
+        </select>
+        ${['Vol','VWAP','EMA','RSI','MACD'].map(k=>`<button id="${domId}${k}" onclick="toggleTickerTabIndicator('${tabId}','${domId}','${ticker}','${k}')" style="background:${st[k]?'rgba(0,0,0,.3)':'#0f1a2e'};border:1px solid ${st[k]?({Vol:'#4a8aff',VWAP:'#ffd700',EMA:'#ff9100',RSI:'#a78bfa',MACD:'#00d4ff'}[k]):'#1a2a4a'};border-radius:3px;color:${st[k]?({Vol:'#4a8aff',VWAP:'#ffd700',EMA:'#ff9100',RSI:'#a78bfa',MACD:'#00d4ff'}[k]):'#4a6a8a'};font-size:.5rem;padding:1px 5px;cursor:pointer;">${k}</button>`).join('')}
+        <span id="${domId}ChartBadge" style="font-size:.52rem;color:#00c853;margin-left:auto;">Loading...</span>
+      </div>`;
+    document.getElementById(`${domId}Range`).onchange=e=>{st.range=e.target.value;buildTickerTabChart(ticker,domId,tabId);};
+    document.getElementById(`${domId}Tf`).onchange=e=>{st.tf=e.target.value;buildTickerTabChart(ticker,domId,tabId);};
+    await loadTickerTabChart(ticker, domId, tabId);
+  }
+
+  function toggleTickerTabIndicator(tabId, domId, ticker, key){
+    const st=tickerTabIndicators[tabId];if(!st)return;
+    st[key]=!st[key];
+    buildTickerTabChart(ticker, domId, tabId);
+  }
+
+  async function loadTickerTabChart(ticker, domId, tabId){
+    const st=tickerTabIndicators[tabId];
+    const chartEl=document.getElementById(`${domId}Chart`);
+    const badge=document.getElementById(`${domId}ChartBadge`);
+    if(tickerTabState[tabId]?.chart){try{tickerTabState[tabId].chart.remove();}catch(e){}}
+    if(tickerTabState[tabId]?.rsiChart){try{tickerTabState[tabId].rsiChart.remove();}catch(e){}}
+    if(tickerTabState[tabId]?.macdChart){try{tickerTabState[tabId].macdChart.remove();}catch(e){}}
+    chartEl.innerHTML='';
+    const rsiWrap=document.getElementById(`${domId}RsiWrap`);
+    const macdWrap=document.getElementById(`${domId}MacdWrap`);
+    const rsiEl=document.getElementById(`${domId}RsiChart`);
+    const macdEl=document.getElementById(`${domId}MacdChart`);
+    if(rsiWrap)rsiWrap.style.display=st.RSI?'block':'none';
+    if(macdWrap)macdWrap.style.display=st.MACD?'block':'none';
+    if(rsiEl)rsiEl.innerHTML='';
+    if(macdEl)macdEl.innerHTML='';
+    const days={'1D':1,'2D':2,'5D':5,'10D':10,'15D':15,'1M':30,'3M':90,'6M':180,'1Y':365}[st.range]||2;
+    const start=new Date();start.setDate(start.getDate()-days);
+    try{
+      const r=await fetch(`${API_URL}/api/stock/bars/${ticker}?user=${currentUser?.id||'shafkat'}&timeframe=${st.tf}&days=${days}&start=${start.toISOString().split('T')[0]}`);
+      const data=await r.json();const bars=data.bars||[];
+      if(!bars.length){chartEl.innerHTML='<div class="loading-spinner">No chart data</div>';return;}
+      const toT=t=>Math.floor(new Date(t.includes('T')?t:t.replace(' ','T')).getTime()/1000);
+      const rows=bars.map(b=>({time:toT(b.time),open:b.open,high:b.high,low:b.low,close:b.close,volume:b.volume||0,vwap:b.vwap||0})).sort((a,b)=>a.time-b.time);
+      const chart=LightweightCharts.createChart(chartEl,{width:chartEl.clientWidth||600,height:chartEl.clientHeight||340,layout:{backgroundColor:'#060a12',textColor:'#8aa0c0'},grid:{vertLines:{color:'#0f1a2e'},horzLines:{color:'#0f1a2e'}},timeScale:{timeVisible:true,secondsVisible:false,borderColor:'#1a2a4a',tickMarkFormatter:t=>new Date(t*1000).toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit',hour12:true,timeZone:'America/New_York'})},rightPriceScale:{borderColor:'#1a2a4a',scaleMarginTop:0.08,scaleMarginBottom:st.Vol?0.2:0.05},crosshair:{mode:1},handleScroll:{mouseWheel:true,pressedMouseMove:true},handleScale:{mouseWheel:true,pinch:true}});
+      tickerTabState[tabId].chart=chart;
+      const candles=chart.addCandlestickSeries({upColor:'#00c853',downColor:'#ff1744',borderUpColor:'#00c853',borderDownColor:'#ff1744',wickUpColor:'#00c853',wickDownColor:'#ff1744'});
+      candles.setData(rows.map(b=>({time:b.time,open:b.open,high:b.high,low:b.low,close:b.close})));
+      if(st.VWAP){const vw=rows.filter(b=>b.vwap>0).map(b=>({time:b.time,value:b.vwap}));if(vw.length)chart.addLineSeries({color:'#ffd700',lineWidth:2,priceLineVisible:false,title:'VWAP'}).setData(vw);}
+      const cl=rows.map(b=>b.close),ti=rows.map(b=>b.time);
+      if(st.EMA){const e9=tabEma(cl,9),e20=tabEma(cl,20);chart.addLineSeries({color:'#ff9100',lineWidth:1,priceLineVisible:false,title:'EMA9'}).setData(ti.map((t,i)=>({time:t,value:e9[i]})));chart.addLineSeries({color:'#ff4a4a',lineWidth:1,priceLineVisible:false,title:'EMA20'}).setData(ti.map((t,i)=>({time:t,value:e20[i]})));}
+      if(st.Vol){const vs=chart.addHistogramSeries({priceFormat:{type:'volume'},priceScaleId:'vol'});chart.priceScale('vol').applyOptions({scaleMarginTop:0.8,scaleMarginBottom:0,borderColor:'#1a2a4a'});vs.setData(rows.map(b=>({time:b.time,value:b.volume,color:b.close>=b.open?'rgba(0,200,83,.35)':'rgba(255,23,68,.35)'})));}
+      chart.timeScale().fitContent();
+      if(st.RSI&&rsiEl&&cl.length>=14){
+        const rc=LightweightCharts.createChart(rsiEl,{width:rsiEl.clientWidth||600,height:rsiEl.clientHeight||78,layout:{backgroundColor:'#040810',textColor:'#5a7a9a'},grid:{vertLines:{color:'#0a1020'},horzLines:{color:'#0a1020'}},timeScale:{visible:false},rightPriceScale:{borderColor:'#1a2a4a'},crosshair:{mode:1},handleScroll:false,handleScale:false});
+        tickerTabState[tabId].rsiChart=rc;
+        const rv=tabRsi(cl),rl=rc.addLineSeries({color:'#a78bfa',lineWidth:1,priceLineVisible:false});
+        rl.setData(ti.map((t,i)=>rv[i]!==null?{time:t,value:rv[i]}:null).filter(Boolean));
+        rc.addLineSeries({color:'rgba(255,68,68,.4)',lineWidth:1,lineStyle:2,priceLineVisible:false}).setData([{time:ti[0],value:70},{time:ti[ti.length-1],value:70}]);
+        rc.addLineSeries({color:'rgba(0,200,83,.4)',lineWidth:1,lineStyle:2,priceLineVisible:false}).setData([{time:ti[0],value:30},{time:ti[ti.length-1],value:30}]);
+        rc.timeScale().fitContent();chart.timeScale().subscribeVisibleLogicalRangeChange(range=>{if(range)rc.timeScale().setVisibleLogicalRange(range);});
+      }
+      if(st.MACD&&macdEl&&cl.length>=26){
+        const mc=LightweightCharts.createChart(macdEl,{width:macdEl.clientWidth||600,height:macdEl.clientHeight||78,layout:{backgroundColor:'#040810',textColor:'#5a7a9a'},grid:{vertLines:{color:'#0a1020'},horzLines:{color:'#0a1020'}},timeScale:{visible:false},rightPriceScale:{borderColor:'#1a2a4a'},crosshair:{mode:1},handleScroll:false,handleScale:false});
+        tickerTabState[tabId].macdChart=mc;
+        const mm=tabMacd(cl);
+        mc.addHistogramSeries({priceLineVisible:false}).setData(ti.map((t,i)=>({time:t,value:mm.h[i],color:mm.h[i]>=0?'rgba(0,200,83,.6)':'rgba(255,23,68,.6)'})));
+        mc.addLineSeries({color:'#00d4ff',lineWidth:1,priceLineVisible:false}).setData(ti.map((t,i)=>({time:t,value:mm.ml[i]})));
+        mc.addLineSeries({color:'#ff9100',lineWidth:1,priceLineVisible:false}).setData(ti.map((t,i)=>({time:t,value:mm.sig[i]})));
+        mc.timeScale().fitContent();chart.timeScale().subscribeVisibleLogicalRangeChange(range=>{if(range)mc.timeScale().setVisibleLogicalRange(range);});
+      }
+      addSessionShading(chartEl,bars,chart);
+      new ResizeObserver(()=>{if(tickerTabState[tabId]?.chart)tickerTabState[tabId].chart.resize(chartEl.clientWidth,chartEl.clientHeight);if(tickerTabState[tabId]?.rsiChart&&rsiEl)tickerTabState[tabId].rsiChart.resize(rsiEl.clientWidth,rsiEl.clientHeight);if(tickerTabState[tabId]?.macdChart&&macdEl)tickerTabState[tabId].macdChart.resize(macdEl.clientWidth,macdEl.clientHeight);}).observe(chartEl);
+      if(badge)badge.textContent=`↻ 2s · ${bars.length} bars`;
+    }catch(e){chartEl.innerHTML='<div class="loading-spinner">Chart unavailable</div>';}
   }
 
   applyLayoutTheme(localStorage.getItem('layoutTheme') || 'dark');
+  renderWorkspaceTabs();
+  applyWorkspaceView();
 
   function togglePasswordVisibility(){
     const input=document.getElementById('pwInput');
@@ -1914,9 +2409,12 @@
       const lc=s.warning?'danger':gc;
       const co=s.company_name?s.company_name.substring(0,18)+(s.company_name.length>18?'…':''):'';
       const ex=s.exchange?` · ${s.exchange}`:'';
-      return`<div class="screener-item ${lc}" onclick="openStockPopup('${s.ticker}')">
+      return`<div class="screener-item ${lc}" onclick="openTickerTab('${s.ticker}')">
         <div><div class="screener-ticker">${s.ticker}</div><div class="screener-company">${co}${ex}</div></div>
-        <div style="text-align:right"><div class="screener-gap">+${s.gap_pct}%</div><span class="screener-grade ${gc}">${s.grade}</span></div>
+        <div class="screener-actions">
+          <div><div class="screener-gap">+${s.gap_pct}%</div><span class="screener-grade ${gc}">${s.grade}</span></div>
+          <button class="quick-view-btn" onclick="event.stopPropagation();openStockPopup('${s.ticker}')" title="Open quick view popup">View</button>
+        </div>
       </div>`;
     }).join('');
   }
@@ -1944,7 +2442,7 @@
     const companyLine=companyParts.length
       ?`<div class="company-info">${companyParts.join(' · ')}</div>`:'';
 
-    return`<div class="setup-card ${cc}" id="card-${s.ticker}" onclick="openStockPopup('${s.ticker}')">
+    return`<div class="setup-card ${cc}" id="card-${s.ticker}" onclick="openTickerTab('${s.ticker}')">
       <div class="card-header">
         <div class="ticker-info">
           <span class="ticker">${s.ticker}</span>
@@ -1952,7 +2450,10 @@
           ${patternTag}
           <span class="news-count-pill ${pillClass}">📰 ${nc} (5d)</span>
         </div>
-        <span class="gap-pct">+${s.gap_pct}%</span>
+        <div class="card-actions">
+          <button class="quick-view-btn" onclick="event.stopPropagation();openStockPopup('${s.ticker}')" title="Open quick view popup">View</button>
+          <span class="gap-pct">+${s.gap_pct}%</span>
+        </div>
       </div>
       ${companyLine}
       <div class="card-metrics">
@@ -1991,15 +2492,24 @@
         updateScreener();
         ['statSetups','fStatSetups'].forEach(id=>document.getElementById(id).textContent=allResults.length);
       }
-      openStockPopupFromData(data);input.value='';
+      openTickerTab(data.ticker, data);input.value='';
     }catch(e){alert('Search failed. Check ticker and try again.');}
     document.getElementById('searchLoading').style.display='none';
   }
 
   // ── POPUP ──
   async function openStockPopup(ticker){
-    const setup=allResults.find(s=>s.ticker===ticker);
-    if(setup)openStockPopupFromData(setup);
+    ticker=(ticker||'').toUpperCase();
+    if(!ticker)return;
+    let setup=allResults.find(s=>s.ticker===ticker);
+    if(setup){openStockPopupFromData(setup);return;}
+    const existingTab=workspaceTabs.find(t=>t.type==='ticker'&&t.ticker===ticker&&t.setup);
+    if(existingTab?.setup){openStockPopupFromData(existingTab.setup);return;}
+    try{
+      const r=await fetch(`${API_URL}/api/stock/search/${ticker}`);
+      const data=await r.json();
+      if(data&&!data.error)openStockPopupFromData(data);
+    }catch(e){}
   }
 
   function openStockPopupFromData(setup){
@@ -2877,19 +3387,16 @@ loadChart();
     const panel   = document.getElementById('rightPanel');
     const btn     = document.getElementById('panelToggleBtn');
     const restore = document.getElementById('panelRestoreBtn');
-    panelOpen = !panelOpen;
-    // Must set inline style directly — CSS class alone can't override inline style
-    if(panelOpen){
-      panel.style.width    = '270px';
-      panel.style.minWidth = '270px';
-      panel.classList.remove('collapsed');
-    } else {
-      panel.style.width    = '0';
-      panel.style.minWidth = '0';
+    panelOpen = false;
+    if(panel){
+      panel.style.width='0';
+      panel.style.minWidth='0';
       panel.classList.add('collapsed');
     }
+    if(btn)btn.style.display='none';
+    if(restore)restore.style.display='none';
+    // Must set inline style directly — CSS class alone can't override inline style
     if(btn){ btn.textContent = panelOpen ? '◀ Hide' : '▶ Show'; btn.title = panelOpen ? 'Hide right panel' : 'Show right panel'; }
-    if(restore){ restore.style.display = panelOpen ? 'none' : 'block'; }
   }
 
   // ── INTERVAL AUTO-SWITCH — main page (popup + expanded charts) ──
