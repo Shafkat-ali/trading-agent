@@ -103,6 +103,11 @@ _tradier_lookup_cache = {'ts': None, 'tickers': []}
 _listed_symbol_cache = {'ts': None, 'tickers': []}
 _afterhours_activity_cache = {}
 _polymarket_cache = {'ts': None, 'data': None}
+SCAN_CACHE_TTL = int(os.getenv('SCAN_CACHE_TTL', '180'))
+SCAN_BACKGROUND_INTERVAL = int(os.getenv('SCAN_BACKGROUND_INTERVAL', '120'))
+SCAN_BACKGROUND_MODES = ['morning_gap', 'scanopp', 'afterhrs']
+scan_cache = {}
+scan_cache_locks = {}
 
 SCAN_MODES = {
     'morning_gap': {
@@ -172,6 +177,26 @@ SCAN_MODES = {
         'min_volume':50_000,'min_rvol':0,'max_float_m':0,'max_mktcap_m':0,'require_news':False,
     },
 }
+
+def filters_for_mode(mode: str):
+    m = SCAN_MODES.get(mode, SCAN_MODES['morning_gap'])
+    return {
+        'min_price':        m['min_price'],
+        'max_price':        m['max_price'],
+        'min_gap_pct':      m['min_gap'],
+        'min_dollar_vol':   m['min_dvol'],
+        'min_volume':       m['min_volume'],
+        'min_trades':       m.get('min_trades', 0),
+        'min_rvol':         m['min_rvol'],
+        'max_float_m':      m['max_float_m'],
+        'max_market_cap_m': m['max_mktcap_m'],
+        'require_news':     m['require_news'],
+        'max_vwap_distance_pct': m.get('max_vwap_distance_pct', 0),
+        'max_gap_pct':      m.get('max_gap_pct', 0),
+        'max_spread_pct':   m.get('max_spread_pct', 0),
+        'min_ah_volume':    m.get('min_ah_volume', 0),
+        'min_volume_surge': m.get('min_volume_surge', 0),
+    }
 
 STRONG_KEYWORDS  = ['fda','approval','approved','breakthrough','contract','partnership','merger',
     'acquisition','earnings','beat','guidance','revenue','clinical','trial','phase','results',
@@ -529,23 +554,7 @@ async def set_scan_mode(user_id: str, mode: str):
     if mode not in SCAN_MODES:   return {'error':f'Unknown mode: {mode}'}
     m = SCAN_MODES[mode]
     user_state[user_id]['mode'] = mode
-    user_state[user_id]['filters'] = {
-        'min_price':        m['min_price'],
-        'max_price':        m['max_price'],
-        'min_gap_pct':      m['min_gap'],
-        'min_dollar_vol':   m['min_dvol'],
-        'min_volume':       m['min_volume'],
-        'min_trades':       m.get('min_trades', 0),
-        'min_rvol':         m['min_rvol'],
-        'max_float_m':      m['max_float_m'],
-        'max_market_cap_m': m['max_mktcap_m'],
-        'require_news':     m['require_news'],
-        'max_vwap_distance_pct': m.get('max_vwap_distance_pct', 0),
-        'max_gap_pct':      m.get('max_gap_pct', 0),
-        'max_spread_pct':   m.get('max_spread_pct', 0),
-        'min_ah_volume':    m.get('min_ah_volume', 0),
-        'min_volume_surge': m.get('min_volume_surge', 0),
-    }
+    user_state[user_id]['filters'] = filters_for_mode(mode)
     log_alert(f"🔄 [{user_id}] Mode: {m['label']}")
     return {'status':'ok','mode':mode,'filters':user_state[user_id]['filters']}
 
@@ -580,6 +589,26 @@ async def get_user_results(user_id: str):
 async def start_scanner(user_id: str):
     if user_id not in user_state: return {'error':'Unknown user'}
     s = user_state[user_id]
+    mode = s['mode']
+    cached = get_cached_scan(user_id, mode, SCAN_CACHE_TTL) if mode != 'custom' else None
+    if cached and not s['running']:
+        s['scan_results'] = cached['results']
+        done_status = cached.get('done_status') or {
+            'phase': 'done',
+            'message': f"✅ {len(cached['results'])} cached setup(s)",
+            'progress': len(cached['results']),
+            'total': len(cached['results']),
+        }
+        await broadcast_to_user(user_id, {
+            'type':'scan_results','data':cached['results'],
+            'time':cached.get('time', datetime.now().strftime('%H:%M:%S')),
+            'count':len(cached['results']),'alerts':alert_log[:20],
+            'scan_status':done_status,'mode':mode,'filters':s['filters'],
+        })
+        await broadcast_to_user(user_id, {'type':'status','running':False,'mode':mode})
+        asyncio.create_task(refresh_scan_cache(user_id, mode, force=True))
+        log_alert(f"⚡ [{user_id}] Served {mode} from live cache ({int(cached.get('age', 0))}s old)")
+        return {'status':'cached','mode':mode,'age':cached.get('age', 0),'count':len(cached['results'])}
     if not s['running']:
         s['running'] = True; s['scan_results'] = []; s['scan_id'] = s.get('scan_id', 0) + 1
         asyncio.create_task(scanner_loop(user_id, s['scan_id']))
@@ -2867,11 +2896,18 @@ def process_ticker(stock_data, mode='morning_gap', filters=None):
 # SCANNER LOOP
 # ============================================================
 
-async def do_scan(user_id, scan_id=None):
+async def do_scan(user_id, scan_id=None, mode_override=None, filters_override=None, quiet=False):
     s       = user_state[user_id]
-    filters = s['filters'].copy()
-    mode    = s['mode']
+    filters = (filters_override or s['filters']).copy()
+    mode    = mode_override or s['mode']
     label   = SCAN_MODES.get(mode, {}).get('label', mode)
+
+    async def send_status(status):
+        if not quiet:
+            await broadcast_to_user(user_id, {'type':'scan_status','status':status})
+
+    def cancelled():
+        return (not quiet) and scan_id is not None and scan_id != s.get('scan_id')
 
     ah_start = datetime.now().replace(hour=16, minute=0, second=0, microsecond=0)
     if mode == 'afterhrs' and datetime.now() < ah_start:
@@ -2880,17 +2916,17 @@ async def do_scan(user_id, scan_id=None):
         return [], {'phase':'done','message':msg,'progress':0,'total':0}
 
     status = {'phase':'fetching','message':f'📡 Building universe...','progress':0,'total':0}
-    await broadcast_to_user(user_id, {'type':'scan_status','status':status})
+    await send_status(status)
     await asyncio.sleep(0)
 
     # Step 1: Build universe and log every source
     universe, universe_errors = get_dynamic_universe()
-    if scan_id is not None and scan_id != s.get('scan_id'):
+    if cancelled():
         return [], {'phase':'done','message':'Scan superseded by a newer request','progress':0,'total':0}
     log_alert(f"🔍 [{user_id}] Universe: {len(universe)} tickers | errors: {universe_errors or 'none'}")
 
     status['message'] = f'📡 Universe: {len(universe)} tickers — querying Tradier...'
-    await broadcast_to_user(user_id, {'type':'scan_status','status':status})
+    await send_status(status)
     await asyncio.sleep(0)
 
     candidates = []
@@ -2904,7 +2940,7 @@ async def do_scan(user_id, scan_id=None):
 
         if quote_error:
             status['message'] = f'⚠️ Tradier: {quote_error} — trying Yahoo...'
-            await broadcast_to_user(user_id, {'type':'scan_status','status':status})
+            await send_status(status)
             await asyncio.sleep(0)
         elif quote_map:
             # Filter the quotes
@@ -2946,7 +2982,7 @@ async def do_scan(user_id, scan_id=None):
         extra_symbols = [sym for sym in lookup_universe if sym not in existing_universe]
         if extra_symbols:
             status['message'] = f'📡 Expanding ScanOpp with {len(extra_symbols)} Tradier lookup symbols...'
-            await broadcast_to_user(user_id, {'type':'scan_status','status':status})
+            await send_status(status)
             await asyncio.sleep(0)
             lookup_quotes, lookup_error = get_tradier_quotes(extra_symbols, user_id)
             before = len(candidates)
@@ -2987,7 +3023,7 @@ async def do_scan(user_id, scan_id=None):
         ]
         if extra_symbols:
             status['message'] = f'Expanding {label} with {len(extra_symbols)} listed symbols via Tradier...'
-            await broadcast_to_user(user_id, {'type':'scan_status','status':status})
+            await send_status(status)
             await asyncio.sleep(0)
             listed_quotes, listed_error = get_tradier_quotes_parallel(extra_symbols, user_id)
             listed_candidates = filter_tradier_quote_map(listed_quotes, filters, f'{mode}-tradier-listed')
@@ -3091,7 +3127,7 @@ async def do_scan(user_id, scan_id=None):
             candidates = relaxed_candidates
             scan_source = f'{scan_source}+relaxed' if scan_source != 'none' else 'relaxed'
 
-    if scan_id is not None and scan_id != s.get('scan_id'):
+    if cancelled():
         return [], {'phase':'done','message':'Scan superseded by a newer request','progress':0,'total':0}
 
     if not candidates:
@@ -3119,7 +3155,7 @@ async def do_scan(user_id, scan_id=None):
 
     enrich_source = 'Tradier time-sales' if mode == 'afterhrs' else 'Alpaca data'
     status = {'phase':'analyzing','message':f'Enriching {total} with {enrich_source}...','progress':0,'total':total}
-    await broadcast_to_user(user_id, {'type':'scan_status','status':status})
+    await send_status(status)
     await asyncio.sleep(0)
 
     results = []
@@ -3130,27 +3166,28 @@ async def do_scan(user_id, scan_id=None):
 
     async def enrich_candidate(stock_data):
         async with sem:
-            if not s['running'] or (scan_id is not None and scan_id != s.get('scan_id')):
+            if (not quiet and not s['running']) or cancelled():
                 return stock_data.get('ticker', ''), None
             setup = await asyncio.to_thread(process_ticker, stock_data, mode, filters)
             return stock_data.get('ticker', ''), setup
 
     tasks = [asyncio.create_task(enrich_candidate(stock_data)) for stock_data in candidates]
     for task in asyncio.as_completed(tasks):
-        if not s['running'] or (scan_id is not None and scan_id != s.get('scan_id')):
+        if (not quiet and not s['running']) or cancelled():
             for pending in tasks:
                 pending.cancel()
             break
         ticker, setup = await task
         count += 1
         status = {'phase':'analyzing','message':f'Checking {ticker} ({count}/{total})...','progress':count,'total':total}
-        await broadcast_to_user(user_id, {'type':'scan_status','status':status})
+        await send_status(status)
         if setup:
             results.append(setup)
-            await broadcast_to_user(user_id, {'type':'new_ticker','setup':setup})
+            if not quiet:
+                await broadcast_to_user(user_id, {'type':'new_ticker','setup':setup})
             await asyncio.sleep(0)
 
-            if setup['grade'] in ['A+','A'] and not setup['warning'] and ticker not in s['alerted']:
+            if not quiet and setup['grade'] in ['A+','A'] and not setup['warning'] and ticker not in s['alerted']:
                 s['alerted'].add(ticker)
                 log_alert(f"🚀 [{user_id}] {setup['grade']}: {ticker} +{setup['gap_pct']}%")
                 send_email(
@@ -3173,12 +3210,12 @@ async def do_scan(user_id, scan_id=None):
         scanopp_filters['min_volume'] = min(scanopp_filters.get('min_volume', 0), 50_000)
         scanopp_filters['max_price'] = max(scanopp_filters.get('max_price', 15.0), 50.0)
         log_alert(f"🔁 [{user_id}] ScanOpp enrichment returned 0 — retrying with relaxed momentum filters")
-        await broadcast_to_user(user_id, {'type':'scan_status','status':{
+        await send_status({
             'phase':'analyzing',
             'message':'ScanOpp strict pass found 0 — retrying broader momentum scan...',
             'progress':0,
             'total':total,
-        }})
+        })
 
         async def retry_scanopp(stock_data):
             setup = await asyncio.to_thread(process_ticker, stock_data, mode, scanopp_filters)
@@ -3186,7 +3223,7 @@ async def do_scan(user_id, scan_id=None):
 
         retry_tasks = [asyncio.create_task(retry_scanopp(stock_data)) for stock_data in candidates]
         for task in asyncio.as_completed(retry_tasks):
-            if not s['running'] or (scan_id is not None and scan_id != s.get('scan_id')):
+            if (not quiet and not s['running']) or cancelled():
                 for pending in retry_tasks:
                     pending.cancel()
                 break
@@ -3194,7 +3231,8 @@ async def do_scan(user_id, scan_id=None):
             if setup:
                 setup['scan_pass'] = 'relaxed'
                 results.append(setup)
-                await broadcast_to_user(user_id, {'type':'new_ticker','setup':setup})
+                if not quiet:
+                    await broadcast_to_user(user_id, {'type':'new_ticker','setup':setup})
                 await asyncio.sleep(0)
 
     results.sort(
@@ -3203,6 +3241,74 @@ async def do_scan(user_id, scan_id=None):
     )
     done_status = {'phase':'done','message':f'✅ {len(results)} setup(s) found','progress':total,'total':total}
     return results, done_status
+
+def scan_cache_key(user_id, mode):
+    return f"{user_id}:{mode}"
+
+def get_cached_scan(user_id, mode, max_age=None):
+    cached = scan_cache.get(scan_cache_key(user_id, mode))
+    if not cached:
+        return None
+    age = (datetime.now() - cached['ts']).total_seconds()
+    if max_age is not None and age > max_age:
+        return None
+    return {**cached, 'age': age}
+
+async def refresh_scan_cache(user_id, mode, force=False):
+    if user_id not in user_state or mode not in SCAN_MODES:
+        return None
+    if mode == 'afterhrs':
+        ah_start = datetime.now().replace(hour=16, minute=0, second=0, microsecond=0)
+        if datetime.now() < ah_start:
+            return None
+    key = scan_cache_key(user_id, mode)
+    cached = get_cached_scan(user_id, mode, SCAN_CACHE_TTL)
+    if cached and not force:
+        return cached
+    lock = scan_cache_locks.get(key)
+    if lock is None:
+        lock = asyncio.Lock()
+        scan_cache_locks[key] = lock
+    async with lock:
+        cached = get_cached_scan(user_id, mode, SCAN_CACHE_TTL)
+        if cached and not force:
+            return cached
+        filters = filters_for_mode(mode)
+        log_alert(f"⚡ [{user_id}] Background warming {mode} scan cache")
+        results, done_status = await do_scan(
+            user_id,
+            mode_override=mode,
+            filters_override=filters,
+            quiet=True
+        )
+        cached = {
+            'results': results,
+            'done_status': done_status,
+            'ts': datetime.now(),
+            'time': datetime.now().strftime('%H:%M:%S'),
+            'filters': filters,
+            'mode': mode,
+        }
+        scan_cache[key] = cached
+        log_alert(f"✅ [{user_id}] Cached {mode}: {len(results)} setup(s)")
+        return {**cached, 'age': 0}
+
+async def background_scan_cache_loop():
+    await asyncio.sleep(5)
+    while True:
+        try:
+            for user_id in user_state:
+                for mode in SCAN_BACKGROUND_MODES:
+                    await refresh_scan_cache(user_id, mode)
+                    await asyncio.sleep(2)
+        except Exception as e:
+            log_alert(f"⚠️ Background scan cache error: {e}")
+        await asyncio.sleep(SCAN_BACKGROUND_INTERVAL)
+
+@app.on_event("startup")
+async def start_background_scan_cache():
+    if os.getenv('ENABLE_BACKGROUND_SCANNER', 'true').lower() in {'1','true','yes','on'}:
+        asyncio.create_task(background_scan_cache_loop())
 
 async def scanner_loop(user_id, scan_id):
     s = user_state[user_id]
@@ -3215,6 +3321,15 @@ async def scanner_loop(user_id, scan_id):
             if scan_id != s.get('scan_id'):
                 break
             s['scan_results']    = results
+            if s['mode'] != 'custom':
+                scan_cache[scan_cache_key(user_id, s['mode'])] = {
+                    'results': results,
+                    'done_status': done_status,
+                    'ts': datetime.now(),
+                    'time': datetime.now().strftime('%H:%M:%S'),
+                    'filters': s['filters'].copy(),
+                    'mode': s['mode'],
+                }
             await broadcast_to_user(user_id, {
                 'type':'scan_results','data':results,
                 'time':datetime.now().strftime('%H:%M:%S'),
