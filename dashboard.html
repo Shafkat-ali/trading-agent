@@ -122,6 +122,20 @@
     .workspace-placeholder-box{max-width:420px;background:#0f1729;border:1px solid #1e2d4a;border-radius:10px;padding:22px;box-shadow:0 12px 36px rgba(0,0,0,.22);}
     .workspace-placeholder-title{font-size:.9rem;color:#dceaff;font-weight:900;margin-bottom:7px;}
     .workspace-placeholder-copy{font-size:.68rem;line-height:1.5;color:#6f86aa;}
+    .command-center{width:min(920px,94vw);background:#0f1729;border:1px solid #1e2d4a;border-radius:10px;padding:18px;box-shadow:0 16px 44px rgba(0,0,0,.28);}
+    .command-title{font-size:1.15rem;font-weight:900;color:#fff;margin-bottom:5px;}
+    .command-sub{font-size:.68rem;color:#6f86aa;margin-bottom:14px;}
+    .command-open-row{display:flex;gap:8px;margin-bottom:16px;}
+    .command-input{flex:1;background:#08101d;border:1px solid #2a3a5a;border-radius:8px;color:#e8f2ff;font-size:.86rem;font-weight:800;padding:10px 12px;text-transform:uppercase;outline:none;}
+    .command-input:focus{border-color:#2fc7ff;box-shadow:0 0 0 2px rgba(47,199,255,.12);}
+    .command-btn{border:1px solid #2a4a78;background:#132745;color:#bfe1ff;border-radius:8px;padding:9px 14px;font-size:.7rem;font-weight:900;cursor:pointer;}
+    .command-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px;}
+    .command-tile{border:1px solid #1e2d4a;background:#0a1220;border-radius:9px;padding:12px;text-align:left;cursor:pointer;transition:all .16s;min-height:96px;}
+    .command-tile:hover{transform:translateY(-1px);border-color:#2fc7ff;background:#10213a;}
+    .command-icon{font-size:1.25rem;margin-bottom:8px;}
+    .command-name{font-size:.75rem;color:#fff;font-weight:900;margin-bottom:4px;}
+    .command-copy{font-size:.58rem;color:#6f86aa;line-height:1.4;}
+    @media(max-width:900px){.command-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.command-open-row{flex-direction:column}}
     .workspace-view.hidden{display:none!important;}
     .scanner-workspace{min-height:calc(100vh - 149px);}
     .ticker-workspace{height:calc(100vh - 149px);display:flex;flex-direction:column;background:#08101d;color:#dce8f8;padding:14px;overflow:auto;}
@@ -586,8 +600,13 @@
     body.light-theme .panel-toggle-tab:hover{background:#eaf2ff!important;border-color:#93c5fd!important;}
     body.light-theme .workspace-tab.active{background:#dbeafe!important;color:#0f172a!important;border-color:#93c5fd!important;box-shadow:inset 0 2px 0 #0284c7;}
     body.light-theme .workspace-placeholder{background:#f4f7fb!important;color:#64748b!important;border-color:#d7e0ef!important;}
-    body.light-theme .workspace-placeholder-box{background:#ffffff!important;border-color:#d7e0ef!important;}
-    body.light-theme .workspace-placeholder-title{color:#0f172a!important;}
+    body.light-theme .workspace-placeholder-box,
+    body.light-theme .command-center,
+    body.light-theme .command-tile{background:#ffffff!important;border-color:#d7e0ef!important;}
+    body.light-theme .workspace-placeholder-title,
+    body.light-theme .command-title,
+    body.light-theme .command-name{color:#0f172a!important;}
+    body.light-theme .command-input{background:#f8fafc!important;color:#0f172a!important;border-color:#cbd5e1!important;}
     body.light-theme .ticker-workspace{background:#f4f7fb!important;color:#172033!important;}
     body.light-theme .ticker-shell,
     body.light-theme .ticker-shell-note,
@@ -1157,15 +1176,32 @@
 </div>
 
 <div class="workspace-placeholder hidden" id="workspacePlaceholder">
-  <div class="workspace-placeholder-box">
-    <div class="workspace-placeholder-title" id="workspacePlaceholderTitle">New Workspace Tab</div>
-    <div class="workspace-placeholder-copy">The tab shell is ready. Ticker workspaces, scanner migration, and internal Heat Map/Polymarket tabs come in the next phases.</div>
+  <div class="command-center">
+    <div class="command-title" id="workspacePlaceholderTitle">New Tab</div>
+    <div class="command-sub">Choose where to go next, or type a ticker and press Enter.</div>
+    <div class="command-open-row">
+      <input class="command-input" id="commandTickerInput" placeholder="Open ticker, e.g. DUOT"
+        onkeydown="if(event.key==='Enter')openCommandTicker()">
+      <button class="command-btn" onclick="openCommandTicker()">Open Ticker</button>
+    </div>
+    <div class="command-grid">
+      <button class="command-tile" onclick="activateWorkspaceTab('scanner')"><div class="command-icon">📊</div><div class="command-name">Scanner+</div><div class="command-copy">Return to live scan buttons and results.</div></button>
+      <button class="command-tile" onclick="openCommandWorkspace('filters')"><div class="command-icon">🎛</div><div class="command-name">Filters</div><div class="command-copy">Open scan filters and custom criteria.</div></button>
+      <button class="command-tile" onclick="openCommandWorkspace('paper')"><div class="command-icon">📄</div><div class="command-name">Paper Trading</div><div class="command-copy">Orders, account, positions, and history.</div></button>
+      <button class="command-tile" onclick="openCommandWorkspace('news')"><div class="command-icon">🌍</div><div class="command-name">News / SEC</div><div class="command-copy">Market news and danger-watch filings.</div></button>
+      <button class="command-tile" onclick="openCharts()"><div class="command-icon">📈</div><div class="command-name">8 Charts</div><div class="command-copy">Open the multi-chart workspace.</div></button>
+      <button class="command-tile" onclick="openHeatMapPage()"><div class="command-icon">🟩</div><div class="command-name">Heat Map</div><div class="command-copy">Live sector and index market map.</div></button>
+      <button class="command-tile" onclick="openPolymarketPage()"><div class="command-icon">🔵</div><div class="command-name">Polymarket</div><div class="command-copy">Stock-market related prediction markets.</div></button>
+      <button class="command-tile" onclick="openCommandWorkspace('screener')"><div class="command-icon">📋</div><div class="command-name">Side Screener</div><div class="command-copy">Compact sorted result list from the old panel.</div></button>
+    </div>
   </div>
 </div>
 
 <div class="ticker-workspace hidden" id="tickerWorkspace"></div>
 
 <div class="external-workspace hidden" id="externalWorkspace"></div>
+
+<div class="external-workspace hidden" id="utilityWorkspace"></div>
 
 <script>
   const API_URL     = `${location.protocol}//${location.host}`;
@@ -1248,7 +1284,7 @@
 
   function addBlankWorkspaceTab(){
     const id=`blank-${Date.now()}`;
-    workspaceTabs.push({id:id,title:'New Tab',icon:'＋',type:'blank',closable:true});
+    workspaceTabs.push({id:id,title:'New Tab',icon:'＋',type:'command',closable:true});
     activeWorkspaceTab=id;
     renderWorkspaceTabs();
     applyWorkspaceView();
@@ -1259,24 +1295,69 @@
     const isScanner=tab.type==='scanner';
     const isTicker=tab.type==='ticker';
     const isExternal=tab.type==='external';
+    const isUtility=tab.type==='utility';
+    const isCommand=tab.type==='command';
     const scannerWorkspace=document.getElementById('scannerWorkspace');
     const tickerWorkspace=document.getElementById('tickerWorkspace');
     const externalWorkspace=document.getElementById('externalWorkspace');
+    const utilityWorkspace=document.getElementById('utilityWorkspace');
     const restore=document.getElementById('panelRestoreBtn');
     const placeholder=document.getElementById('workspacePlaceholder');
     const placeholderTitle=document.getElementById('workspacePlaceholderTitle');
     if(scannerWorkspace)scannerWorkspace.classList.toggle('hidden',!isScanner);
     if(tickerWorkspace)tickerWorkspace.classList.toggle('hidden',!isTicker);
     if(externalWorkspace)externalWorkspace.classList.toggle('hidden',!isExternal);
+    if(utilityWorkspace)utilityWorkspace.classList.toggle('hidden',!isUtility);
     if(restore){
       restore.style.display='none';
     }
     if(isTicker)renderTickerWorkspace(tab);
     if(isExternal)renderExternalWorkspace(tab);
+    if(isUtility)renderUtilityWorkspace(tab);
     if(placeholder){
-      placeholder.classList.toggle('hidden',isScanner||isTicker||isExternal);
+      placeholder.classList.toggle('hidden',isScanner||isTicker||isExternal||isUtility);
       if(placeholderTitle)placeholderTitle.textContent=tab.title||'New Workspace Tab';
+      if(isCommand)setTimeout(()=>document.getElementById('commandTickerInput')?.focus(),30);
     }
+  }
+
+  function openCommandTicker(){
+    const input=document.getElementById('commandTickerInput');
+    const ticker=(input?.value||'').trim().toUpperCase();
+    if(!ticker)return;
+    openTickerTab(ticker);
+    if(input)input.value='';
+  }
+
+  function openCommandWorkspace(kind){
+    const map={
+      filters:{title:'Filters',icon:'🎛',source:'tab-filters'},
+      paper:{title:'Paper Trading',icon:'📄',source:'tab-paper'},
+      news:{title:'News / SEC',icon:'🌍',source:'tab-news'},
+      screener:{title:'Side Screener',icon:'📋',source:'tab-screener'},
+    };
+    const cfg=map[kind];if(!cfg)return;
+    let tab=workspaceTabs.find(t=>t.id===`utility-${kind}`);
+    if(!tab){
+      tab={id:`utility-${kind}`,title:cfg.title,icon:cfg.icon,type:'utility',closable:true,utility:kind,source:cfg.source};
+      workspaceTabs.push(tab);
+    }
+    activeWorkspaceTab=tab.id;
+    renderWorkspaceTabs();
+    applyWorkspaceView();
+  }
+
+  function renderUtilityWorkspace(tab){
+    const host=document.getElementById('utilityWorkspace');
+    const src=document.getElementById(tab.source);
+    if(!host||!src)return;
+    const parkedPanel=document.getElementById('rightPanel');
+    host.querySelectorAll('.tab-content').forEach(el=>parkedPanel?.appendChild(el));
+    host.innerHTML=`<div class="workspace-view scanner-workspace" style="height:100%;overflow:auto;padding:12px;background:#0a0e1a;"><div class="ticker-tab-top" style="padding:12px;margin-bottom:12px;"><div class="command-title">${tab.icon||''} ${tab.title}</div><div class="command-sub">Restored from the old side panel as a full workspace tab.</div></div><div id="utilityMount"></div></div>`;
+    const mount=host.querySelector('#utilityMount');
+    mount.appendChild(src);
+    src.classList.add('active');
+    src.style.display='block';
   }
 
   function openExternalWorkspaceTab(id,title,icon,url){
@@ -2222,7 +2303,12 @@ run();
       const msg=JSON.parse(event.data);
       if(msg.type==='status'){
         isRunning=msg.running;updateStatusUI(isRunning);
-        if(!isRunning)hideProgress();
+        if(!isRunning){
+          stopPolling();
+          updateScanBtns(null);
+          if(isLoading&&!allResults.length)showEmptyScanResult({message:'Scan finished with no matching stocks.'});
+          hideProgress();
+        }
         if(msg.mode){currentMode=msg.mode;updateActiveModeLabel(msg.mode);}
       }
       if(msg.type==='scan_status')updateProgress(msg.status);
@@ -2232,6 +2318,7 @@ run();
       }
       if(msg.type==='scan_results'){
         const data=msg.data||[];
+        if(data.length&&isLoading)clearLoadingScreen();
         data.forEach(s=>{if(!allResults.find(r=>r.ticker===s.ticker)){allResults.push(s);addTickerToDOM(s);}});
         if(data.length)updateScreener();
         renderAlerts(msg.alerts);updateStats(allResults,msg.time);
@@ -2250,6 +2337,7 @@ run();
       try{
         const r=await fetch(`${API_URL}/api/results/${uid}`);
         const data=await r.json();
+        renderAlerts(data.alerts);
         if(data.data&&data.data.length>0){
           let added=false;
           data.data.forEach(s=>{
@@ -2258,7 +2346,15 @@ run();
             }
           });
           if(added){updateScreener();updateStats(allResults,data.time);}
-          renderAlerts(data.alerts);
+        }
+        if(data.running===false&&isRunning){
+          const doneStatus={
+            phase:'done',
+            message:allResults.length?`✅ ${allResults.length} setup(s) found`:'No stocks matched this scan.',
+            progress:allResults.length,
+            total:allResults.length
+          };
+          updateProgress(doneStatus);
         }
       }catch(e){}
     },5000);

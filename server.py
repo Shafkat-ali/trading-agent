@@ -573,7 +573,8 @@ async def get_user_results(user_id: str):
     if user_id not in user_state: return {'data':[],'alerts':alert_log[:20]}
     s = user_state[user_id]
     return {'data':s['scan_results'],'alerts':alert_log[:20],
-            'time':datetime.now().strftime('%H:%M:%S'),'mode':s['mode']}
+            'time':datetime.now().strftime('%H:%M:%S'),'mode':s['mode'],
+            'running':s.get('running', False)}
 
 @app.post("/api/scanner/start/{user_id}")
 async def start_scanner(user_id: str):
