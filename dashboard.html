@@ -1072,7 +1072,7 @@
         <div class="vwap-note" style="margin-top:4px">Exchange: NASDAQ, NYSE, AMEX (auto-applied)</div>
       </div>
 
-      <button class="apply-btn" onclick="applyFilters()">✅ Apply Custom Filters & Rescan</button>
+      <button class="apply-btn" id="applyFiltersBtn" onclick="applyFilters()">✅ Apply Custom Filters & Rescan</button>
       <button class="reset-btn" onclick="resetToMorningGap()">↩ Reset to MorningGap</button>
     </div>
 
@@ -1325,7 +1325,7 @@
     const input=document.getElementById('commandTickerInput');
     const ticker=(input?.value||'').trim().toUpperCase();
     if(!ticker)return;
-    openTickerTab(ticker);
+    openTickerTab(ticker,null,{replaceActiveCommand:true});
     if(input)input.value='';
   }
 
@@ -1381,11 +1381,25 @@
     host.innerHTML=`<iframe class="external-tab-frame" data-tab-id="${tab.id}" src="${tab.url}" title="${tab.title}"></iframe>`;
   }
 
-  function openTickerTab(ticker, setup=null){
+  function openTickerTab(ticker, setup=null, opts={}){
     ticker=(ticker||'').toUpperCase();
     if(!ticker)return;
     const id=`ticker-${ticker}`;
+    const activeTab=workspaceTabs.find(t=>t.id===activeWorkspaceTab);
     let tab=workspaceTabs.find(t=>t.id===id);
+    if(opts.replaceActiveCommand&&activeTab?.type==='command'){
+      if(tab&&tab.id!==activeTab.id){
+        workspaceTabs=workspaceTabs.filter(t=>t.id!==activeTab.id);
+      }else{
+        tab=activeTab;
+        tab.id=id;
+        tab.title=ticker;
+        tab.icon='🟡';
+        tab.type='ticker';
+        tab.ticker=ticker;
+        tab.setup=setup||allResults.find(r=>r.ticker===ticker)||null;
+      }
+    }
     if(!tab){
       tab={id:id,title:ticker,icon:'🟡',type:'ticker',closable:true,ticker:ticker,setup:setup||allResults.find(r=>r.ticker===ticker)||null};
       workspaceTabs.push(tab);
@@ -2387,6 +2401,30 @@ run();
   }
 
   // ── DUAL SCAN BUTTONS ──
+  function showScanLoading(mode, alreadyRunningThisMode=false){
+    allResults=[];isLoading=true;
+    const resultsEl=document.getElementById('results');
+    if(resultsEl){
+      resultsEl.innerHTML=`
+        <div class="no-results">
+          <div class="no-results-logos">
+            <img src="${PAYDA_LOGO}"  alt="Payda"     onerror="this.style.display='none'">
+            <img src="${UYGHUR_LOGO}" alt="UyghurKid" onerror="this.style.display='none'">
+          </div>
+          <div class="icon">${alreadyRunningThisMode?'🔄':(MODES[mode]?.label.split(' ')[0]||'🔍')}</div>
+          <p style="color:#ffd700;font-size:.85rem;font-weight:700">
+            ${alreadyRunningThisMode?'Rescanning':'Starting'} ${MODES[mode]?.label||mode}...
+          </p>
+          <p style="font-size:.68rem;margin-top:4px;color:#4a6a8a">${MODES[mode]?.desc||''}</p>
+          <div class="loading-bar"><div class="loading-fill"></div></div>
+          <p style="font-size:.58rem;margin-top:5px;color:#2a3a5a">Stocks appear as they are found</p>
+        </div>`;
+    }
+    const screenerList=document.getElementById('screenerList');
+    if(screenerList)screenerList.innerHTML='<div class="screener-empty">Scanning...</div>';
+    ['statSetups','statAplus','fStatSetups','fStatAplus'].forEach(id=>{const el=document.getElementById(id);if(el)el.textContent='0';});
+  }
+
   async function startWithMode(mode){
     if(!currentUser){alert('Please select a user first');return;}
     const alreadyRunningThisMode=isRunning&&!isPaused&&currentMode===mode;
@@ -2496,6 +2534,10 @@ run();
   // ── CUSTOM FILTERS ──
   async function applyFilters(){
     if(!currentUser)return;
+    const btn=document.getElementById('applyFiltersBtn');
+    if(btn){btn.disabled=true;btn.textContent='Applying filters...';}
+    activateWorkspaceTab('scanner');
+    showScanLoading('custom',false);
     const minPrice=parseFloat(document.getElementById('fMinPrice').value)||0.10;
     const maxPrice=parseFloat(document.getElementById('fMaxPrice').value)||50;
     const minGap  =parseFloat(document.getElementById('fMinGap').value)||5;
@@ -2512,7 +2554,12 @@ run();
           max_float_m:maxFloat,max_market_cap_m:maxMktCap,require_news:newsOn})
       });
       await startWithMode('custom');
-    }catch(e){alert('Failed to apply filters');}
+    }catch(e){
+      isLoading=false;
+      alert('Failed to apply filters');
+    }finally{
+      if(btn){btn.disabled=false;btn.textContent='✅ Apply Custom Filters & Rescan';}
+    }
   }
 
   async function resetToMorningGap(){
