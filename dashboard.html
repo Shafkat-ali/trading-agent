@@ -640,7 +640,7 @@
 
       <div class="pattern-section">
         <div class="pattern-header">
-          <div class="popup-section-title" style="margin-bottom:0">🎯 Sykes Pattern Analysis</div>
+          <div class="popup-section-title" style="margin-bottom:0">🎯 Expert Pattern Analysis</div>
           <span class="pattern-name-big" id="patternName">Detecting...</span>
         </div>
         <div class="pattern-desc" id="patternDesc">Analyzing...</div>
@@ -2020,7 +2020,10 @@
     document.getElementById('patternDesc').textContent=setup.pattern_desc||'No pattern analysis';
     document.getElementById('patternCriteria').innerHTML=(setup.pattern_criteria||[]).length
       ?(setup.pattern_criteria||[]).map(c=>{
-          let cls='';if(c.startsWith('✅'))cls='pass';else if(c.startsWith('⚠️'))cls='warn';else if(c.startsWith('🚨'))cls='risk';
+          let cls='';
+          if(c.startsWith('✅')||c.startsWith('PASS:'))cls='pass';
+          else if(c.startsWith('⚠️')||c.startsWith('WARN:'))cls='warn';
+          else if(c.startsWith('🚨')||c.startsWith('RISK:'))cls='risk';
           return`<div class="criteria-item ${cls}">${c}</div>`;
         }).join('')
       :'<div class="criteria-item">No criteria available</div>';

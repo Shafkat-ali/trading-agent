@@ -1542,8 +1542,6 @@ async def search_ticker(ticker: str):
         spread_pct = round(((ask - bid) / ((ask + bid) / 2)) * 100, 2) if bid > 0 and ask > 0 else 0
 
         halt_info                              = get_halt_info(ticker)
-        pattern, pattern_desc, pattern_criteria = detect_sykes_pattern(
-            ticker, price, prev_close, pct_change, closes, rvol, dollar_vol)
         grade, notes                            = grade_setup(pct_change, dollar_vol, rvol)
         strength, news_count, headlines, warning = check_catalyst(ticker)
 
@@ -1561,6 +1559,11 @@ async def search_ticker(ticker: str):
             f"📰 {news_count} article(s) in 5 days" if news_count > 0 else
             "📰 0 articles in past 5 days"
         )
+
+        pattern, pattern_desc, pattern_criteria = detect_expert_patterns(
+            ticker, price, prev_close, pct_change, closes, rvol, dollar_vol,
+            vwap=vwap, high=high, low=low, open_price=open_price, volume=volume,
+            news_count=news_count, warning=warning)
 
         entry_low  = round(price * 0.99, 2)
         entry_high = round(price * 1.02, 2)
@@ -1776,6 +1779,152 @@ def detect_sykes_pattern(ticker, price, prev_close, pct_change, closes, vol_rati
 # ============================================================
 # CATALYST CHECK
 # ============================================================
+
+def detect_expert_patterns(ticker, price, prev_close, pct_change, closes, vol_ratio, dollar_vol,
+                           vwap=0, high=0, low=0, open_price=0, volume=0, news_count=0,
+                           warning=False, session='regular'):
+    """
+    Multi-expert pattern classifier based on Sykes, Warrior, Humbled Trader,
+    and Bear Bull Traders/Aziz playbooks. It uses fields already collected by
+    the scanner so pattern recognition does not slow the scan down.
+    """
+    closes = closes or []
+    n = len(closes)
+    matches = []
+    criteria = []
+
+    recent_high = max(closes[-5:]) if n >= 5 else 0
+    recent_run = ((recent_high - closes[-5]) / closes[-5] * 100) if n >= 5 and closes[-5] > 0 else 0
+    dip_from_high = ((price - recent_high) / recent_high * 100) if recent_high > 0 else 0
+    near_5d_high = bool(recent_high and price >= recent_high * 0.97)
+    green_days = sum(1 for i in range(max(1, n - 5), n) if closes[i] > closes[i-1]) if n >= 2 else 0
+    prev_days_red = n >= 4 and all(closes[i] < closes[i-1] for i in range(-3, 0))
+    prev_days_green = n >= 4 and all(closes[i] > closes[i-1] for i in range(-3, 0))
+    above_vwap = price > vwap if vwap else None
+    now_hour = datetime.now().hour
+    early_open = 9 <= now_hour <= 10
+    afternoon = 13 <= now_hour <= 16
+    has_news = news_count > 0
+
+    def add(score, label, desc, bullets):
+        matches.append({'score': score, 'label': label, 'desc': desc, 'bullets': bullets})
+
+    if pct_change >= 50:
+        add(100, "Sykes: Supernova",
+            "Huge percent runner; momentum can continue, but risk rises sharply after crowding.",
+            [f"PASS: up {pct_change:.1f}% today",
+             f"PASS: dollar volume ${dollar_vol:,.0f}",
+             "RISK: supernovas can unwind violently; sell into strength and use hard risk"])
+
+    if prev_days_red and pct_change >= 8 and (vol_ratio >= 1.5 or has_news):
+        add(88, "Sykes: First Green Day",
+            "Meaningful first green day after weakness/consolidation with volume or catalyst.",
+            [f"PASS: prior daily candles were weak, now up {pct_change:.1f}%",
+             f"PASS: RVOL {vol_ratio:.1f}x" if vol_ratio >= 2 else f"WARN: RVOL {vol_ratio:.1f}x; stronger setup wants unusual volume",
+             "PASS: catalyst present" if has_news else "WARN: no catalyst found in recent news",
+             "NOTE: best FGD closes near HOD; confirm on chart before overnight idea"])
+
+    if recent_run >= 50 and dip_from_high <= -20:
+        add(92, "Sykes: Morning Panic Dip Buy",
+            "Prior multi-day runner is panicking off highs; valid only after selling pressure slows.",
+            [f"PASS: prior run about {recent_run:.0f}%",
+             f"PASS: {abs(dip_from_high):.0f}% off recent high",
+             "NOTE: wait for bounce confirmation/double-bottom; never catch a falling knife"])
+
+    if prev_days_green and pct_change <= -5 and recent_run >= 20:
+        add(84, "Sykes: First Red Day / Fade",
+            "First red day after multiple green candles; short-biased traders watch backside weakness.",
+            [f"PASS: recent run about {recent_run:.0f}%",
+             f"PASS: now red {abs(pct_change):.1f}%",
+             "RISK: short squeezes are brutal; requires borrow/liquidity and tight risk"])
+
+    if pct_change >= 4 and (vol_ratio >= 1.5 or dollar_vol >= 1_000_000):
+        add(82, "Warrior: Gap and Go",
+            "Gapper with liquidity/volume; best confirmation is premarket high or opening range break.",
+            [f"PASS: gap/change {pct_change:.1f}% (Warrior watches >4% gappers)",
+             f"PASS: RVOL {vol_ratio:.1f}x" if vol_ratio >= 1.5 else f"PASS: dollar volume ${dollar_vol:,.0f}",
+             "PASS: catalyst present" if has_news else "WARN: catalyst not confirmed",
+             "NOTE: confirm break of premarket high or 1-min opening range"])
+
+    if n >= 5 and pct_change >= 5:
+        flagpole = ((recent_high - closes[-5]) / closes[-5] * 100) if closes[-5] > 0 else 0
+        flag_range = ((recent_high - min(closes[-3:])) / recent_high * 100) if recent_high > 0 else 0
+        if flagpole >= 15 and flag_range <= 18:
+            add(78, "Warrior: Bull Flag / Pennant",
+                "Strong move followed by controlled consolidation near highs.",
+                [f"PASS: flagpole about {flagpole:.0f}%",
+                 f"PASS: consolidation range {flag_range:.1f}%",
+                 "WARN: invalid if pullback loses VWAP or retraces more than half the move"])
+
+    if near_5d_high and pct_change >= 5 and vol_ratio >= 1.5:
+        add(76, "Warrior/Sykes: Daily Breakout",
+            "Price is pressing recent resistance with volume confirmation.",
+            [f"PASS: price near 5-day high ${recent_high:.2f}",
+             f"PASS: RVOL {vol_ratio:.1f}x",
+             "NOTE: no volume or failed HOD break turns this into a chase"])
+
+    if early_open and pct_change >= 4 and vol_ratio >= 1.5:
+        add(74, "Andrew Aziz: Opening Range Break Candidate",
+            "Stock in play during the opening window; confirm 1-min/5-min ORB direction on chart.",
+            [f"PASS: active near open, up {pct_change:.1f}%",
+             f"PASS: RVOL {vol_ratio:.1f}x",
+             "NOTE: needs actual opening-range high/low break for final confirmation"])
+
+    if above_vwap is True and pct_change >= 3 and vol_ratio >= 1.2:
+        add(72, "Humbled Trader / Aziz: VWAP Reclaim",
+            "Price is above VWAP with positive momentum; VWAP may act as intraday support.",
+            [f"PASS: price ${price:.2f} above VWAP ${vwap:.2f}",
+             f"PASS: up {pct_change:.1f}% with RVOL {vol_ratio:.1f}x",
+             "NOTE: better if higher highs/lows and buying volume continue"])
+    elif above_vwap is False and pct_change <= -3:
+        add(68, "Humbled Trader / Aziz: VWAP Rejection",
+            "Price is below VWAP with downside pressure; VWAP may act as resistance.",
+            [f"PASS: price ${price:.2f} below VWAP ${vwap:.2f}",
+             f"PASS: down {abs(pct_change):.1f}%",
+             "NOTE: watch for lower highs or failed VWAP retests"])
+
+    if afternoon and pct_change >= 5 and above_vwap is True:
+        add(70, "Aziz: Afternoon VWAP Trend",
+            "Afternoon stock in play holding above VWAP; trend continuation candidate.",
+            [f"PASS: afternoon mover up {pct_change:.1f}%",
+             f"PASS: holding above VWAP ${vwap:.2f}",
+             "NOTE: avoid if price chops through VWAP without trend"])
+
+    if n >= 6 and pct_change >= 3:
+        total_climb = ((closes[-1] - closes[-6]) / closes[-6] * 100) if closes[-6] > 0 else 0
+        step_pattern = all(closes[i] > closes[i-1] * 0.93 for i in range(-4, 0))
+        if step_pattern and total_climb >= 20:
+            add(66, "Sykes: Multi-Day Runner / Stair Stepper",
+                "Progressive multi-day climb with shallow pullbacks.",
+                [f"PASS: {green_days} green days in recent stretch",
+                 f"PASS: total climb about {total_climb:.0f}%",
+                 "RISK: crowded runners often fail hard on first red day"])
+
+    if pct_change >= 10 and not matches:
+        add(50, "Momentum Watch",
+            "Strong move, but it does not cleanly meet the stricter expert pattern rules yet.",
+            [f"WARN: up {pct_change:.1f}% without a clean expert setup",
+             "NOTE: wait for VWAP, HOD, ORB, or pullback confirmation"])
+
+    if warning:
+        criteria.append("RISK: recent filings/news contain dilution, offering, lawsuit, or other danger keywords")
+
+    if not matches:
+        return ("No Clear Expert Pattern",
+            "Does not cleanly match the Sykes, Warrior, Humbled Trader, or Aziz playbooks using available live data.",
+            criteria + ["WARN: move too small or missing volume/catalyst confirmation",
+                        "RISK: skip until a cleaner setup appears"])
+
+    matches.sort(key=lambda m: m['score'], reverse=True)
+    top = matches[:4]
+    pattern = " + ".join(m['label'] for m in top[:3])
+    desc = f"{len(matches)} expert-style match(es). Top read: {top[0]['desc']}"
+    criteria.extend([f"PASS: {m['label']} - {m['desc']}" for m in top])
+    for m in top:
+        criteria.extend(m['bullets'][:4])
+    if len(matches) > 4:
+        criteria.append(f"NOTE: {len(matches) - 4} additional lower-confidence pattern(s) also matched")
+    return (pattern, desc, criteria[:18])
 
 def check_catalyst(ticker):
     try:
@@ -2657,8 +2806,10 @@ def process_ticker(stock_data, mode='morning_gap', filters=None):
                 closes = []
 
         halt_info                               = get_halt_info(ticker)
-        pattern, pattern_desc, pattern_criteria  = detect_sykes_pattern(
-            ticker, price, prev_close, gap_pct, closes, rvol, dollar_vol)
+        pattern, pattern_desc, pattern_criteria  = detect_expert_patterns(
+            ticker, price, prev_close, gap_pct, closes, rvol, dollar_vol,
+            vwap=vwap, volume=volume, news_count=news_count, warning=warning,
+            session=stock_data.get('session', mode))
 
         above_vwap = price > vwap if vwap > 0 else None
         spread_pct = round(((ask - bid) / ((ask + bid) / 2)) * 100, 2) if bid > 0 and ask > 0 else 0
