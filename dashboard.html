@@ -157,6 +157,9 @@
     .ticker-tab-chart{background:#080c18;border-radius:8px;border:1px solid #1a2035;overflow:hidden;min-height:430px;}
     .ticker-tab-chart-body{height:350px;position:relative;}
     .ticker-chart-frame{width:100%;height:100%;border:0;background:#060a12;display:block;}
+    .ticker-tab-chart-body .tradingview-widget-container,
+    .ticker-tab-chart-body .tradingview-widget-container__widget,
+    .ticker-tab-chart-body iframe{width:100%!important;height:100%!important;display:block!important;}
     .ticker-tab-subchart{height:78px;position:relative;border-top:1px solid #1a2a4a;display:none;}
     .ticker-tab-subchart-label{position:absolute;top:2px;left:5px;font-size:.46rem;color:#4a6a8a;z-index:5;pointer-events:none;}
     .ticker-tab-subchart-inner{width:100%;height:100%;}
@@ -1486,7 +1489,7 @@
           <div class="ticker-tab-stack">
             <div class="ticker-tab-chart">
               <div class="popup-section-title" style="padding:8px 10px;margin:0;border-bottom:1px solid #1a2a4a">
-                📉 Live Chart <span class="chart-label">Tradier — Pre/After Market</span>
+                📉 Live Chart <span class="chart-label">TradingView — Hosted Chart</span>
               </div>
               <div id="${domId}ChartControls"></div>
               <div class="ticker-tab-chart-body" id="${domId}Chart"></div>
@@ -1626,30 +1629,91 @@
   }
 
   const tickerTabIndicators={};
+  const tickerTvRangeIntervals={'1D':'1','5D':'5','1M':'15','3M':'60','6M':'60','12M':'D'};
+  const tickerTvExchangeMap={NASDAQ:'NASDAQ',NYSE:'NYSE',AMEX:'AMEX','NYSE ARCA':'AMEX','NYSE MKT':'AMEX'};
+  function tickerTvInterval(v){
+    return ({'1Min':'1','5Min':'5','15Min':'15','1Hour':'60','1Day':'D','1':'1','5':'5','15':'15','60':'60','D':'D'}[v]||'1');
+  }
+  function tickerTvExchange(ex){
+    const up=String(ex||'').toUpperCase();
+    const key=Object.keys(tickerTvExchangeMap).find(k=>up.includes(k));
+    return tickerTvExchangeMap[key]||'NASDAQ';
+  }
+  async function resolveTickerTvSymbol(ticker, tabId){
+    ticker=String(ticker||'').trim().toUpperCase();
+    if(!ticker)return 'NASDAQ:AAPL';
+    if(ticker.includes(':'))return ticker;
+    const tab=workspaceTabs.find(t=>t.id===tabId);
+    const setup=tab?.setup||allResults.find(r=>r.ticker===ticker)||{};
+    if(setup.exchange)return `${tickerTvExchange(setup.exchange)}:${ticker}`;
+    try{
+      const r=await fetch(`${API_URL}/api/stock/search/${ticker}`);
+      const data=await r.json();
+      return `${tickerTvExchange(data.exchange)}:${ticker}`;
+    }catch(e){
+      return `NASDAQ:${ticker}`;
+    }
+  }
+  function tickerTvWidgetConfig(symbol, interval, range){
+    return {
+      autosize:true,
+      symbol,
+      interval:interval||'1',
+      range:range||'1D',
+      timezone:'America/New_York',
+      theme:'dark',
+      style:'1',
+      locale:'en',
+      allow_symbol_change:true,
+      calendar:false,
+      hide_side_toolbar:false,
+      hide_top_toolbar:false,
+      withdateranges:true,
+      details:false,
+      hotlist:false,
+      studies:['Volume@tv-basicstudies'],
+      support_host:'https://www.tradingview.com'
+    };
+  }
   function tabEma(d,p){const k=2/(p+1);let e=null;return d.map(v=>{if(e===null)e=v;else e=v*k+e*(1-k);return e;});}
   function tabRsi(c,p=14){return c.map((_,i)=>{if(i<p)return null;let g=0,l=0;for(let j=i-p+1;j<=i;j++){const d=c[j]-c[j-1];if(d>0)g+=d;else l-=d;}return 100-100/(1+(g/p)/((l/p)||1e-6));});}
   function tabMacd(c){const f=tabEma(c,12),s=tabEma(c,26),ml=f.map((v,i)=>v-s[i]),sig=tabEma(ml,9);return{ml,sig,h:ml.map((v,i)=>v-sig[i])};}
   async function buildTickerTabChart(ticker, domId, tabId){
     const controls=document.getElementById(`${domId}ChartControls`);
     const chartEl=document.getElementById(`${domId}Chart`);
-    if(!controls||!chartEl||!window.LightweightCharts)return;
-    tickerTabIndicators[tabId]=tickerTabIndicators[tabId]||{Vol:true,VWAP:false,EMA:false,RSI:false,MACD:false,range:'2D',tf:'1Min'};
+    if(!controls||!chartEl)return;
+    tickerTabIndicators[tabId]=tickerTabIndicators[tabId]||{range:'1D',tf:'1'};
     const st=tickerTabIndicators[tabId];
+    if(['2D','10D','15D'].includes(st.range))st.range='5D';
+    st.tf=tickerTvInterval(st.tf);
     controls.innerHTML=`
       <div style="display:flex;align-items:center;gap:5px;padding:5px 8px;background:#0d1525;border-bottom:1px solid #1a2a4a;flex-wrap:wrap;">
         <span style="font-size:.65rem;font-weight:800;color:#ffd700;">${ticker}</span>
         <select id="${domId}Range" style="background:#060a12;border:1px solid #2a3a5a;border-radius:4px;color:#ffd700;font-size:.6rem;padding:2px 4px;font-weight:700;">
-          ${['1D','2D','5D','10D','15D','1M','3M','6M','1Y'].map(r=>`<option value="${r}"${st.range===r?' selected':''}>${r.replace('D',' day').replace('M',' month').replace('Y',' year')}</option>`).join('')}
+          ${[['1D','1 day'],['5D','5 days'],['1M','1 month'],['3M','3 months'],['6M','6 months'],['12M','1 year']].map(([v,l])=>`<option value="${v}"${st.range===v?' selected':''}>${l}</option>`).join('')}
         </select>
         <select id="${domId}Tf" style="background:#060a12;border:1px solid #2a3a5a;border-radius:4px;color:#a0b8d0;font-size:.6rem;padding:2px 4px;">
-          ${[['1Min','1m'],['5Min','5m'],['15Min','15m'],['1Day','1D']].map(([v,l])=>`<option value="${v}"${st.tf===v?' selected':''}>${l}</option>`).join('')}
+          ${[['1','1m'],['5','5m'],['15','15m'],['60','1h'],['D','1D']].map(([v,l])=>`<option value="${v}"${st.tf===v?' selected':''}>${l}</option>`).join('')}
         </select>
-        ${['Vol','VWAP','EMA','RSI','MACD'].map(k=>`<button id="${domId}${k}" onclick="toggleTickerTabIndicator('${tabId}','${domId}','${ticker}','${k}')" style="background:${st[k]?'rgba(0,0,0,.3)':'#0f1a2e'};border:1px solid ${st[k]?({Vol:'#4a8aff',VWAP:'#ffd700',EMA:'#ff9100',RSI:'#a78bfa',MACD:'#00d4ff'}[k]):'#1a2a4a'};border-radius:3px;color:${st[k]?({Vol:'#4a8aff',VWAP:'#ffd700',EMA:'#ff9100',RSI:'#a78bfa',MACD:'#00d4ff'}[k]):'#4a6a8a'};font-size:.5rem;padding:1px 5px;cursor:pointer;">${k}</button>`).join('')}
-        <span id="${domId}ChartBadge" style="font-size:.52rem;color:#00c853;margin-left:auto;">Loading...</span>
+        <button onclick="buildTickerTabChart('${ticker}','${domId}','${tabId}')" style="background:#16345f;border:1px solid #2a5f9d;border-radius:4px;color:#c8e5ff;font-size:.56rem;padding:2px 8px;cursor:pointer;">Load</button>
+        <span id="${domId}ChartBadge" style="font-size:.52rem;color:#00c853;margin-left:auto;">TradingView</span>
       </div>`;
     document.getElementById(`${domId}Range`).onchange=e=>{st.range=e.target.value;buildTickerTabChart(ticker,domId,tabId);};
     document.getElementById(`${domId}Tf`).onchange=e=>{st.tf=e.target.value;buildTickerTabChart(ticker,domId,tabId);};
-    await loadTickerTabChart(ticker, domId, tabId);
+    const rsiWrap=document.getElementById(`${domId}RsiWrap`);
+    const macdWrap=document.getElementById(`${domId}MacdWrap`);
+    if(rsiWrap)rsiWrap.style.display='none';
+    if(macdWrap)macdWrap.style.display='none';
+    chartEl.innerHTML='<div class="tradingview-widget-container" style="height:100%;width:100%;background:#050914"><div class="tradingview-widget-container__widget" style="height:100%;width:100%"></div></div>';
+    const badge=document.getElementById(`${domId}ChartBadge`);
+    if(badge)badge.textContent='Loading TradingView...';
+    const symbol=await resolveTickerTvSymbol(ticker, tabId);
+    const script=document.createElement('script');
+    script.src='https://s3.tradingview.com/external-embedding/embed-widget-advanced-chart.js';
+    script.async=true;
+    script.innerHTML=JSON.stringify(tickerTvWidgetConfig(symbol,st.tf,st.range));
+    chartEl.querySelector('.tradingview-widget-container').appendChild(script);
+    if(badge)badge.textContent=symbol;
   }
 
   function toggleTickerTabIndicator(tabId, domId, ticker, key){
@@ -3724,8 +3788,119 @@ loadChart();
     w.document.close();
   }
 
+  function buildTradingViewChartsPage(apiUrl){
+    return `<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<title>TradingView 8 Charts - Payda x UyghurKid</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box;}
+body{height:100vh;display:flex;flex-direction:column;overflow:hidden;background:#050914;color:#dce8f8;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;}
+.hdr{height:38px;display:flex;align-items:center;gap:10px;padding:6px 12px;background:#08101f;border-bottom:1px solid #20314d;flex-shrink:0;}
+.hdr-title{font-size:.88rem;font-weight:900;color:#ffd700;white-space:nowrap;}
+.hdr-hint{font-size:.58rem;color:#6f86aa;}
+.hdr-btn{margin-left:auto;background:#132745;border:1px solid #2a4a78;border-radius:6px;color:#bfe1ff;font-size:.62rem;font-weight:800;padding:4px 11px;cursor:pointer;}
+.grid{display:grid;grid-template-columns:repeat(4,1fr);grid-template-rows:repeat(2,1fr);gap:6px;padding:6px;flex:1;min-height:0;}
+.cell{min-width:0;min-height:0;display:flex;flex-direction:column;overflow:hidden;background:#060b16;border:1px solid #1b2a45;border-radius:7px;}
+.cell-hdr{height:34px;display:flex;align-items:center;gap:4px;padding:4px 5px;background:#0d1728;border-bottom:1px solid #1b2a45;flex-shrink:0;}
+.tk{width:78px;background:#050914;border:1px solid #2a3a5a;border-radius:5px;color:#fff;font-size:.72rem;font-weight:900;padding:4px 6px;text-transform:uppercase;outline:none;}
+.tk:focus{border-color:#2fc7ff;box-shadow:0 0 0 1px rgba(47,199,255,.22);}
+.exchange,.interval,.range{background:#050914;border:1px solid #2a3a5a;border-radius:5px;color:#9fb7d7;font-size:.58rem;font-weight:800;padding:3px 4px;height:24px;}
+.load{background:#16345f;border:1px solid #2a5f9d;border-radius:5px;color:#c8e5ff;font-size:.58rem;font-weight:900;padding:4px 8px;cursor:pointer;height:24px;}
+.load:hover{background:#1d75d8;color:#fff;}
+.badge{font-size:.52rem;color:#52739d;margin-left:auto;min-width:36px;text-align:right;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.tv-host{flex:1;min-height:0;position:relative;background:#050914;}
+.tv-host.loading{display:flex;align-items:center;justify-content:center;color:#ffd700;font-size:.7rem;font-weight:900;}
+.tv-host iframe{display:block!important;width:100%!important;height:100%!important;}
+@media(max-width:1200px){.grid{grid-template-columns:repeat(2,1fr);grid-template-rows:repeat(4,1fr);}.hdr-hint{display:none;}}
+</style>
+</head>
+<body>
+<div class="hdr">
+  <span class="hdr-title">TradingView 8 Charts</span>
+  <span class="hdr-hint">Hosted TradingView widgets for smoother drag/zoom. Type ticker, choose exchange, load.</span>
+  <button class="hdr-btn" onclick="refreshAll()">Refresh All</button>
+</div>
+<div class="grid" id="grid"></div>
+<script>
+const API=${JSON.stringify(apiUrl)};
+const seeds=['AAPL','MSFT','NVDA','TSLA','AMD','QQQ','SPY','IWM'];
+const rangeIntervals={ '1D':'1', '5D':'5', '1M':'15', '3M':'60', '1Y':'D' };
+const exchangeMap={NASDAQ:'NASDAQ',NYSE:'NYSE',AMEX:'AMEX','NYSE ARCA':'AMEX','NYSE MKT':'AMEX'};
+function cellHtml(i,ticker){
+  return '<div class="cell"><div class="cell-hdr">'
+    +'<input class="tk" id="tk'+i+'" value="'+ticker+'" oninput="this.value=this.value.toUpperCase()" onkeydown="if(event.key===\\'Enter\\')load('+i+')">'
+    +'<select class="exchange" id="ex'+i+'"><option value="AUTO">Auto</option><option>NASDAQ</option><option>NYSE</option><option>AMEX</option></select>'
+    +'<select class="range" id="rg'+i+'" onchange="syncInterval('+i+');load('+i+')"><option value="1D">1D</option><option value="5D">5D</option><option value="1M">1M</option><option value="3M">3M</option><option value="1Y">1Y</option></select>'
+    +'<select class="interval" id="iv'+i+'" onchange="load('+i+')"><option value="1">1m</option><option value="5">5m</option><option value="15">15m</option><option value="60">1h</option><option value="D">1D</option></select>'
+    +'<button class="load" onclick="load('+i+')">Load</button><span class="badge" id="bd'+i+'"></span></div>'
+    +'<div class="tv-host loading" id="host'+i+'">TradingView</div></div>';
+}
+function init(){const grid=document.getElementById('grid');grid.innerHTML=seeds.map((s,i)=>cellHtml(i,s)).join('');seeds.forEach((_,i)=>load(i));}
+function syncInterval(i){const rg=document.getElementById('rg'+i).value;document.getElementById('iv'+i).value=rangeIntervals[rg]||'1';}
+async function resolveSymbol(ticker,exchange){
+  ticker=(ticker||'').trim().toUpperCase();
+  if(!ticker)return 'NASDAQ:AAPL';
+  if(ticker.includes(':'))return ticker;
+  if(exchange&&exchange!=='AUTO')return exchange+':'+ticker;
+  try{
+    const r=await fetch(API+'/api/stock/search/'+ticker);
+    const data=await r.json();
+    const ex=(data.exchange||'').toUpperCase();
+    const key=Object.keys(exchangeMap).find(k=>ex.includes(k));
+    return (exchangeMap[key]||'NASDAQ')+':'+ticker;
+  }catch(e){return 'NASDAQ:'+ticker;}
+}
+function widgetConfig(symbol,interval,range){
+  return {
+    autosize:true,
+    symbol:symbol,
+    interval:interval||'1',
+    range:range||'1D',
+    timezone:'America/New_York',
+    theme:'dark',
+    style:'1',
+    locale:'en',
+    allow_symbol_change:true,
+    calendar:false,
+    hide_side_toolbar:false,
+    hide_top_toolbar:false,
+    withdateranges:true,
+    details:false,
+    hotlist:false,
+    studies:['Volume@tv-basicstudies'],
+    support_host:'https://www.tradingview.com'
+  };
+}
+async function load(i){
+  const ticker=document.getElementById('tk'+i).value.trim().toUpperCase();
+  const host=document.getElementById('host'+i);
+  const badge=document.getElementById('bd'+i);
+  if(!ticker){host.textContent='Enter ticker';return;}
+  host.className='tv-host loading';
+  host.textContent='Loading '+ticker+'...';
+  badge.textContent='';
+  const symbol=await resolveSymbol(ticker,document.getElementById('ex'+i).value);
+  host.innerHTML='<div class="tradingview-widget-container" style="height:100%;width:100%"><div class="tradingview-widget-container__widget" style="height:100%;width:100%"></div></div>';
+  const script=document.createElement('script');
+  script.src='https://s3.tradingview.com/external-embedding/embed-widget-advanced-chart.js';
+  script.async=true;
+  script.innerHTML=JSON.stringify(widgetConfig(symbol,document.getElementById('iv'+i).value,document.getElementById('rg'+i).value));
+  host.querySelector('.tradingview-widget-container').appendChild(script);
+  host.className='tv-host';
+  badge.textContent=symbol;
+}
+function refreshAll(){for(let i=0;i<8;i++)load(i);}
+init();
+<\/script>
+</body>
+</html>`;
+  }
+
   function buildChartsPage(){
     const apiUrl = typeof API_URL !== 'undefined' ? API_URL : window.location.origin;
+    return buildTradingViewChartsPage(apiUrl);
     return `<!DOCTYPE html>
 <html>
 <head>
