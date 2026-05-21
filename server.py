@@ -3272,7 +3272,7 @@ HEATMAP_PAGE_HTML = """
   <title>Market Heat Map</title>
   <style>
     *{box-sizing:border-box;margin:0;padding:0}
-    body{min-height:100vh;background:#050914;color:#eef6ff;font-family:Segoe UI,Arial,sans-serif;overflow:hidden}
+    body{min-height:100vh;background:#050914;color:#eef6ff;font-family:Segoe UI,Arial,sans-serif;overflow:auto}
     .top{height:64px;background:linear-gradient(135deg,#08111f,#0b1f32);border-bottom:1px solid #1f3552;display:flex;align-items:center;justify-content:space-between;padding:12px 18px;gap:14px}
     .title h1{font-size:1.15rem;font-weight:900;letter-spacing:.2px}
     .title p{font-size:.64rem;color:#6f8caf;letter-spacing:1.4px;text-transform:uppercase;margin-top:3px}
@@ -3281,17 +3281,17 @@ HEATMAP_PAGE_HTML = """
     .pill b{color:#fff}
     .btn{background:#112945;border:1px solid #2c4d78;color:#cce7ff;border-radius:8px;padding:8px 12px;font-size:.72rem;font-weight:800;cursor:pointer}
     .btn:hover{filter:brightness(1.15)}
-    .wrap{height:calc(100vh - 64px);padding:7px;display:flex;flex-direction:column;gap:6px;background:#f7f8fb}
-    .legend{display:flex;align-items:center;gap:8px;font-size:.65rem;color:#334155;justify-content:flex-end;padding:0 3px}
+    .wrap{min-height:calc(100vh - 64px);padding:7px;display:flex;flex-direction:column;gap:6px;background:#f7f8fb}
+    .legend{display:flex;align-items:center;gap:8px;font-size:.65rem;color:#334155;justify-content:flex-end;padding:0 8px;white-space:nowrap;overflow:visible}
     .sw{width:34px;height:12px;border-radius:3px}.red{background:#f75d6a}.flat{background:#c9c9c9}.green{background:#31b975}
-    .map{flex:1;min-height:0;display:grid;grid-template-columns:repeat(14,minmax(42px,1fr));grid-auto-rows:minmax(72px,1fr);grid-auto-flow:dense;gap:3px;background:#e5e7eb;border:1px solid #d4d7dd;overflow:hidden}
+    .map{flex:1;min-height:720px;display:grid;grid-template-columns:repeat(14,minmax(42px,1fr));grid-auto-rows:minmax(78px,1fr);grid-auto-flow:dense;gap:3px;background:#e5e7eb;border:1px solid #d4d7dd;overflow:visible}
     .sector{background:#f7f8fb;border:1px solid #fff;overflow:hidden;display:flex;flex-direction:column;min-height:0;box-shadow:inset 0 0 0 1px rgba(0,0,0,.04)}
-    .sector.technology{grid-column:span 4;grid-row:span 4}.sector.communication{grid-column:span 4;grid-row:span 3}.sector.consumer-cyclical{grid-column:span 3;grid-row:span 3}
-    .sector.financial{grid-column:span 4;grid-row:span 2}.sector.healthcare{grid-column:span 3;grid-row:span 3}.sector.energy{grid-column:span 3;grid-row:span 2}
+    .sector.technology{grid-column:span 4;grid-row:span 5}.sector.communication{grid-column:span 4;grid-row:span 3}.sector.consumer-cyclical{grid-column:span 3;grid-row:span 3}
+    .sector.financial{grid-column:span 4;grid-row:span 3}.sector.healthcare{grid-column:span 3;grid-row:span 3}.sector.energy{grid-column:span 3;grid-row:span 2}
     .sector.consumer-defensive{grid-column:span 3;grid-row:span 2}.sector.industrial{grid-column:span 3;grid-row:span 2}.sector.materials,.sector.utilities,.sector.real-estate,.sector.index-etfs{grid-column:span 2;grid-row:span 2}
     .sector-head{display:flex;align-items:center;justify-content:space-between;padding:3px 5px;border-bottom:1px solid rgba(0,0,0,.08);font-size:.56rem;font-weight:800;color:#111827;background:#f8fafc}
     .sector-head span:last-child{font-family:Consolas,monospace}
-    .stocks{flex:1;min-height:0;display:grid;grid-template-columns:repeat(24,minmax(0,1fr));grid-auto-rows:minmax(15px,1fr);grid-auto-flow:dense;gap:2px;padding:2px;background:#f1f5f9}
+    .stocks{flex:1;min-height:0;display:grid;grid-template-columns:repeat(24,minmax(0,1fr));grid-auto-rows:minmax(10px,1fr);grid-auto-flow:dense;gap:2px;padding:2px;background:#f1f5f9;overflow:hidden}
     .stock{position:relative;border:1px solid rgba(255,255,255,.62);display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:2px;color:#fff;overflow:hidden;text-shadow:0 1px 2px rgba(0,0,0,.28);box-shadow:inset 0 0 18px rgba(255,255,255,.08)}
     .stock::after{content:"";position:absolute;inset:0;background:linear-gradient(140deg,rgba(255,255,255,.15),transparent 45%,rgba(0,0,0,.08));pointer-events:none}
     .logo{width:30px;height:30px;border-radius:50%;display:flex;align-items:center;justify-content:center;background:rgba(6,12,22,.78);border:2px solid rgba(255,255,255,.55);font-size:.58rem;font-weight:900;margin-bottom:6px;color:#fff;position:relative;z-index:1}
@@ -3300,6 +3300,8 @@ HEATMAP_PAGE_HTML = """
     .sym{font-weight:900;font-size:.86rem;line-height:1;position:relative;z-index:1}
     .chg{font-size:.78rem;font-family:Consolas,monospace;margin-top:5px;position:relative;z-index:1}
     .px{font-size:.56rem;color:rgba(255,255,255,.8);margin-top:2px;position:relative;z-index:1}
+    .stock.mid .logo{width:22px;height:22px;font-size:.48rem;margin-bottom:3px}
+    .stock.mid .sym{font-size:.72rem}.stock.mid .chg{font-size:.62rem;margin-top:2px}.stock.mid .px{font-size:.46rem}
     .stock.small .sym{font-size:.52rem}.stock.small .chg{font-size:.46rem;margin-top:1px}.stock.small .px{display:none}
     .stock.tiny .sym{font-size:.42rem}.stock.tiny .chg,.stock.tiny .px{display:none}
     .loading,.error{height:100%;display:flex;align-items:center;justify-content:center;background:#091421;border:1px solid #1b304d;border-radius:10px;color:#9bb8d6}
@@ -3346,14 +3348,14 @@ HEATMAP_PAGE_HTML = """
     function sectorClass(name){return String(name||'').toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/^-|-$/g,'')}
     function tileSize(weight){
       weight=Number(weight||1);
-      if(weight>=10)return {c:12,r:10,cls:'mega'};
-      if(weight>=8)return {c:12,r:8,cls:'large'};
-      if(weight>=6)return {c:8,r:7,cls:'large'};
-      if(weight>=5)return {c:8,r:6,cls:'mid'};
-      if(weight>=4)return {c:6,r:5,cls:'mid'};
-      if(weight>=3)return {c:5,r:4,cls:'small'};
-      if(weight>=2)return {c:4,r:3,cls:'small'};
-      return {c:3,r:2,cls:'tiny'};
+      if(weight>=10)return {c:12,r:8,cls:'mega'};
+      if(weight>=8)return {c:12,r:7,cls:'large'};
+      if(weight>=6)return {c:8,r:5,cls:'large'};
+      if(weight>=5)return {c:8,r:4,cls:'mid'};
+      if(weight>=4)return {c:6,r:4,cls:'mid'};
+      if(weight>=3)return {c:4,r:3,cls:'small'};
+      if(weight>=2)return {c:3,r:2,cls:'small'};
+      return {c:2,r:2,cls:'tiny'};
     }
     function logoText(sym){
       const map={AAPL:'AP',MSFT:'MS',NVDA:'NV',GOOGL:'G',GOOG:'G',META:'ME',AMZN:'AZ',TSLA:'T',JPM:'JP',V:'V',MA:'MC',XOM:'XO',LLY:'LL',UNH:'UH'};
