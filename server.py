@@ -1450,6 +1450,7 @@ def _fetch_market_heatmap(user_id='shafkat'):
         avg = sum(r['change_pct'] * r['weight'] for r in rows) / weight_sum
         sectors.append({
             'name': sector,
+            'key': ''.join(ch.lower() if ch.isalnum() else '-' for ch in sector).strip('-'),
             'change_pct': round(avg, 2),
             'weight': weight_sum,
             'stocks': sorted(rows, key=lambda r: r['weight'], reverse=True),
@@ -3280,22 +3281,30 @@ HEATMAP_PAGE_HTML = """
     .pill b{color:#fff}
     .btn{background:#112945;border:1px solid #2c4d78;color:#cce7ff;border-radius:8px;padding:8px 12px;font-size:.72rem;font-weight:800;cursor:pointer}
     .btn:hover{filter:brightness(1.15)}
-    .wrap{height:calc(100vh - 64px);padding:10px;display:flex;flex-direction:column;gap:8px}
-    .legend{display:flex;align-items:center;gap:8px;font-size:.65rem;color:#8ba9ca;justify-content:flex-end}
-    .sw{width:34px;height:12px;border-radius:3px}.red{background:#a2172f}.flat{background:#26364c}.green{background:#0da35b}
-    .map{flex:1;min-height:0;display:grid;grid-template-columns:repeat(4,minmax(0,1fr));grid-auto-rows:minmax(160px,1fr);gap:7px}
-    .sector{background:#091421;border:1px solid #1b304d;border-radius:8px;overflow:hidden;display:flex;flex-direction:column;min-height:0}
-    .sector-head{display:flex;align-items:center;justify-content:space-between;padding:7px 8px;border-bottom:1px solid rgba(255,255,255,.06);font-size:.7rem;font-weight:900;color:#dcecff;background:rgba(255,255,255,.025)}
+    .wrap{height:calc(100vh - 64px);padding:7px;display:flex;flex-direction:column;gap:6px;background:#f7f8fb}
+    .legend{display:flex;align-items:center;gap:8px;font-size:.65rem;color:#334155;justify-content:flex-end;padding:0 3px}
+    .sw{width:34px;height:12px;border-radius:3px}.red{background:#f75d6a}.flat{background:#c9c9c9}.green{background:#31b975}
+    .map{flex:1;min-height:0;display:grid;grid-template-columns:repeat(14,minmax(42px,1fr));grid-auto-rows:minmax(72px,1fr);grid-auto-flow:dense;gap:3px;background:#e5e7eb;border:1px solid #d4d7dd;overflow:hidden}
+    .sector{background:#f7f8fb;border:1px solid #fff;overflow:hidden;display:flex;flex-direction:column;min-height:0;box-shadow:inset 0 0 0 1px rgba(0,0,0,.04)}
+    .sector.technology{grid-column:span 4;grid-row:span 4}.sector.communication{grid-column:span 4;grid-row:span 3}.sector.consumer-cyclical{grid-column:span 3;grid-row:span 3}
+    .sector.financial{grid-column:span 4;grid-row:span 2}.sector.healthcare{grid-column:span 3;grid-row:span 3}.sector.energy{grid-column:span 3;grid-row:span 2}
+    .sector.consumer-defensive{grid-column:span 3;grid-row:span 2}.sector.industrial{grid-column:span 3;grid-row:span 2}.sector.materials,.sector.utilities,.sector.real-estate,.sector.index-etfs{grid-column:span 2;grid-row:span 2}
+    .sector-head{display:flex;align-items:center;justify-content:space-between;padding:3px 5px;border-bottom:1px solid rgba(0,0,0,.08);font-size:.56rem;font-weight:800;color:#111827;background:#f8fafc}
     .sector-head span:last-child{font-family:Consolas,monospace}
-    .stocks{flex:1;min-height:0;display:flex;flex-wrap:wrap;gap:3px;padding:5px;align-content:stretch}
-    .stock{position:relative;border:1px solid rgba(255,255,255,.11);border-radius:4px;min-width:54px;min-height:42px;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:3px;color:#f7fbff;overflow:hidden}
-    .stock.big{min-width:96px;min-height:68px}
-    .sym{font-weight:900;font-size:.78rem;line-height:1}
-    .chg{font-size:.66rem;font-family:Consolas,monospace;margin-top:4px}
-    .px{font-size:.52rem;color:rgba(255,255,255,.72);margin-top:2px}
+    .stocks{flex:1;min-height:0;display:grid;grid-template-columns:repeat(24,minmax(0,1fr));grid-auto-rows:minmax(15px,1fr);grid-auto-flow:dense;gap:2px;padding:2px;background:#f1f5f9}
+    .stock{position:relative;border:1px solid rgba(255,255,255,.62);display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:2px;color:#fff;overflow:hidden;text-shadow:0 1px 2px rgba(0,0,0,.28);box-shadow:inset 0 0 18px rgba(255,255,255,.08)}
+    .stock::after{content:"";position:absolute;inset:0;background:linear-gradient(140deg,rgba(255,255,255,.15),transparent 45%,rgba(0,0,0,.08));pointer-events:none}
+    .logo{width:30px;height:30px;border-radius:50%;display:flex;align-items:center;justify-content:center;background:rgba(6,12,22,.78);border:2px solid rgba(255,255,255,.55);font-size:.58rem;font-weight:900;margin-bottom:6px;color:#fff;position:relative;z-index:1}
+    .stock.small .logo{width:15px;height:15px;font-size:.36rem;margin-bottom:1px;border-width:1px}
+    .stock.tiny .logo{display:none}
+    .sym{font-weight:900;font-size:.86rem;line-height:1;position:relative;z-index:1}
+    .chg{font-size:.78rem;font-family:Consolas,monospace;margin-top:5px;position:relative;z-index:1}
+    .px{font-size:.56rem;color:rgba(255,255,255,.8);margin-top:2px;position:relative;z-index:1}
+    .stock.small .sym{font-size:.52rem}.stock.small .chg{font-size:.46rem;margin-top:1px}.stock.small .px{display:none}
+    .stock.tiny .sym{font-size:.42rem}.stock.tiny .chg,.stock.tiny .px{display:none}
     .loading,.error{height:100%;display:flex;align-items:center;justify-content:center;background:#091421;border:1px solid #1b304d;border-radius:10px;color:#9bb8d6}
     .error{color:#ffd0d8;border-color:#7f1d2d}
-    @media(max-width:1100px){body{overflow:auto}.wrap{height:auto}.map{grid-template-columns:repeat(2,minmax(0,1fr));height:auto}.sector{min-height:260px}}
+    @media(max-width:1100px){body{overflow:auto}.wrap{height:auto}.map{grid-template-columns:repeat(2,minmax(0,1fr));height:auto}.sector{min-height:260px;grid-column:span 1!important;grid-row:span 1!important}}
     @media(max-width:650px){.top{height:auto;align-items:flex-start;flex-direction:column}.wrap{height:auto}.map{grid-template-columns:1fr}.stats{width:100%}.btn{flex:1}.sector{min-height:300px}}
   </style>
 </head>
@@ -3333,15 +3342,32 @@ HEATMAP_PAGE_HTML = """
     }
     function fmt(p){p=Number(p||0);return (p>0?'+':'')+p.toFixed(2)+'%'}
     function price(p){p=Number(p||0);return p?'$'+p.toFixed(p<10?2:2):'--'}
+    function esc(s){return String(s||'').replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]))}
+    function sectorClass(name){return String(name||'').toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/^-|-$/g,'')}
+    function tileSize(weight){
+      weight=Number(weight||1);
+      if(weight>=10)return {c:12,r:10,cls:'mega'};
+      if(weight>=8)return {c:12,r:8,cls:'large'};
+      if(weight>=6)return {c:8,r:7,cls:'large'};
+      if(weight>=5)return {c:8,r:6,cls:'mid'};
+      if(weight>=4)return {c:6,r:5,cls:'mid'};
+      if(weight>=3)return {c:5,r:4,cls:'small'};
+      if(weight>=2)return {c:4,r:3,cls:'small'};
+      return {c:3,r:2,cls:'tiny'};
+    }
+    function logoText(sym){
+      const map={AAPL:'AP',MSFT:'MS',NVDA:'NV',GOOGL:'G',GOOG:'G',META:'ME',AMZN:'AZ',TSLA:'T',JPM:'JP',V:'V',MA:'MC',XOM:'XO',LLY:'LL',UNH:'UH'};
+      return map[sym]||sym.slice(0,2);
+    }
     function stockCell(s){
-      const grow=Math.max(1, Math.min(10, Number(s.weight||1)));
-      const big=grow>=6?' big':'';
-      return `<div class="stock${big}" title="${s.description||s.symbol} ${fmt(s.change_pct)}" style="background:${colorFor(s.change_pct)};flex:${grow} 1 ${44+grow*8}px">
-        <div class="sym">${s.symbol}</div><div class="chg">${fmt(s.change_pct)}</div><div class="px">${price(s.price)}</div>
+      const sz=tileSize(s.weight);
+      return `<div class="stock ${sz.cls}" title="${esc(s.description||s.symbol)} ${fmt(s.change_pct)}" style="background:${colorFor(s.change_pct)};grid-column:span ${sz.c};grid-row:span ${sz.r}">
+        <div class="logo">${esc(logoText(s.symbol))}</div>
+        <div class="sym">${esc(s.symbol)}</div><div class="chg">${fmt(s.change_pct)}</div><div class="px">${price(s.price)}</div>
       </div>`;
     }
     function sectorBlock(sec){
-      return `<section class="sector" style="grid-row:span ${sec.weight>22?2:1}">
+      return `<section class="sector ${sectorClass(sec.key||sec.name)}">
         <div class="sector-head"><span>${sec.name}</span><span style="color:${sec.change_pct>=0?'#22e38a':'#ff5d78'}">${fmt(sec.change_pct)}</span></div>
         <div class="stocks">${(sec.stocks||[]).map(stockCell).join('')}</div>
       </section>`;
