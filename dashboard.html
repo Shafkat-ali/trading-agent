@@ -3143,7 +3143,7 @@
           <div class="ticker-tab-stack">
             <div class="ticker-tab-chart">
               <div class="popup-section-title" style="padding:8px 10px;margin:0;border-bottom:1px solid #1a2a4a">
-                📉 Live Chart <span class="chart-label">TradingView — Hosted Chart</span>
+                📉 Live Chart <span class="chart-label">Tradier — Pre/After Market</span>
               </div>
               <div id="${domId}ChartControls"></div>
               <div class="ticker-tab-chart-body" id="${domId}Chart"></div>
@@ -3349,38 +3349,36 @@
     const controls=document.getElementById(`${domId}ChartControls`);
     const chartEl=document.getElementById(`${domId}Chart`);
     if(!controls||!chartEl)return;
-    tickerTabIndicators[tabId]=tickerTabIndicators[tabId]||{range:'1D',tf:'1'};
+    tickerTabIndicators[tabId]=tickerTabIndicators[tabId]||{range:'2D',tf:'1Min',Vol:true,VWAP:false,EMA:false,RSI:false,MACD:false};
     const st=tickerTabIndicators[tabId];
-    if(['2D','10D','15D'].includes(st.range))st.range='5D';
-    st.tf=tickerTvInterval(st.tf);
+    if(['1','5','15','60','D'].includes(st.tf)){
+      st.tf=({'1':'1Min','5':'5Min','15':'15Min','60':'1Hour','D':'1Day'}[st.tf]||'1Min');
+    }
+    const indBtn=(key,label,color)=>`
+      <button id="${domId}Ind${key}" onclick="toggleTickerTabIndicator('${tabId}','${domId}','${ticker}','${key}')"
+        style="background:${st[key]?'rgba(0,0,0,.32)':'#0f1a2e'};border:1px solid ${st[key]?color:'#1a2a4a'};border-radius:4px;color:${st[key]?color:'#4a6a8a'};font-size:.52rem;padding:2px 7px;cursor:pointer;">${label}</button>`;
     controls.innerHTML=`
       <div style="display:flex;align-items:center;gap:5px;padding:5px 8px;background:#0d1525;border-bottom:1px solid #1a2a4a;flex-wrap:wrap;">
         <span style="font-size:.65rem;font-weight:800;color:#ffd700;">${ticker}</span>
         <select id="${domId}Range" style="background:#060a12;border:1px solid #2a3a5a;border-radius:4px;color:#ffd700;font-size:.6rem;padding:2px 4px;font-weight:700;">
-          ${[['1D','1 day'],['5D','5 days'],['1M','1 month'],['3M','3 months'],['6M','6 months'],['12M','1 year']].map(([v,l])=>`<option value="${v}"${st.range===v?' selected':''}>${l}</option>`).join('')}
+          ${[['1D','1 day'],['2D','2 days'],['5D','5 days'],['10D','10 days'],['15D','15 days'],['1M','1 month'],['3M','3 months'],['6M','6 months'],['1Y','1 year']].map(([v,l])=>`<option value="${v}"${st.range===v?' selected':''}>${l}</option>`).join('')}
         </select>
         <select id="${domId}Tf" style="background:#060a12;border:1px solid #2a3a5a;border-radius:4px;color:#a0b8d0;font-size:.6rem;padding:2px 4px;">
-          ${[['1','1m'],['5','5m'],['15','15m'],['60','1h'],['D','1D']].map(([v,l])=>`<option value="${v}"${st.tf===v?' selected':''}>${l}</option>`).join('')}
+          ${[['1Min','1m'],['5Min','5m'],['15Min','15m'],['1Hour','1h'],['1Day','1D']].map(([v,l])=>`<option value="${v}"${st.tf===v?' selected':''}>${l}</option>`).join('')}
         </select>
         <button onclick="buildTickerTabChart('${ticker}','${domId}','${tabId}')" style="background:#16345f;border:1px solid #2a5f9d;border-radius:4px;color:#c8e5ff;font-size:.56rem;padding:2px 8px;cursor:pointer;">Load</button>
-        <span id="${domId}ChartBadge" style="font-size:.52rem;color:#00c853;margin-left:auto;">TradingView</span>
+        <div style="display:flex;gap:3px;margin-left:6px;">
+          ${indBtn('Vol','Vol','#4a8aff')}
+          ${indBtn('VWAP','VWAP','#ffd700')}
+          ${indBtn('EMA','EMA','#ff9100')}
+          ${indBtn('RSI','RSI','#a78bfa')}
+          ${indBtn('MACD','MACD','#00d4ff')}
+        </div>
+        <span id="${domId}ChartBadge" style="font-size:.52rem;color:#00c853;margin-left:auto;">Tradier</span>
       </div>`;
     document.getElementById(`${domId}Range`).onchange=e=>{st.range=e.target.value;buildTickerTabChart(ticker,domId,tabId);};
     document.getElementById(`${domId}Tf`).onchange=e=>{st.tf=e.target.value;buildTickerTabChart(ticker,domId,tabId);};
-    const rsiWrap=document.getElementById(`${domId}RsiWrap`);
-    const macdWrap=document.getElementById(`${domId}MacdWrap`);
-    if(rsiWrap)rsiWrap.style.display='none';
-    if(macdWrap)macdWrap.style.display='none';
-    chartEl.innerHTML='<div class="tradingview-widget-container" style="height:100%;width:100%;background:#050914"><div class="tradingview-widget-container__widget" style="height:100%;width:100%"></div></div>';
-    const badge=document.getElementById(`${domId}ChartBadge`);
-    if(badge)badge.textContent='Loading TradingView...';
-    const symbol=await resolveTickerTvSymbol(ticker, tabId);
-    const script=document.createElement('script');
-    script.src='https://s3.tradingview.com/external-embedding/embed-widget-advanced-chart.js';
-    script.async=true;
-    script.innerHTML=JSON.stringify(tickerTvWidgetConfig(symbol,st.tf,st.range));
-    chartEl.querySelector('.tradingview-widget-container').appendChild(script);
-    if(badge)badge.textContent=symbol;
+    await loadTickerTabChart(ticker, domId, tabId);
   }
 
   function toggleTickerTabIndicator(tabId, domId, ticker, key){
@@ -3443,8 +3441,8 @@ run();
     const macdWrap=document.getElementById(`${domId}MacdWrap`);
     const rsiEl=document.getElementById(`${domId}RsiChart`);
     const macdEl=document.getElementById(`${domId}MacdChart`);
-    if(rsiWrap)rsiWrap.style.display=st.RSI?'block':'none';
-    if(macdWrap)macdWrap.style.display=st.MACD?'block':'none';
+    if(rsiWrap)rsiWrap.style.display='none';
+    if(macdWrap)macdWrap.style.display='none';
     if(rsiEl)rsiEl.innerHTML='';
     if(macdEl)macdEl.innerHTML='';
     const days={'1D':1,'2D':2,'5D':5,'10D':10,'15D':15,'1M':30,'3M':90,'6M':180,'1Y':365}[st.range]||2;
