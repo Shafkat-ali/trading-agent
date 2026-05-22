@@ -1728,6 +1728,18 @@ async def get_stock_metrics(ticker: str):
                 if not m.get('shortPercentFloat'):
                     yf_spf = info.get('shortPercentOfFloat', 0)
                     if yf_spf: m['shortPercentFloat'] = round(yf_spf * 100, 2)
+                if not m.get('sharesOutstanding'):
+                    yf_shares = info.get('sharesOutstanding', 0)
+                    if yf_shares: m['sharesOutstanding'] = round(yf_shares / 1_000_000, 2)
+                if not m.get('trailingPE'):
+                    yf_pe = info.get('trailingPE', 0)
+                    if yf_pe: m['trailingPE'] = round(yf_pe, 2)
+                if not m.get('epsTTM'):
+                    yf_eps = info.get('trailingEps', 0)
+                    if yf_eps: m['epsTTM'] = round(yf_eps, 2)
+                if not m.get('averageVolume'):
+                    yf_avg_vol = info.get('averageVolume', 0)
+                    if yf_avg_vol: m['averageVolume'] = round(yf_avg_vol / 1_000_000, 2)
                 finnhub_data['metric'] = m
             except:
                 pass

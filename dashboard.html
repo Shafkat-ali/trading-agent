@@ -3244,8 +3244,38 @@
       }
       aiLastTickerPrice[ticker]=d.c;
       rememberQuoteTrend(ticker, d.c);
+      updateTickerStatsFromQuote(domId, d);
       pushLiveQuoteToTickerChart(ticker, d);
     }catch(e){}
+  }
+
+  function fmtCompactNumber(v){
+    const n=Number(v);
+    if(!Number.isFinite(n)||n<=0)return '--';
+    if(n>=1e9)return `${(n/1e9).toFixed(2)}B`;
+    if(n>=1e6)return `${(n/1e6).toFixed(2)}M`;
+    if(n>=1e3)return `${(n/1e3).toFixed(n>=1e5?0:1)}K`;
+    return Math.round(n).toLocaleString();
+  }
+  function fmtMarketCapM(v){
+    const n=Number(v);
+    if(!Number.isFinite(n)||n<=0)return '--';
+    return n>=1000?`$${(n/1000).toFixed(2)}B`:`$${n.toFixed(2)}M`;
+  }
+  function updateTickerStatsFromQuote(domId, d){
+    const vol=document.getElementById(`${domId}StatVol`);
+    if(vol&&d.v)vol.textContent=fmtCompactNumber(d.v);
+    const mkt=document.getElementById(`${domId}StatMktCap`);
+    const sharesM=Number(mkt?.dataset?.sharesM||0);
+    if(mkt&&sharesM&&d.c)mkt.textContent=fmtMarketCapM(d.c*sharesM);
+    const open=document.getElementById(`${domId}StatOpen`);
+    if(open&&d.o)open.textContent=`$${Number(d.o).toFixed(2)}`;
+    const prev=document.getElementById(`${domId}StatPrev`);
+    if(prev&&d.pc)prev.textContent=`$${Number(d.pc).toFixed(4)}`;
+    const high=document.getElementById(`${domId}StatHigh`);
+    if(high&&d.h)high.textContent=`$${Number(d.h).toFixed(2)}`;
+    const low=document.getElementById(`${domId}StatLow`);
+    if(low&&d.l)low.textContent=`$${Number(d.l).toFixed(2)}`;
   }
 
   function pushLiveQuoteToTickerChart(ticker, quote){
@@ -3269,26 +3299,42 @@
 
   async function fetchStatsInto(ticker, domId){
     try{
-      const [pr,mr]=await Promise.all([fetch(`${API_URL}/api/stock/profile/${ticker}`),fetch(`${API_URL}/api/stock/metrics/${ticker}`)]);
-      const profile=await pr.json();const metrics=await mr.json();const m=metrics.metric||{};
+      const [pr,mr,qr]=await Promise.all([
+        fetch(`${API_URL}/api/stock/profile/${ticker}`),
+        fetch(`${API_URL}/api/stock/metrics/${ticker}`),
+        fetch(`${API_URL}/api/stock/quote/${ticker}?user=${currentUser?.id||'shafkat'}`)
+      ]);
+      const profile=await pr.json();const metrics=await mr.json();const quote=await qr.json();const m=metrics.metric||{};
       const fmt=(v,pre='',suf='')=>(v!=null&&v!==''&&v!==0)?`${pre}${typeof v==='number'?v.toLocaleString():v}${suf}`:'--';
-      const mktCap=profile.marketCapitalization?`$${(profile.marketCapitalization/1000).toFixed(2)}B`:'--';
+      const sharesM=Number(profile.shareOutstanding||m.sharesOutstanding||0);
+      const liveMktCapM=(quote?.c&&sharesM)?quote.c*sharesM:Number(profile.marketCapitalization||0);
+      const mktCap=fmtMarketCapM(liveMktCapM);
       const floatVal=m.float;const floatStr=floatVal?`${floatVal.toFixed(1)}M`:'--';
+      const sharesStr=sharesM?`${sharesM.toFixed(2)}M`:'--';
+      const volStr=fmtCompactNumber(quote?.v||m.volume||0);
       const floatCls=floatVal?(floatVal<5?'highlight':floatVal<20?'warn':''):'';
       const shortCls=m.shortPercentFloat?(m.shortPercentFloat>20?'danger':m.shortPercentFloat>10?'warn':''):'';
       document.getElementById(`${domId}Stats`).innerHTML=`
         <div class="kstat-grid">
           <div>
-            <div class="kstat-row"><span class="kstat-key">Market Cap</span><span class="kstat-val">${mktCap}</span></div>
+            <div class="kstat-row"><span class="kstat-key">MKT CAP</span><span class="kstat-val" id="${domId}StatMktCap" data-shares-m="${sharesM||''}">${mktCap}</span></div>
+            <div class="kstat-row"><span class="kstat-key">VOL</span><span class="kstat-val" id="${domId}StatVol">${volStr}</span></div>
+            <div class="kstat-row"><span class="kstat-key">Open</span><span class="kstat-val" id="${domId}StatOpen">${quote?.o?`$${quote.o.toFixed(2)}`:'--'}</span></div>
+            <div class="kstat-row"><span class="kstat-key">Prev Close</span><span class="kstat-val" id="${domId}StatPrev">${quote?.pc?`$${quote.pc.toFixed(4)}`:'--'}</span></div>
+            <div class="kstat-row"><span class="kstat-key">High</span><span class="kstat-val" id="${domId}StatHigh">${quote?.h?`$${quote.h.toFixed(2)}`:fmt(m['52WeekHigh'],'$')}</span></div>
+            <div class="kstat-row"><span class="kstat-key">Low</span><span class="kstat-val" id="${domId}StatLow">${quote?.l?`$${quote.l.toFixed(2)}`:fmt(m['52WeekLow'],'$')}</span></div>
             <div class="kstat-row"><span class="kstat-key">Float</span><span class="kstat-val ${floatCls}">${floatStr}</span></div>
-            <div class="kstat-row"><span class="kstat-key">52W High</span><span class="kstat-val">${fmt(m['52WeekHigh'],'$')}</span></div>
-            <div class="kstat-row"><span class="kstat-key">52W Low</span><span class="kstat-val">${fmt(m['52WeekLow'],'$')}</span></div>
-            <div class="kstat-row"><span class="kstat-key">Beta</span><span class="kstat-val">${fmt(m.beta)}</span></div>
+            <div class="kstat-row"><span class="kstat-key">Shares</span><span class="kstat-val">${sharesStr}</span></div>
           </div>
           <div>
+            <div class="kstat-row"><span class="kstat-key">52W High</span><span class="kstat-val">${fmt(m['52WeekHigh'],'$')}</span></div>
+            <div class="kstat-row"><span class="kstat-key">52W Low</span><span class="kstat-val">${fmt(m['52WeekLow'],'$')}</span></div>
+            <div class="kstat-row"><span class="kstat-key">Avg Vol</span><span class="kstat-val">${fmtCompactNumber((m.averageVolume||m['10DayAverageTradingVolume']||0)*1000000)}</span></div>
+            <div class="kstat-row"><span class="kstat-key">P/E</span><span class="kstat-val">${fmt(m.trailingPE)}</span></div>
+            <div class="kstat-row"><span class="kstat-key">EPS</span><span class="kstat-val">${fmt(m.epsTTM)}</span></div>
+            <div class="kstat-row"><span class="kstat-key">Beta</span><span class="kstat-val">${fmt(m.beta)}</span></div>
             <div class="kstat-row"><span class="kstat-key">Short Ratio</span><span class="kstat-val ${shortCls}">${m.shortInterestRatio?m.shortInterestRatio.toFixed(2):'--'}</span></div>
             <div class="kstat-row"><span class="kstat-key">Short % Float</span><span class="kstat-val ${shortCls}">${m.shortPercentFloat?m.shortPercentFloat.toFixed(1)+'%':'--'}</span></div>
-            <div class="kstat-row"><span class="kstat-key">Avg Vol 10D</span><span class="kstat-val">${m['10DayAverageTradingVolume']?m['10DayAverageTradingVolume'].toFixed(1)+'M':'--'}</span></div>
             <div class="kstat-row"><span class="kstat-key">Industry</span><span class="kstat-val" style="font-size:.52rem">${profile.finnhubIndustry||'--'}</span></div>
             <div class="kstat-row"><span class="kstat-key">Exchange</span><span class="kstat-val">${profile.exchange||'--'}</span></div>
           </div>
@@ -3433,14 +3479,16 @@
 const CFG=${JSON.stringify(cfg)};
 const $=id=>document.getElementById(id);
 let liveChart=null,liveCandles=null,liveRows=[];
+let lastLogicalRange=CFG.visibleLogicalRange||null;
 function msg(t){$('main').innerHTML='<div class="msg">'+t+'</div>'}
 function toT(t){if(typeof t==='number')return Math.floor(t>9999999999?t/1000:t);const raw=String(t||'').trim();if(!raw)return 0;const d=new Date(raw.includes('T')?raw:raw.replace(' ','T'));const ms=d.getTime();return Number.isFinite(ms)?Math.floor(ms/1000):0}
 function num(v){return Number.isFinite(Number(v))?Number(v):0}
 function ema(d,p){const k=2/(p+1);let e=null;return d.map(v=>{e=e===null?v:v*k+e*(1-k);return e})}
 function rsi(c,p=14){return c.map((_,i)=>{if(i<p)return null;let g=0,l=0;for(let j=i-p+1;j<=i;j++){const d=c[j]-c[j-1];if(d>0)g+=d;else l-=d}return 100-100/(1+(g/p)/((l/p)||1e-6))})}
 function macd(c){const f=ema(c,12),s=ema(c,26),ml=f.map((v,i)=>v-s[i]),sig=ema(ml,9);return{ml,sig,h:ml.map((v,i)=>v-sig[i])}}
+function sessionVwap(rows){let pv=0,vol=0,lastDay='';return rows.map(b=>{const day=new Date(b.time*1000).toLocaleDateString('en-US',{timeZone:'America/New_York'});if(day!==lastDay){pv=0;vol=0;lastDay=day}const v=num(b.volume),h=num(b.high),l=num(b.low),c=num(b.close);if(v>0&&h>0&&l>0&&c>0){pv+=((h+l+c)/3)*v;vol+=v}return vol>0?{time:b.time,value:pv/vol}:null}).filter(Boolean)}
 function shade(el,bars,chart){const parse=t=>toT(t);const sessions=[];let cur=null,start=null;bars.forEach(b=>{const ts=parse(b.time||b.t||b.date);const d=new Date(ts*1000);const parts=new Intl.DateTimeFormat('en-US',{timeZone:'America/New_York',hour:'numeric',minute:'numeric',hour12:false}).formatToParts(d);const h=Number(parts.find(p=>p.type==='hour')?.value||0),m=Number(parts.find(p=>p.type==='minute')?.value||0),mins=h*60+m;const s=mins>=240&&mins<570?'pre':mins>=570&&mins<960?'regular':'post';if(s!==cur){if(cur&&start!==null)sessions.push({s:cur,t0:start,t1:ts});cur=s;start=ts}});if(cur)sessions.push({s:cur,t0:start,t1:parse(bars[bars.length-1].time||bars[bars.length-1].t||bars[bars.length-1].date)+120});const colors={pre:'rgba(140,150,165,.10)',regular:'rgba(45,130,255,.08)',post:'rgba(0,190,120,.10)'};let cv=document.createElement('canvas');cv.style.cssText='position:absolute;inset:0;pointer-events:none;z-index:1';el.style.position='relative';el.appendChild(cv);function draw(){const r=el.getBoundingClientRect();cv.width=r.width;cv.height=r.height;const ctx=cv.getContext('2d');ctx.clearRect(0,0,cv.width,cv.height);sessions.forEach(x=>{const x0=chart.timeScale().timeToCoordinate(x.t0),x1=chart.timeScale().timeToCoordinate(x.t1);if(x0==null||x1==null)return;ctx.fillStyle=colors[x.s];ctx.fillRect(Math.min(x0,x1),0,Math.abs(x1-x0),cv.height)})}draw();chart.timeScale().subscribeVisibleTimeRangeChange(draw);chart.subscribeCrosshairMove(draw);new ResizeObserver(draw).observe(el)}
-async function run(){try{if(!window.LightweightCharts){msg('Chart library unavailable');return}const start=new Date();start.setDate(start.getDate()-CFG.days);const url=CFG.api+'/api/stock/bars/'+CFG.ticker+'?user='+encodeURIComponent(CFG.user)+'&timeframe='+encodeURIComponent(CFG.tf)+'&days='+CFG.days+'&start='+start.toISOString().split('T')[0];const res=await fetch(url);const data=await res.json();const bars=data.bars||[];if(!bars.length){msg('No chart data');return}const rows=bars.map(b=>({time:toT(b.time||b.t||b.date),open:num(b.open??b.o),high:num(b.high??b.h),low:num(b.low??b.l),close:num(b.close??b.c),volume:num(b.volume??b.v),vwap:num(b.vwap??b.vw)})).filter(b=>b.time>0&&b.open>0&&b.high>0&&b.low>0&&b.close>0).sort((a,b)=>a.time-b.time);if(!rows.length){msg('No valid chart candles');return}const main=$('main');const chart=LightweightCharts.createChart(main,{width:main.clientWidth,height:main.clientHeight,layout:{backgroundColor:'#060a12',textColor:'#8aa0c0'},grid:{vertLines:{color:'#0f1a2e'},horzLines:{color:'#0f1a2e'}},timeScale:{timeVisible:true,secondsVisible:false,borderColor:'#1a2a4a',tickMarkFormatter:t=>new Date(t*1000).toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit',hour12:true,timeZone:'America/New_York'})},localization:{timeFormatter:t=>new Date(t*1000).toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit',hour12:true,timeZone:'America/New_York'})},rightPriceScale:{borderColor:'#1a2a4a',scaleMarginTop:.08,scaleMarginBottom:(CFG.ind.Vol?0.2:0.05)},crosshair:{mode:1},handleScroll:{mouseWheel:true,pressedMouseMove:true},handleScale:{mouseWheel:true,pinch:true}});const cs=chart.addCandlestickSeries({upColor:'#00c853',downColor:'#ff1744',borderUpColor:'#00c853',borderDownColor:'#ff1744',wickUpColor:'#00c853',wickDownColor:'#ff1744'});liveChart=chart;liveCandles=cs;liveRows=rows;cs.setData(rows.map(b=>({time:b.time,open:b.open,high:b.high,low:b.low,close:b.close})));const cl=rows.map(b=>b.close),ti=rows.map(b=>b.time);if(CFG.ind.VWAP){const vw=rows.filter(b=>b.vwap>0).map(b=>({time:b.time,value:b.vwap}));if(vw.length)chart.addLineSeries({color:'#ffd700',lineWidth:2,priceLineVisible:false,title:'VWAP'}).setData(vw)}if(CFG.ind.EMA){const e9=ema(cl,9),e20=ema(cl,20);chart.addLineSeries({color:'#ff9100',lineWidth:1,priceLineVisible:false,title:'EMA9'}).setData(ti.map((t,i)=>({time:t,value:e9[i]})));chart.addLineSeries({color:'#ff4a4a',lineWidth:1,priceLineVisible:false,title:'EMA20'}).setData(ti.map((t,i)=>({time:t,value:e20[i]})))}if(CFG.ind.Vol){const vs=chart.addHistogramSeries({priceFormat:{type:'volume'},priceScaleId:'vol'});chart.priceScale('vol').applyOptions({scaleMarginTop:.8,scaleMarginBottom:0,borderColor:'#1a2a4a'});vs.setData(rows.map(b=>({time:b.time,value:b.volume,color:b.close>=b.open?'rgba(0,200,83,.35)':'rgba(255,23,68,.35)'})))}chart.timeScale().fitContent();shade(main,bars,chart);if(CFG.ind.RSI&&cl.length>=14){$('rsiWrap').classList.add('on');const el=$('rsi');const rc=LightweightCharts.createChart(el,{width:el.clientWidth,height:el.clientHeight,layout:{backgroundColor:'#040810',textColor:'#5a7a9a'},grid:{vertLines:{color:'#0a1020'},horzLines:{color:'#0a1020'}},timeScale:{visible:false},rightPriceScale:{borderColor:'#1a2a4a'},handleScroll:false,handleScale:false});const rv=rsi(cl),rl=rc.addLineSeries({color:'#a78bfa',lineWidth:1,priceLineVisible:false});rl.setData(ti.map((t,i)=>rv[i]!=null?{time:t,value:rv[i]}:null).filter(Boolean));rc.timeScale().fitContent();chart.timeScale().subscribeVisibleLogicalRangeChange(r=>{if(r)rc.timeScale().setVisibleLogicalRange(r)})}if(CFG.ind.MACD&&cl.length>=26){$('macdWrap').classList.add('on');const el=$('macd');const mc=LightweightCharts.createChart(el,{width:el.clientWidth,height:el.clientHeight,layout:{backgroundColor:'#040810',textColor:'#5a7a9a'},grid:{vertLines:{color:'#0a1020'},horzLines:{color:'#0a1020'}},timeScale:{visible:false},rightPriceScale:{borderColor:'#1a2a4a'},handleScroll:false,handleScale:false});const mm=macd(cl);mc.addHistogramSeries({priceLineVisible:false}).setData(ti.map((t,i)=>({time:t,value:mm.h[i],color:mm.h[i]>=0?'rgba(0,200,83,.6)':'rgba(255,23,68,.6)'})));mc.addLineSeries({color:'#00d4ff',lineWidth:1,priceLineVisible:false}).setData(ti.map((t,i)=>({time:t,value:mm.ml[i]})));mc.addLineSeries({color:'#ff9100',lineWidth:1,priceLineVisible:false}).setData(ti.map((t,i)=>({time:t,value:mm.sig[i]})));mc.timeScale().fitContent();chart.timeScale().subscribeVisibleLogicalRangeChange(r=>{if(r)mc.timeScale().setVisibleLogicalRange(r)})}new ResizeObserver(()=>chart.resize(main.clientWidth,main.clientHeight)).observe(main);parent.postMessage({type:'ticker-chart-ready',ticker:CFG.ticker,count:rows.length},'*')}catch(e){console.error(e);msg('Chart unavailable<br><span style="color:#ff8080">'+(e.message||e)+'</span>');parent.postMessage({type:'ticker-chart-error',ticker:CFG.ticker,error:e.message||String(e)},'*')}}
+async function run(){try{if(!window.LightweightCharts){msg('Chart library unavailable');return}const start=new Date();start.setDate(start.getDate()-CFG.days);const url=CFG.api+'/api/stock/bars/'+CFG.ticker+'?user='+encodeURIComponent(CFG.user)+'&timeframe='+encodeURIComponent(CFG.tf)+'&days='+CFG.days+'&start='+start.toISOString().split('T')[0];const res=await fetch(url);const data=await res.json();const bars=data.bars||[];if(!bars.length){msg('No chart data');return}const rows=bars.map(b=>({time:toT(b.time||b.t||b.date),open:num(b.open??b.o),high:num(b.high??b.h),low:num(b.low??b.l),close:num(b.close??b.c),volume:num(b.volume??b.v),vwap:num(b.vwap??b.vw)})).filter(b=>b.time>0&&b.open>0&&b.high>0&&b.low>0&&b.close>0).sort((a,b)=>a.time-b.time);if(!rows.length){msg('No valid chart candles');return}const main=$('main');const chart=LightweightCharts.createChart(main,{width:main.clientWidth,height:main.clientHeight,layout:{backgroundColor:'#060a12',textColor:'#8aa0c0'},grid:{vertLines:{color:'#0f1a2e'},horzLines:{color:'#0f1a2e'}},timeScale:{timeVisible:true,secondsVisible:false,borderColor:'#1a2a4a',tickMarkFormatter:t=>new Date(t*1000).toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit',hour12:true,timeZone:'America/New_York'})},localization:{timeFormatter:t=>new Date(t*1000).toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit',hour12:true,timeZone:'America/New_York'})},rightPriceScale:{borderColor:'#1a2a4a',scaleMarginTop:.08,scaleMarginBottom:(CFG.ind.Vol?0.2:0.05)},crosshair:{mode:1},handleScroll:{mouseWheel:true,pressedMouseMove:true},handleScale:{mouseWheel:true,pinch:true}});const cs=chart.addCandlestickSeries({upColor:'#00c853',downColor:'#ff1744',borderUpColor:'#00c853',borderDownColor:'#ff1744',wickUpColor:'#00c853',wickDownColor:'#ff1744'});liveChart=chart;liveCandles=cs;liveRows=rows;cs.setData(rows.map(b=>({time:b.time,open:b.open,high:b.high,low:b.low,close:b.close})));const cl=rows.map(b=>b.close),ti=rows.map(b=>b.time);if(CFG.ind.VWAP){const vw=sessionVwap(rows);if(vw.length)chart.addLineSeries({color:'#ffd700',lineWidth:2,priceLineVisible:false,title:'VWAP'}).setData(vw)}if(CFG.ind.EMA){const e9=ema(cl,9),e20=ema(cl,20);chart.addLineSeries({color:'#ff9100',lineWidth:1,priceLineVisible:false,title:'EMA9'}).setData(ti.map((t,i)=>({time:t,value:e9[i]})));chart.addLineSeries({color:'#ff4a4a',lineWidth:1,priceLineVisible:false,title:'EMA20'}).setData(ti.map((t,i)=>({time:t,value:e20[i]})))}if(CFG.ind.Vol){const vs=chart.addHistogramSeries({priceFormat:{type:'volume'},priceScaleId:'vol'});chart.priceScale('vol').applyOptions({scaleMarginTop:.8,scaleMarginBottom:0,borderColor:'#1a2a4a'});vs.setData(rows.map(b=>({time:b.time,value:b.volume,color:b.close>=b.open?'rgba(0,200,83,.35)':'rgba(255,23,68,.35)'})))}if(lastLogicalRange){chart.timeScale().setVisibleLogicalRange(lastLogicalRange)}else{chart.timeScale().fitContent()}chart.timeScale().subscribeVisibleLogicalRangeChange(r=>{if(r){lastLogicalRange=r;parent.postMessage({type:'ticker-chart-range',ticker:CFG.ticker,range:r},'*')}});shade(main,bars,chart);if(CFG.ind.RSI&&cl.length>=14){$('rsiWrap').classList.add('on');const el=$('rsi');const rc=LightweightCharts.createChart(el,{width:el.clientWidth,height:el.clientHeight,layout:{backgroundColor:'#040810',textColor:'#5a7a9a'},grid:{vertLines:{color:'#0a1020'},horzLines:{color:'#0a1020'}},timeScale:{visible:false},rightPriceScale:{borderColor:'#1a2a4a'},handleScroll:false,handleScale:false});const rv=rsi(cl),rl=rc.addLineSeries({color:'#a78bfa',lineWidth:1,priceLineVisible:false});rl.setData(ti.map((t,i)=>rv[i]!=null?{time:t,value:rv[i]}:null).filter(Boolean));rc.timeScale().fitContent();chart.timeScale().subscribeVisibleLogicalRangeChange(r=>{if(r)rc.timeScale().setVisibleLogicalRange(r)})}if(CFG.ind.MACD&&cl.length>=26){$('macdWrap').classList.add('on');const el=$('macd');const mc=LightweightCharts.createChart(el,{width:el.clientWidth,height:el.clientHeight,layout:{backgroundColor:'#040810',textColor:'#5a7a9a'},grid:{vertLines:{color:'#0a1020'},horzLines:{color:'#0a1020'}},timeScale:{visible:false},rightPriceScale:{borderColor:'#1a2a4a'},handleScroll:false,handleScale:false});const mm=macd(cl);mc.addHistogramSeries({priceLineVisible:false}).setData(ti.map((t,i)=>({time:t,value:mm.h[i],color:mm.h[i]>=0?'rgba(0,200,83,.6)':'rgba(255,23,68,.6)'})));mc.addLineSeries({color:'#00d4ff',lineWidth:1,priceLineVisible:false}).setData(ti.map((t,i)=>({time:t,value:mm.ml[i]})));mc.addLineSeries({color:'#ff9100',lineWidth:1,priceLineVisible:false}).setData(ti.map((t,i)=>({time:t,value:mm.sig[i]})));mc.timeScale().fitContent();chart.timeScale().subscribeVisibleLogicalRangeChange(r=>{if(r)mc.timeScale().setVisibleLogicalRange(r)})}new ResizeObserver(()=>chart.resize(main.clientWidth,main.clientHeight)).observe(main);parent.postMessage({type:'ticker-chart-ready',ticker:CFG.ticker,count:rows.length},'*')}catch(e){console.error(e);msg('Chart unavailable<br><span style="color:#ff8080">'+(e.message||e)+'</span>');parent.postMessage({type:'ticker-chart-error',ticker:CFG.ticker,error:e.message||String(e)},'*')}}
 window.addEventListener('message',ev=>{const d=ev.data||{};if(d.type!=='ticker-live-quote'||String(d.ticker||'').toUpperCase()!==String(CFG.ticker||'').toUpperCase()||!liveCandles||!liveRows.length)return;const price=num(d.price);if(price<=0)return;let row=liveRows[liveRows.length-1];const now=Math.floor((d.ts||Date.now())/1000);const tf=String(CFG.tf||'1Min');const span=tf==='5Min'?300:tf==='15Min'?900:tf==='1Hour'?3600:tf==='1Day'?86400:60;if(now-row.time>span+20){row={time:Math.floor(now/span)*span,open:price,high:price,low:price,close:price,volume:num(d.volume)||0,vwap:0};liveRows.push(row)}else{row.high=Math.max(row.high,price);row.low=Math.min(row.low,price);row.close=price;if(d.volume)row.volume=Math.max(row.volume,num(d.volume))}liveCandles.update({time:row.time,open:row.open,high:row.high,low:row.low,close:row.close});parent.postMessage({type:'ticker-chart-live',ticker:CFG.ticker,price:price},'*')});run();
 <\/script></body></html>`;
   }
@@ -3462,6 +3510,11 @@ window.addEventListener('message',ev=>{const d=ev.data||{};if(d.type!=='ticker-l
       const domId=tab.id.replace(/[^a-zA-Z0-9_-]/g,'_');
       const badge=document.getElementById(`${domId}ChartBadge`);
       if(badge)badge.textContent='Chart error';
+    }
+    if(d.type==='ticker-chart-range'){
+      const tabId=`ticker-${String(d.ticker||'').toUpperCase()}`;
+      const tab=workspaceTabs.find(t=>t.id===tabId);
+      if(tab&&tickerTabIndicators[tab.id])tickerTabIndicators[tab.id].visibleLogicalRange=d.range;
     }
     if(d.type==='ticker-chart-live'){
       const tabId=`ticker-${String(d.ticker||'').toUpperCase()}`;
@@ -3493,7 +3546,7 @@ window.addEventListener('message',ev=>{const d=ev.data||{};if(d.type!=='ticker-l
     const iframe=document.createElement('iframe');
     iframe.className='ticker-chart-frame';
     iframe.title=`${ticker} live chart`;
-    iframe.srcdoc=tickerTabChartDoc({api:API_URL,ticker,tf:st.tf,days,user:currentUser?.id||'shafkat',ind:{Vol:st.Vol,VWAP:st.VWAP,EMA:st.EMA,RSI:st.RSI,MACD:st.MACD}});
+    iframe.srcdoc=tickerTabChartDoc({api:API_URL,ticker,tf:st.tf,days,user:currentUser?.id||'shafkat',visibleLogicalRange:st.visibleLogicalRange||null,ind:{Vol:st.Vol,VWAP:st.VWAP,EMA:st.EMA,RSI:st.RSI,MACD:st.MACD}});
     chartEl.appendChild(iframe);
     if(badge)badge.textContent='Loading...';
     return;
@@ -3519,7 +3572,7 @@ window.addEventListener('message',ev=>{const d=ev.data||{};if(d.type!=='ticker-l
       tickerTabState[tabId].chart=chart;
       const candles=chart.addCandlestickSeries({upColor:'#00c853',downColor:'#ff1744',borderUpColor:'#00c853',borderDownColor:'#ff1744',wickUpColor:'#00c853',wickDownColor:'#ff1744'});
       candles.setData(rows.map(b=>({time:b.time,open:b.open,high:b.high,low:b.low,close:b.close})));
-      if(st.VWAP){const vw=rows.filter(b=>b.vwap>0).map(b=>({time:b.time,value:b.vwap}));if(vw.length)chart.addLineSeries({color:'#ffd700',lineWidth:2,priceLineVisible:false,title:'VWAP'}).setData(vw);}
+      if(st.VWAP){const vw=calcSessionVwap(rows);if(vw.length)chart.addLineSeries({color:'#ffd700',lineWidth:2,priceLineVisible:false,title:'VWAP'}).setData(vw);}
       const cl=rows.map(b=>b.close),ti=rows.map(b=>b.time);
       if(st.EMA){const e9=tabEma(cl,9),e20=tabEma(cl,20);chart.addLineSeries({color:'#ff9100',lineWidth:1,priceLineVisible:false,title:'EMA9'}).setData(ti.map((t,i)=>({time:t,value:e9[i]})));chart.addLineSeries({color:'#ff4a4a',lineWidth:1,priceLineVisible:false,title:'EMA20'}).setData(ti.map((t,i)=>({time:t,value:e20[i]})));}
       if(st.Vol){const vs=chart.addHistogramSeries({priceFormat:{type:'volume'},priceScaleId:'vol'});chart.priceScale('vol').applyOptions({scaleMarginTop:0.8,scaleMarginBottom:0,borderColor:'#1a2a4a'});vs.setData(rows.map(b=>({time:b.time,value:b.volume,color:b.close>=b.open?'rgba(0,200,83,.35)':'rgba(255,23,68,.35)'})));}
@@ -4558,6 +4611,7 @@ window.addEventListener('message',ev=>{const d=ev.data||{};if(d.type!=='ticker-l
   let popupPollTimer      = null;
   let popupCurrentTicker  = null;
   let popupCurrentTf      = '1Min';
+  let popupVisibleLogicalRange = null;
 
   function refreshPopupChart(ticker){
     if(popupPollTimer){ clearInterval(popupPollTimer); popupPollTimer=null; }
@@ -4604,7 +4658,7 @@ button:hover{background:#1a3a6a;}button.on{border-color:var(--c);color:var(--c);
     <span id="liveChg"   style="font-size:.58rem;color:#6a8aaa;">--%</span>
   </div>
   <select class="rng" id="rng" onchange="onRange(this.value)">${rangeOpts}</select>
-  <select id="tf" onchange="loadChart()">${tfOpts}</select>
+  <select id="tf" onchange="visibleRange=null;loadChart()">${tfOpts}</select>
   <button onclick="loadChart()">↻</button>
   <button class="on" id="bVol"  style="--c:#4a8aff" onclick="tog('Vol')">Vol</button>
   <button         id="bVWAP" style="--c:#ffd700" onclick="tog('VWAP')">VWAP</button>
@@ -4622,16 +4676,17 @@ button:hover{background:#1a3a6a;}button.on{border-color:var(--c);color:var(--c);
 const API='${apiUrl}',TK='${tk}';
 const RM=${JSON.stringify(RANGES_MAP)},AM=${JSON.stringify(AUTO_TF_MAP)};
 const ind={Vol:true,VWAP:false,EMA:false,RSI:false,MACD:false};
-let chart=null,rsiC=null,macdC=null,poll=null;
+let chart=null,rsiC=null,macdC=null,poll=null,visibleRange=null;
 function pT(t){return Math.floor(new Date(t.includes('T')?t:t.replace(' ','T')).getTime()/1000);}
 function ema(d,p){const k=2/(p+1);let e=null;return d.map(v=>{if(e===null)e=v;else e=v*k+e*(1-k);return e;});}
 function rsi(c,p=14){return c.map((_,i)=>{if(i<p)return null;let g=0,l=0;for(let j=i-p+1;j<=i;j++){const d=c[j]-c[j-1];if(d>0)g+=d;else l-=d;}return 100-100/(1+(g/p)/((l/p)||1e-6));});}
 function macd(c){const f=ema(c,12),s=ema(c,26),ml=f.map((v,i)=>v-s[i]),sig=ema(ml,9);return{ml,sig,h:ml.map((v,i)=>v-sig[i])};}
-function tog(k){ind[k]=!ind[k];document.getElementById('b'+k).classList.toggle('on',ind[k]);
+function calcSessionVwap(rows){let pv=0,vol=0,lastDay='';return rows.map(b=>{const day=new Date(b.t*1000).toLocaleDateString('en-US',{timeZone:'America/New_York'});if(day!==lastDay){pv=0;vol=0;lastDay=day;}const v=Number(b.v||0);if(v>0&&b.h>0&&b.l>0&&b.c>0){pv+=((b.h+b.l+b.c)/3)*v;vol+=v;}return vol>0?{time:b.t,value:pv/vol}:null;}).filter(Boolean);}
+function tog(k){try{visibleRange=chart?.timeScale().getVisibleLogicalRange()||visibleRange}catch(e){}ind[k]=!ind[k];document.getElementById('b'+k).classList.toggle('on',ind[k]);
   if(k==='RSI')document.getElementById('rsiWrap').style.display=ind.RSI?'block':'none';
   if(k==='MACD')document.getElementById('macdWrap').style.display=ind.MACD?'block':'none';
   loadChart();}
-function onRange(r){const t=AM[r]||'1Min';document.getElementById('tf').value=t;loadChart();}
+function onRange(r){visibleRange=null;const t=AM[r]||'1Min';document.getElementById('tf').value=t;loadChart();}
 async function loadChart(){
   if(poll){clearInterval(poll);poll=null;}
   const r=document.getElementById('rng').value,t=document.getElementById('tf').value;
@@ -4679,7 +4734,7 @@ function render(bars){
   cs.setData(s.map(b=>({time:b.t,open:b.o,high:b.h,low:b.l,close:b.c})));
   window._cs=cs;  // store ref for live poll updates
   if(ind.VWAP){
-    const vw=s.filter(b=>b.vw>0).map(b=>({time:b.t,value:b.vw}));
+    const vw=calcSessionVwap(s);
     if(vw.length){chart.addLineSeries({color:'#ffd700',lineWidth:2,priceLineVisible:false,title:'VWAP'}).setData(vw);}
   }
   if(ind.EMA&&cl.length>=20){
@@ -4687,7 +4742,8 @@ function render(bars){
     chart.addLineSeries({color:'#ff4a4a',lineWidth:1,priceLineVisible:false,title:'EMA20'}).setData(ti.map((t,i)=>({time:t,value:ema(cl,20)[i]})));
   }
   if(ind.Vol){const vs=chart.addHistogramSeries({priceFormat:{type:'volume'},priceScaleId:'vol'});chart.priceScale('vol').applyOptions({scaleMarginTop:0.8,scaleMarginBottom:0});vs.setData(s.map(b=>({time:b.t,value:b.v,color:b.c>=b.o?'rgba(0,200,83,.35)':'rgba(255,23,68,.35)'})));}
-  chart.timeScale().fitContent();
+  if(visibleRange){chart.timeScale().setVisibleLogicalRange(visibleRange)}else{chart.timeScale().fitContent()}
+  chart.timeScale().subscribeVisibleLogicalRangeChange(r=>{if(r)visibleRange=r;});
   if(ind.RSI&&cl.length>=14){const re=document.getElementById('rsiEl');rsiC=LightweightCharts.createChart(re,{width:re.clientWidth,height:re.clientHeight,layout:{backgroundColor:'#040810',textColor:'#5a7a9a'},grid:{vertLines:{color:'#0a1020'},horzLines:{color:'#0a1020'}},timeScale:{visible:false},rightPriceScale:{borderColor:'#1a2a4a'},crosshair:{mode:1},handleScroll:false,handleScale:false});const rv=rsi(cl),rl=rsiC.addLineSeries({color:'#a78bfa',lineWidth:1,priceLineVisible:false});rl.setData(ti.map((t,j)=>rv[j]!==null?{time:t,value:rv[j]}:null).filter(Boolean));rsiC.addLineSeries({color:'rgba(255,68,68,.4)',lineWidth:1,lineStyle:2,priceLineVisible:false}).setData([{time:ti[0],value:70},{time:ti[ti.length-1],value:70}]);rsiC.addLineSeries({color:'rgba(0,200,83,.4)',lineWidth:1,lineStyle:2,priceLineVisible:false}).setData([{time:ti[0],value:30},{time:ti[ti.length-1],value:30}]);rsiC.timeScale().fitContent();chart.timeScale().subscribeVisibleLogicalRangeChange(r=>{if(r&&rsiC)rsiC.timeScale().setVisibleLogicalRange(r);});}
   if(ind.MACD&&cl.length>=26){const me=document.getElementById('macdEl');macdC=LightweightCharts.createChart(me,{width:me.clientWidth,height:me.clientHeight,layout:{backgroundColor:'#040810',textColor:'#5a7a9a'},grid:{vertLines:{color:'#0a1020'},horzLines:{color:'#0a1020'}},timeScale:{visible:false},rightPriceScale:{borderColor:'#1a2a4a'},crosshair:{mode:1},handleScroll:false,handleScale:false});const{ml,sig,h}=macd(cl);macdC.addHistogramSeries({priceLineVisible:false}).setData(ti.map((t,j)=>({time:t,value:h[j],color:h[j]>=0?'rgba(0,200,83,.6)':'rgba(255,23,68,.6)'})));macdC.addLineSeries({color:'#00d4ff',lineWidth:1,priceLineVisible:false}).setData(ti.map((t,j)=>({time:t,value:ml[j]})));macdC.addLineSeries({color:'#ff9100',lineWidth:1,priceLineVisible:false}).setData(ti.map((t,j)=>({time:t,value:sig[j]})));macdC.timeScale().fitContent();chart.timeScale().subscribeVisibleLogicalRangeChange(r=>{if(r&&macdC)macdC.timeScale().setVisibleLogicalRange(r);});}
   new ResizeObserver(()=>{if(chart)chart.resize(mc.clientWidth,mc.clientHeight);if(rsiC){const e=document.getElementById('rsiEl');rsiC.resize(e.clientWidth,e.clientHeight);}if(macdC){const e=document.getElementById('macdEl');macdC.resize(e.clientWidth,e.clientHeight);}}).observe(document.body);
@@ -4789,7 +4845,7 @@ loadChart();
     }
     // Re-render with new indicator state
     const ticker = document.getElementById('popupTicker')?.textContent;
-    if(ticker && ticker !== '--') popupLoadChart(ticker);
+    if(ticker && ticker !== '--') popupLoadChart(ticker, true);
   }
   // Poll interval — 2 seconds for all timeframes
 
@@ -4889,7 +4945,8 @@ loadChart();
     popupLoadChart(ticker);
   }
 
-  async function popupLoadChart(ticker){
+  async function popupLoadChart(ticker, preserveRange=false){
+    if(preserveRange&&popupChartInstance){try{popupVisibleLogicalRange=popupChartInstance.timeScale().getVisibleLogicalRange();}catch(e){}}else{popupVisibleLogicalRange=null;}
     if(popupPollTimer){ clearInterval(popupPollTimer); popupPollTimer=null; }
 
     const tf    = document.getElementById('popupTf')?.value    || '1Min';
@@ -5018,7 +5075,7 @@ loadChart();
       chart._candles = candles;
 
       if(popupInd.VWAP){
-        const vwpts = sorted.filter(b=>b.vw>0).map(b=>({time:b.t,value:b.vw}));
+        const vwpts = calcSessionVwap(sorted);
         if(vwpts.length){ const vl=chart.addLineSeries({color:'#ffd700',lineWidth:2,priceLineVisible:false,title:'VWAP'}); vl.setData(vwpts); }
       }
 
@@ -5036,8 +5093,8 @@ loadChart();
         chart.priceScale('vol').applyOptions({scaleMarginTop:0.8,scaleMarginBottom:0,borderColor:'#1a2a4a'});
         vs.setData(sorted.map(b=>({time:b.t,value:b.v,color:b.c>=b.o?'rgba(0,200,83,.35)':'rgba(255,23,68,.35)'})));
       }
-
-      chart.timeScale().fitContent();
+      if(popupVisibleLogicalRange){chart.timeScale().setVisibleLogicalRange(popupVisibleLogicalRange)}else{chart.timeScale().fitContent()}
+      chart.timeScale().subscribeVisibleLogicalRangeChange(range=>{if(range)popupVisibleLogicalRange=range;});
 
       // Session shading
       (function(){
@@ -5162,17 +5219,26 @@ loadChart();
         const src=d.source==='tradier'?'Tradier':(d.source==='alpaca'?'Alpaca':'Finnhub');
         document.getElementById('quoteUpdated').textContent=
           `${src} · ${new Date().toLocaleTimeString('en-US',{hour12:true,timeZone:'America/New_York'})} EST`;
+        updateTickerStatsFromQuote('popup', d);
       }
     }catch(e){}
   }
 
   async function fetchStats(ticker){
     try{
-      const [pr,mr]=await Promise.all([fetch(`${API_URL}/api/stock/profile/${ticker}`),fetch(`${API_URL}/api/stock/metrics/${ticker}`)]);
-      const profile=await pr.json();const metrics=await mr.json();const m=metrics.metric||{};
+      const [pr,mr,qr]=await Promise.all([
+        fetch(`${API_URL}/api/stock/profile/${ticker}`),
+        fetch(`${API_URL}/api/stock/metrics/${ticker}`),
+        fetch(`${API_URL}/api/stock/quote/${ticker}?user=${currentUser?.id||'shafkat'}`)
+      ]);
+      const profile=await pr.json();const metrics=await mr.json();const quote=await qr.json();const m=metrics.metric||{};
       const fmt=(v,pre='',suf='')=>(v!=null&&v!==''&&v!==0)?`${pre}${typeof v==='number'?v.toLocaleString():v}${suf}`:'--';
-      const mktCap=profile.marketCapitalization?`$${(profile.marketCapitalization/1000).toFixed(2)}B`:'--';
+      const sharesM=Number(profile.shareOutstanding||m.sharesOutstanding||0);
+      const liveMktCapM=(quote?.c&&sharesM)?quote.c*sharesM:Number(profile.marketCapitalization||0);
+      const mktCap=fmtMarketCapM(liveMktCapM);
       const floatVal=m.float;const floatStr=floatVal?`${floatVal.toFixed(1)}M`:'--';
+      const sharesStr=sharesM?`${sharesM.toFixed(2)}M`:'--';
+      const volStr=fmtCompactNumber(quote?.v||m.volume||0);
       const floatCls=floatVal?(floatVal<5?'highlight':floatVal<20?'warn':''):'';
       const shortR=m.shortInterestRatio?m.shortInterestRatio.toFixed(2):'--';
       const shortP=m.shortPercentFloat?`${m.shortPercentFloat.toFixed(1)}%`:'--';
@@ -5180,16 +5246,24 @@ loadChart();
       document.getElementById('popupStats').innerHTML=`
         <div class="kstat-grid">
           <div>
-            <div class="kstat-row"><span class="kstat-key">Market Cap</span><span class="kstat-val">${mktCap}</span></div>
+            <div class="kstat-row"><span class="kstat-key">MKT CAP</span><span class="kstat-val" id="popupStatMktCap" data-shares-m="${sharesM||''}">${mktCap}</span></div>
+            <div class="kstat-row"><span class="kstat-key">VOL</span><span class="kstat-val" id="popupStatVol">${volStr}</span></div>
+            <div class="kstat-row"><span class="kstat-key">Open</span><span class="kstat-val" id="popupStatOpen">${quote?.o?`$${quote.o.toFixed(2)}`:'--'}</span></div>
+            <div class="kstat-row"><span class="kstat-key">Prev Close</span><span class="kstat-val" id="popupStatPrev">${quote?.pc?`$${quote.pc.toFixed(4)}`:'--'}</span></div>
+            <div class="kstat-row"><span class="kstat-key">High</span><span class="kstat-val" id="popupStatHigh">${quote?.h?`$${quote.h.toFixed(2)}`:fmt(m['52WeekHigh'],'$')}</span></div>
+            <div class="kstat-row"><span class="kstat-key">Low</span><span class="kstat-val" id="popupStatLow">${quote?.l?`$${quote.l.toFixed(2)}`:fmt(m['52WeekLow'],'$')}</span></div>
             <div class="kstat-row"><span class="kstat-key">Float</span><span class="kstat-val ${floatCls}">${floatStr}</span></div>
-            <div class="kstat-row"><span class="kstat-key">52W High</span><span class="kstat-val">${fmt(m['52WeekHigh'],'$')}</span></div>
-            <div class="kstat-row"><span class="kstat-key">52W Low</span><span class="kstat-val">${fmt(m['52WeekLow'],'$')}</span></div>
-            <div class="kstat-row"><span class="kstat-key">Beta</span><span class="kstat-val">${fmt(m.beta)}</span></div>
+            <div class="kstat-row"><span class="kstat-key">Shares</span><span class="kstat-val">${sharesStr}</span></div>
           </div>
           <div>
+            <div class="kstat-row"><span class="kstat-key">52W High</span><span class="kstat-val">${fmt(m['52WeekHigh'],'$')}</span></div>
+            <div class="kstat-row"><span class="kstat-key">52W Low</span><span class="kstat-val">${fmt(m['52WeekLow'],'$')}</span></div>
+            <div class="kstat-row"><span class="kstat-key">Avg Vol</span><span class="kstat-val">${fmtCompactNumber((m.averageVolume||m['10DayAverageTradingVolume']||0)*1000000)}</span></div>
+            <div class="kstat-row"><span class="kstat-key">P/E</span><span class="kstat-val">${fmt(m.trailingPE)}</span></div>
+            <div class="kstat-row"><span class="kstat-key">EPS</span><span class="kstat-val">${fmt(m.epsTTM)}</span></div>
+            <div class="kstat-row"><span class="kstat-key">Beta</span><span class="kstat-val">${fmt(m.beta)}</span></div>
             <div class="kstat-row"><span class="kstat-key">Short Ratio</span><span class="kstat-val ${shortCls}">${shortR}</span></div>
             <div class="kstat-row"><span class="kstat-key">Short % Float</span><span class="kstat-val ${shortCls}">${shortP}</span></div>
-            <div class="kstat-row"><span class="kstat-key">Avg Vol 10D</span><span class="kstat-val">${m['10DayAverageTradingVolume']?m['10DayAverageTradingVolume'].toFixed(1)+'M':'--'}</span></div>
             <div class="kstat-row"><span class="kstat-key">Industry</span><span class="kstat-val" style="font-size:.52rem">${profile.finnhubIndustry||'--'}</span></div>
             <div class="kstat-row"><span class="kstat-key">Exchange</span><span class="kstat-val">${profile.exchange||'--'}</span></div>
           </div>
@@ -5748,6 +5822,18 @@ function calcEMA(data,p){const k=2/(p+1);let e=null;return data.map(v=>{if(e===n
 function calcRSI(c,p=14){return c.map((_,i)=>{if(i<p)return null;let g=0,l=0;for(let j=i-p+1;j<=i;j++){const d=c[j]-c[j-1];if(d>0)g+=d;else l-=d;}const rs=(g/p)/((l/p)||0.0001);return 100-100/(1+rs);});}
 function calcMACD(c,f=12,s2=26,sg=9){const eF=calcEMA(c,f),eS=calcEMA(c,s2);const ml=eF.map((v,i)=>v-eS[i]);const sig=calcEMA(ml,sg);const h=ml.map((v,i)=>v-sig[i]);return{ml,sig,h};}
 function parseT(t){if(!t)return 0;return Math.floor(new Date(t.includes('T')?t:t.replace(' ','T')).getTime()/1000);}
+function calcSessionVwap(rows){
+  let pv=0,vol=0,lastDay='';
+  return rows.map(b=>{
+    const t=b.t??b.time;
+    const day=new Date(t*1000).toLocaleDateString('en-US',{timeZone:'America/New_York'});
+    if(day!==lastDay){pv=0;vol=0;lastDay=day;}
+    const v=Number(b.v??b.volume??0);
+    const h=Number(b.h??b.high??0),l=Number(b.l??b.low??0),c=Number(b.c??b.close??0);
+    if(v>0&&h>0&&l>0&&c>0){pv+=((h+l+c)/3)*v;vol+=v;}
+    return vol>0?{time:t,value:pv/vol}:null;
+  }).filter(Boolean);
+}
 
 const RANGES={
   '1D':   {days:1,    tf:'1Min'},
@@ -5887,6 +5973,7 @@ function expToggle(ind){
   const b=document.getElementById('exp'+ind);if(b)b.classList.toggle('on',exp['show'+ind]);
   if(ind==='RSI')document.getElementById('expRsiWrap').classList.toggle('hidden',!exp.showRSI);
   if(ind==='MACD')document.getElementById('expMacdWrap').classList.toggle('hidden',!exp.showMACD);
+  try{exp.visibleLogicalRange=exp.chart?.timeScale().getVisibleLogicalRange()||exp.visibleLogicalRange;}catch(e){}
   if(exp.bars.length)expRender();
 }
 
@@ -5942,7 +6029,7 @@ function expRender(){
   candles.setData(sorted.map(b=>({time:b.t,open:b.o,high:b.h,low:b.l,close:b.c})));
 
   if(exp.showVWAP){
-    const vwpts=sorted.filter(b=>b.vw>0).map(b=>({time:b.t,value:b.vw}));
+    const vwpts=calcSessionVwap(sorted);
     if(vwpts.length){const vl=chart.addLineSeries({color:'#ffd700',lineWidth:2,priceLineVisible:false,title:'VWAP'});vl.setData(vwpts);}
   }
 
@@ -5957,8 +6044,8 @@ function expRender(){
     chart.priceScale('vol').applyOptions({scaleMarginTop:0.8,scaleMarginBottom:0,borderColor:'#1a2a4a'});
     vs.setData(sorted.map(b=>({time:b.t,value:b.v,color:b.c>=b.o?'rgba(0,200,83,.35)':'rgba(255,23,68,.35)'})));
   }
-
-  chart.timeScale().fitContent();
+  if(exp.visibleLogicalRange){chart.timeScale().setVisibleLogicalRange(exp.visibleLogicalRange)}else{chart.timeScale().fitContent()}
+  chart.timeScale().subscribeVisibleLogicalRangeChange(range=>{if(range)exp.visibleLogicalRange=range;});
 
   if(exp.showRSI&&closes.length>=14){
     const rc=LightweightCharts.createChart(re,{width:re.clientWidth,height:re.clientHeight,layout:{backgroundColor:'#040810',textColor:'#5a7a9a'},grid:{vertLines:{color:'#0a1020'},horzLines:{color:'#0a1020'}},timeScale:{visible:false},rightPriceScale:{borderColor:'#1a2a4a',scaleMarginTop:0.1,scaleMarginBottom:0.1},crosshair:{mode:1},handleScroll:false,handleScale:false});
@@ -6058,7 +6145,7 @@ function toggle(i,ind){
   if(btn)btn.classList.toggle('on',s['show'+ind]);
   if(ind==='RSI')document.getElementById('rsiW'+i).classList.toggle('hidden',!s.showRSI);
   if(ind==='MACD')document.getElementById('macdW'+i).classList.toggle('hidden',!s.showMACD);
-  if(s.bars.length)render(i,s.bars);
+  if(s.bars.length){try{s.visibleLogicalRange=s.chart?.timeScale().getVisibleLogicalRange()||s.visibleLogicalRange;}catch(e){} render(i,s.bars,true);}
 }
 
 async function load(i){
@@ -6096,7 +6183,7 @@ async function load(i){
   }catch(e){document.getElementById('cw'+i).innerHTML='<div class="ph"><span style="color:#ff4444">'+e.message+'<\/span><\/div>';}
 }
 
-function render(i,bars){
+function render(i,bars,preserveRange=false){
   const s=state[i];
   const cw=document.getElementById('cw'+i);
   if(s.chart){try{s.chart.remove();}catch(e){}}
@@ -6125,7 +6212,7 @@ function render(i,bars){
   candles.setData(sorted.map(b=>({time:b.t,open:b.o,high:b.h,low:b.l,close:b.c})));
   s._candles=candles; // store ref so poll can update last candle live
   if(s.showVWAP){
-    const vwpts=sorted.filter(b=>b.vw>0).map(b=>({time:b.t,value:b.vw}));
+    const vwpts=calcSessionVwap(sorted);
     if(vwpts.length){const vl=chart.addLineSeries({color:'#ffd700',lineWidth:1,priceLineVisible:false,title:'VWAP'});vl.setData(vwpts);}
   }
   if(s.showEMA&&closes.length>=20){
@@ -6139,8 +6226,8 @@ function render(i,bars){
     chart.priceScale('vol').applyOptions({scaleMarginTop:0.8,scaleMarginBottom:0,borderColor:'#1a2a4a'});
     vs.setData(sorted.map(b=>({time:b.t,value:b.v,color:b.c>=b.o?'rgba(0,200,83,.35)':'rgba(255,23,68,.35)'})));
   }
-
-  chart.timeScale().fitContent();
+  if(preserveRange&&s.visibleLogicalRange){chart.timeScale().setVisibleLogicalRange(s.visibleLogicalRange)}else{chart.timeScale().fitContent()}
+  chart.timeScale().subscribeVisibleLogicalRangeChange(range=>{if(range)s.visibleLogicalRange=range;});
 
   // Session shading for 8-panel
   (function(){
@@ -6442,9 +6529,9 @@ const DEFAULT_TF      = '5Min';
       candles.setData(formatted);
 
       if(chartVwapState[idx]){
-        const vwapPts=bars.filter(b=>b.vwap>0).map(b=>({
-          time:parseT(b.time),value:b.vwap
-        })).filter(b=>b.time>0).sort((a,b)=>a.time-b.time);
+        const vwapPts=calcSessionVwap(bars.map(b=>({
+          t:parseT(b.time),h:b.high,l:b.low,c:b.close,v:b.volume||0
+        })).filter(b=>b.t>0).sort((a,b)=>a.t-b.t));
         if(vwapPts.length){
           const vl=chart.addLineSeries({color:'#ffd700',lineWidth:1,title:'VWAP',priceLineVisible:false});
           vl.setData(vwapPts);
