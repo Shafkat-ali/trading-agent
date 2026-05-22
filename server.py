@@ -1084,8 +1084,40 @@ def compact_ai_context(context: dict):
         'active_tab': context.get('active_tab'),
         'active_ticker': context.get('active_ticker'),
         'active_setup': context.get('active_setup'),
+        'live_quote': context.get('live_quote'),
+        'recent_news': context.get('recent_news'),
+        'sec_filings': context.get('sec_filings'),
+        'metrics': context.get('metrics'),
+        'recent_logs': context.get('recent_logs'),
+        'filters': context.get('filters'),
+        'running': context.get('running'),
         'scanner_results': compact_results,
     }
+
+@app.get("/api/ai/context/{user_id}")
+async def ai_context(user_id: str, ticker: str = ''):
+    uid = user_id if user_id in user_state else 'shafkat'
+    s = user_state.get(uid, {})
+    data = {
+        'user_id': uid,
+        'mode': s.get('mode'),
+        'filters': s.get('filters'),
+        'running': s.get('running', False),
+        'scanner_count': len(s.get('scan_results', [])),
+        'recent_logs': alert_log[:20],
+    }
+    symbol = (ticker or '').upper().strip()
+    if symbol:
+        data['active_ticker'] = symbol
+        quote = await get_stock_quote(symbol, uid)
+        news = await get_stock_news(symbol)
+        sec = await get_sec_filings(symbol)
+        metrics = await get_stock_metrics(symbol)
+        data['live_quote'] = quote if not quote.get('error') else {'error': quote.get('error')}
+        data['recent_news'] = (news.get('news') or [])[:8]
+        data['sec_filings'] = (sec.get('filings') or [])[:8]
+        data['metrics'] = metrics.get('metric', {}) if isinstance(metrics, dict) else {}
+    return data
 
 @app.post("/api/ai/chat")
 async def ai_chat(req: AIChatRequest):
@@ -1110,7 +1142,11 @@ async def ai_chat(req: AIChatRequest):
         "brief, and risk-aware. Do not claim certainty, do not guarantee outcomes, and do not place or "
         "recommend exact trades as instructions. When discussing setups, explain confirmation, invalidation, "
         "liquidity, spread, halt/news risk, and what data is missing. If asked about current news or market "
-        "facts not present in context, say that live browsing/news context was not provided."
+        "facts not present in context, say that live browsing/news context was not provided. You can request "
+        "safe app navigation by ending with action lines. Use ACTION:OPEN_TICKER:SYMBOL to open a ticker. "
+        "Use ACTION:OPEN_WORKSPACE:SCANNER, FILTERS, PAPER, NEWS, SCREENER, HEATMAP, POLYMARKET, or CHARTS "
+        "to navigate. Use ACTION:WATCHLIST:SYM1,SYM2,SYM3 when the user asks to build a watchlist from context. "
+        "Action lines must be on their own line. Never use actions to place orders."
     )
     payload = {
         'model': AI_MODEL,

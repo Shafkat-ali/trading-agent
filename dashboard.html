@@ -94,6 +94,15 @@
     .ai-bubble.error{align-self:flex-start;background:#2b1018;color:#ffb4c0;border-color:#743044;}
     .ai-quick-row{display:flex;gap:6px;flex-wrap:wrap;padding:10px 12px 0;border-top:1px solid #101a2d;}
     .ai-quick{background:#101b30;border:1px solid #2a4a78;color:#bfe1ff;border-radius:999px;padding:5px 8px;font-size:.56rem;font-weight:800;}
+    .ai-watchlist{display:none;margin:8px 12px 0;padding:8px;border:1px solid #243a60;border-radius:9px;background:#08101d;}
+    .ai-watchlist.visible{display:block;}
+    .ai-watch-title{font-size:.58rem;color:#8bb7e8;font-weight:900;margin-bottom:6px;text-transform:uppercase;letter-spacing:.7px;}
+    .ai-watch-chip{display:inline-flex;align-items:center;gap:4px;margin:0 5px 5px 0;background:#14233a;border:1px solid #2a4a78;border-radius:999px;color:#eaf5ff;font-size:.6rem;font-weight:900;padding:4px 8px;}
+    .ai-live{margin:8px 12px 0;padding:8px;border:1px solid #243a60;border-radius:9px;background:#08101d;display:flex;align-items:center;justify-content:space-between;gap:8px;}
+    .ai-live-copy{font-size:.56rem;color:#7f9fc7;line-height:1.35;}
+    .ai-live-title{font-size:.6rem;color:#eaf5ff;font-weight:900;}
+    .ai-live-toggle{border:1px solid #2a4a78;background:#132745;color:#bfe1ff;border-radius:999px;padding:5px 9px;font-size:.56rem;font-weight:900;white-space:nowrap;}
+    .ai-live-toggle.on{background:#064e3b;border-color:#00c853;color:#eafff6;}
     .ai-input-row{display:flex;gap:7px;padding:10px 12px 12px;}
     .ai-input{flex:1;min-height:38px;max-height:92px;resize:vertical;background:#08101d;border:1px solid #2a3a5a;border-radius:8px;color:#e8f2ff;font-size:.68rem;padding:8px;outline:none;}
     .ai-input:focus{border-color:#8b5cf6;box-shadow:0 0 0 2px rgba(139,92,246,.15);}
@@ -646,6 +655,11 @@
     body.light-theme .ai-bubble.assistant{background:#f8fafc!important;border-color:#d7e0ef!important;color:#172033!important;}
     body.light-theme .ai-bubble.user{background:#dbeafe!important;border-color:#93c5fd!important;color:#0f172a!important;}
     body.light-theme .ai-input{background:#f8fafc!important;border-color:#cbd5e1!important;color:#172033!important;}
+    body.light-theme .ai-watchlist{background:#f8fafc!important;border-color:#d7e0ef!important;}
+    body.light-theme .ai-watch-chip{background:#e0f2fe!important;border-color:#93c5fd!important;color:#0f172a!important;}
+    body.light-theme .ai-live{background:#f8fafc!important;border-color:#d7e0ef!important;}
+    body.light-theme .ai-live-title{color:#0f172a!important;}
+    body.light-theme .ai-live-copy{color:#64748b!important;}
     body.light-theme .ai-quick,
     body.light-theme .ai-close{background:#ffffff!important;border-color:#cbd5e1!important;color:#334155!important;}
     body.light-theme .poly-launch{background:linear-gradient(135deg,#0ea5e9,#2563eb)!important;color:#fff!important;border-color:#93c5fd!important;}
@@ -866,6 +880,17 @@
     <button class="ai-quick" onclick="aiQuick('Summarize the current scanner results and rank the strongest opportunities.')">Summarize scanner</button>
     <button class="ai-quick" onclick="aiQuick('Call out the biggest risks in the active ticker or scan list.')">Find risks</button>
     <button class="ai-quick" onclick="aiQuick('Look at the available catalyst/news fields in context and tell me what matters.')">Catalysts</button>
+    <button class="ai-quick" onclick="aiQuick('Compare the top 3 scanner results and tell me which one deserves attention first.')">Compare top 3</button>
+    <button class="ai-quick" onclick="aiQuick('Summarize recent scanner log errors and tell me what they mean.')">Scan logs</button>
+    <button class="ai-quick" onclick="aiQuick('Build a watchlist from the strongest current scanner results.')">Watchlist</button>
+  </div>
+  <div class="ai-watchlist" id="aiWatchlist"></div>
+  <div class="ai-live">
+    <div>
+      <div class="ai-live-title">Live Watch</div>
+      <div class="ai-live-copy">Flags new A+ setups, wide spreads, SEC danger, scanner errors, and fast ticker changes.</div>
+    </div>
+    <button class="ai-live-toggle" id="aiLiveToggle" onclick="toggleAiLiveWatch()">Off</button>
   </div>
   <div class="ai-input-row">
     <textarea class="ai-input" id="aiInput" placeholder="Ask about a ticker, scanner, catalyst, or risk..." onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();sendAiMessage();}"></textarea>
@@ -1279,6 +1304,7 @@
     ['wmUyghur','nrUyghur'].forEach(id => { const el=document.getElementById(id); if(el){el.src=UYGHUR_LOGO;el.onerror=()=>el.style.display='none';} });
   }
   setLogos();
+  window.addEventListener('DOMContentLoaded',()=>{renderAiWatchlist();updateAiLiveToggle();});
 
   function applyLayoutTheme(theme){
     const isLight = theme === 'light';
@@ -1305,6 +1331,9 @@
 
   const aiMessages = [];
   let aiBusy = false;
+  let aiLiveWatch = localStorage.getItem('aiLiveWatch') === 'true';
+  const aiSeenEvents = new Set();
+  const aiLastTickerPrice = {};
 
   function toggleAiPanel(force){
     const panel=document.getElementById('aiPanel');
@@ -1312,6 +1341,64 @@
     const open = typeof force === 'boolean' ? force : panel.classList.contains('hidden');
     panel.classList.toggle('hidden', !open);
     if(open)setTimeout(()=>document.getElementById('aiInput')?.focus(),60);
+  }
+
+  function toggleAiLiveWatch(force){
+    aiLiveWatch = typeof force === 'boolean' ? force : !aiLiveWatch;
+    localStorage.setItem('aiLiveWatch', aiLiveWatch ? 'true' : 'false');
+    updateAiLiveToggle();
+    if(aiLiveWatch)aiLiveAlert('Live Watch is on. I will flag meaningful scanner and ticker changes here.');
+  }
+
+  function updateAiLiveToggle(){
+    const btn=document.getElementById('aiLiveToggle');
+    if(!btn)return;
+    btn.classList.toggle('on', aiLiveWatch);
+    btn.textContent=aiLiveWatch?'On':'Off';
+  }
+
+  function aiLiveAlert(text, key){
+    if(!aiLiveWatch||!text)return;
+    const eventKey=key||text;
+    if(aiSeenEvents.has(eventKey))return;
+    aiSeenEvents.add(eventKey);
+    if(aiSeenEvents.size>250)aiSeenEvents.clear();
+    appendAiBubble('assistant', `Live Watch: ${text}`);
+  }
+
+  function monitorSetup(setup){
+    if(!setup||!setup.ticker)return;
+    const ticker=setup.ticker;
+    const gap=Number(setup.gap_pct||0);
+    const rvol=Number(setup.rvol||0);
+    const dvol=Number(setup.dollar_vol||setup.dollar_volume||0);
+    if(setup.grade==='A+'&&!setup.warning){
+      aiLiveAlert(`${ticker} just hit A+ in ${currentMode}. ${gap>=0?'+':''}${gap.toFixed(1)}%, RVOL ${rvol?`${rvol.toFixed(1)}x`:'n/a'}.`, `aplus:${ticker}:${currentMode}`);
+    }
+    if(gap>=20&&rvol>=2){
+      aiLiveAlert(`${ticker} is moving hard: ${gap.toFixed(1)}% with RVOL ${rvol.toFixed(1)}x. Confirm liquidity and spread before trusting it.`, `momentum:${ticker}:${Math.floor(gap)}`);
+    }
+    if(dvol>=3000000&&gap>=10){
+      aiLiveAlert(`${ticker} has real dollar-volume behind the move: about $${(dvol/1000000).toFixed(1)}M traded and ${gap.toFixed(1)}% change.`, `dvol:${ticker}:${Math.floor(dvol/1000000)}`);
+    }
+    if(setup.warning){
+      aiLiveAlert(`${ticker} is flagged as risky: ${setup.warning}.`, `warning:${ticker}:${setup.warning}`);
+    }
+  }
+
+  function monitorScanBatch(results){
+    (results||[]).forEach(monitorSetup);
+    const strong=(results||[]).filter(s=>s.grade==='A+'&&!s.warning).slice(0,5).map(s=>s.ticker);
+    if(strong.length>=3)aiLiveAlert(`Strong scan cluster: ${strong.join(', ')}. Worth comparing catalysts, spreads, and relative volume.`, `cluster:${currentMode}:${strong.join('-')}`);
+  }
+
+  function monitorAlerts(alerts){
+    (alerts||[]).slice(0,10).forEach(a=>{
+      const msg=String(a.message||'');
+      if(/error|failed|HTTP 4|HTTP 5|badcredentials|not accepted/i.test(msg)){
+        aiLiveAlert(`Scanner log issue: ${msg}`, `log:${a.time}:${msg.slice(0,80)}`);
+      }
+    });
   }
 
   function activeTickerContext(){
@@ -1360,6 +1447,19 @@
     };
   }
 
+  async function buildEnrichedAiContext(){
+    const ctx=buildAiContext();
+    try{
+      const uid=encodeURIComponent(currentUser?.id||'shafkat');
+      const ticker=ctx.active_ticker?`?ticker=${encodeURIComponent(ctx.active_ticker)}`:'';
+      const r=await fetch(`${API_URL}/api/ai/context/${uid}${ticker}`);
+      const extra=await r.json();
+      return {...ctx,...extra};
+    }catch(e){
+      return ctx;
+    }
+  }
+
   function appendAiBubble(role, text){
     const host=document.getElementById('aiMessages');
     if(!host)return;
@@ -1382,6 +1482,7 @@
     aiBusy=true;
     if(btn){btn.disabled=true;btn.textContent='...';}
     try{
+      const context=await buildEnrichedAiContext();
       const r=await fetch(`${API_URL}/api/ai/chat`,{
         method:'POST',
         headers:{'Content-Type':'application/json'},
@@ -1389,16 +1490,17 @@
           user_id:currentUser?.id||'shafkat',
           message:text,
           history:aiMessages.slice(-8),
-          context:buildAiContext()
+          context:context
         })
       });
       const data=await r.json();
       if(data.error){
         appendAiBubble('error', data.error);
       }else{
-        const reply=data.reply||'No AI response returned.';
-        appendAiBubble('assistant', reply);
-        aiMessages.push({role:'assistant',content:reply});
+        const parsed=parseAiActions(data.reply||'No AI response returned.');
+        appendAiBubble('assistant', parsed.display);
+        aiMessages.push({role:'assistant',content:parsed.display});
+        runAiActions(parsed.actions);
       }
     }catch(e){
       appendAiBubble('error', 'AI chat could not connect to the server.');
@@ -1410,6 +1512,77 @@
 
   function aiQuick(text){
     sendAiMessage(text);
+  }
+
+  function parseAiActions(reply){
+    const actions=[];
+    const display=(reply||'').split('\n').filter(line=>{
+      let m=line.match(/^\s*ACTION:OPEN_TICKER:([A-Z0-9.\-]+)\s*$/i);
+      if(m){actions.push({type:'open_ticker',ticker:m[1].toUpperCase()});return false;}
+      m=line.match(/^\s*ACTION:OPEN_WORKSPACE:([A-Z_]+)\s*$/i);
+      if(m){actions.push({type:'open_workspace',target:m[1].toUpperCase()});return false;}
+      m=line.match(/^\s*ACTION:WATCHLIST:([A-Z0-9.,\-\s]+)\s*$/i);
+      if(m){
+        actions.push({
+          type:'watchlist',
+          tickers:m[1].split(',').map(t=>t.trim().toUpperCase()).filter(Boolean).slice(0,12)
+        });
+        return false;
+      }
+      return true;
+    }).join('\n').trim();
+    return {display:display || (actions.length?'Done.':reply),actions};
+  }
+
+  async function runAiActions(actions){
+    for(const action of actions||[]){
+      if(action.type==='open_ticker'&&action.ticker){
+        appendAiBubble('assistant', `Opening ${action.ticker} in a ticker tab.`);
+        try{
+          const r=await fetch(`${API_URL}/api/stock/search/${action.ticker}`);
+          const data=await r.json();
+          openTickerTab(action.ticker, data&&!data.error?data:null);
+        }catch(e){
+          openTickerTab(action.ticker);
+        }
+      }else if(action.type==='open_workspace'&&action.target){
+        runAiWorkspaceAction(action.target);
+      }else if(action.type==='watchlist'&&action.tickers?.length){
+        saveAiWatchlist(action.tickers);
+      }
+    }
+  }
+
+  function runAiWorkspaceAction(target){
+    const t=(target||'').toUpperCase();
+    if(t==='SCANNER')activateWorkspaceTab('scanner');
+    else if(t==='FILTERS')openCommandWorkspace('filters');
+    else if(t==='PAPER')openCommandWorkspace('paper');
+    else if(t==='NEWS')openCommandWorkspace('news');
+    else if(t==='SCREENER')openCommandWorkspace('screener');
+    else if(t==='HEATMAP')openHeatMapPage();
+    else if(t==='POLYMARKET')openPolymarketPage();
+    else if(t==='CHARTS')openCharts();
+  }
+
+  function saveAiWatchlist(tickers){
+    const unique=[...new Set((tickers||[]).map(t=>String(t).toUpperCase()).filter(Boolean))].slice(0,12);
+    if(!unique.length)return;
+    localStorage.setItem('aiCopilotWatchlist', JSON.stringify(unique));
+    renderAiWatchlist(unique);
+    appendAiBubble('assistant', `Watchlist ready: ${unique.join(', ')}`);
+  }
+
+  function renderAiWatchlist(tickers){
+    const host=document.getElementById('aiWatchlist');
+    if(!host)return;
+    let list=tickers;
+    if(!list){
+      try{list=JSON.parse(localStorage.getItem('aiCopilotWatchlist')||'[]');}
+      catch(e){list=[];}
+    }
+    host.classList.toggle('visible', list.length>0);
+    host.innerHTML=list.length?`<div class="ai-watch-title">Copilot Watchlist</div>${list.map(t=>`<button class="ai-watch-chip" onclick="openTickerTab('${t}')">${t}</button>`).join('')}`:'';
   }
 
   let workspaceTabs=[
@@ -1719,6 +1892,9 @@
         document.getElementById(`${domId}Bid`).textContent=`$${d.bid.toFixed(2)}`;
         document.getElementById(`${domId}Ask`).textContent=`$${d.ask.toFixed(2)}`;
         document.getElementById(`${domId}Spread`).textContent=`${spread}%`;
+        if(parseFloat(spread)>=5){
+          aiLiveAlert(`${ticker} spread is wide at ${spread}%. That can distort entries/exits.`, `spread:${ticker}:${Math.floor(parseFloat(spread))}`);
+        }
       }else{
         const spread=Math.max(0.01,(d.c*0.001)).toFixed(2);
         document.getElementById(`${domId}Bid`).textContent=`$${(d.c-parseFloat(spread)/2).toFixed(2)}`;
@@ -1729,6 +1905,14 @@
       document.getElementById(`${domId}Low`).textContent=`L: $${d.l?.toFixed(2)||'--'}`;
       const src=d.source==='tradier'?'Tradier':(d.source==='alpaca'?'Alpaca':'Finnhub');
       document.getElementById(`${domId}QuoteUpdated`).textContent=`${src} · ${new Date().toLocaleTimeString('en-US',{hour12:true,timeZone:'America/New_York'})} EST`;
+      const last=aiLastTickerPrice[ticker];
+      if(last&&last>0){
+        const move=((d.c-last)/last)*100;
+        if(Math.abs(move)>=5){
+          aiLiveAlert(`${ticker} moved ${move>=0?'+':''}${move.toFixed(1)}% since the last live quote refresh.`, `quote-move:${ticker}:${Math.round(d.c*100)}`);
+        }
+      }
+      aiLastTickerPrice[ticker]=d.c;
     }catch(e){}
   }
 
@@ -1787,6 +1971,7 @@
       const section=document.getElementById(`${domId}SecSection`);
       if(!danger.length){if(section)section.style.display='none';return;}
       section.style.display='block';
+      aiLiveAlert(`${ticker} has ${danger.length} SEC danger filing${danger.length!==1?'s':''}. Check dilution/offering risk before trading.`, `sec:${ticker}:${danger.map(f=>f.form).join('-')}`);
       document.getElementById(`${domId}Sec`).innerHTML=danger.slice(0,5).map(f=>
         `<div class="sec-danger"><strong>${f.form||'SEC'}</strong> — ${f.description||'SEC Filing'}
         ${f.filedDate?`<span style="float:right;opacity:.7">${f.filedDate}</span>`:''}</div>`
@@ -2559,12 +2744,15 @@ run();
       if(msg.type==='new_ticker'&&msg.setup){
         if(isLoading)clearLoadingScreen();
         addTickerToDOM(msg.setup);updateScreener();
+        monitorSetup(msg.setup);
       }
       if(msg.type==='scan_results'){
         const data=msg.data||[];
         if(data.length&&isLoading)clearLoadingScreen();
         data.forEach(s=>{if(!allResults.find(r=>r.ticker===s.ticker)){allResults.push(s);addTickerToDOM(s);}});
         if(data.length)updateScreener();
+        monitorScanBatch(data);
+        monitorAlerts(msg.alerts);
         renderAlerts(msg.alerts);updateStats(allResults,msg.time);
         if(msg.scan_status)updateProgress(msg.scan_status);
         if(msg.scan_status?.phase==='done'&&!data.length&&!allResults.length)showEmptyScanResult(msg.scan_status);
@@ -2582,11 +2770,13 @@ run();
         const r=await fetch(`${API_URL}/api/results/${uid}`);
         const data=await r.json();
         renderAlerts(data.alerts);
+        monitorAlerts(data.alerts);
         if(data.data&&data.data.length>0){
           let added=false;
           data.data.forEach(s=>{
             if(!allResults.find(r=>r.ticker===s.ticker)){
               allResults.push(s);if(isLoading)clearLoadingScreen();addTickerToDOM(s);added=true;
+              monitorSetup(s);
             }
           });
           if(added){updateScreener();updateStats(allResults,data.time);}
@@ -2809,6 +2999,7 @@ run();
     if(!setup||!setup.ticker)return;
     if(document.getElementById('card-'+setup.ticker))return;
     if(!allResults.find(r=>r.ticker===setup.ticker))allResults.push(setup);
+    monitorSetup(setup);
     const div=document.createElement('div');div.innerHTML=buildCard(setup);
     const card=div.firstElementChild;if(!card)return;
     const c=document.getElementById('results');
@@ -3702,6 +3893,7 @@ loadChart();
 
   function renderAlerts(alerts){
     if(!alerts||!alerts.length)return;
+    monitorAlerts(alerts);
     document.getElementById('alertLog').innerHTML=alerts.map(a=>
       `<div class="alert-item"><div class="alert-time">${a.time}</div><div class="alert-msg">${a.message}</div></div>`
     ).join('');
