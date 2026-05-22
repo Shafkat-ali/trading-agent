@@ -10,6 +10,7 @@ import threading
 import csv
 import io
 import json
+from pathlib import Path
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
@@ -110,6 +111,65 @@ SCAN_BACKGROUND_INTERVAL = int(os.getenv('SCAN_BACKGROUND_INTERVAL', '120'))
 SCAN_BACKGROUND_MODES = ['morning_gap', 'scanopp', 'afterhrs']
 scan_cache = {}
 scan_cache_locks = {}
+COPILOT_MEMORY_FILE = Path(os.getenv('COPILOT_MEMORY_FILE', 'data/copilot_memory.json'))
+copilot_memory_lock = threading.Lock()
+
+def _empty_copilot_profile(user_id='shafkat'):
+    return {
+        'schema': 'payda-copilot-profile-v1',
+        'user_id': user_id,
+        'updated_at': '',
+        'copilot_mode': 'fast_scan',
+        'live_watch': False,
+        'preferences': '',
+        'lessons': [],
+        'feedback': [],
+        'watchlist': [],
+        'persistent_memory': {'days': []},
+        'session_memory': {'tickers': {}, 'notes': []},
+    }
+
+def _read_copilot_memory_store():
+    try:
+        if not COPILOT_MEMORY_FILE.exists():
+            return {}
+        with COPILOT_MEMORY_FILE.open('r', encoding='utf-8') as f:
+            data = json.load(f)
+            return data if isinstance(data, dict) else {}
+    except Exception as e:
+        log_alert(f"Copilot memory read failed: {e}")
+        return {}
+
+def _write_copilot_memory_store(store):
+    COPILOT_MEMORY_FILE.parent.mkdir(parents=True, exist_ok=True)
+    tmp = COPILOT_MEMORY_FILE.with_suffix('.tmp')
+    with tmp.open('w', encoding='utf-8') as f:
+        json.dump(store, f, ensure_ascii=True, indent=2)
+    tmp.replace(COPILOT_MEMORY_FILE)
+
+def _trim_copilot_profile(profile, user_id='shafkat'):
+    """Bound profile size before saving it to disk."""
+    base = _empty_copilot_profile(user_id)
+    if isinstance(profile, dict):
+        base.update(profile)
+    base['schema'] = 'payda-copilot-profile-v1'
+    base['user_id'] = user_id
+    base['updated_at'] = datetime.now().isoformat()
+    base['preferences'] = str(base.get('preferences') or '')[:6000]
+    base['lessons'] = (base.get('lessons') or [])[:100]
+    base['feedback'] = (base.get('feedback') or [])[:120]
+    base['watchlist'] = [str(t).upper() for t in (base.get('watchlist') or [])[:40]]
+    pmem = base.get('persistent_memory') if isinstance(base.get('persistent_memory'), dict) else {'days': []}
+    pmem['days'] = (pmem.get('days') or [])[:60]
+    base['persistent_memory'] = pmem
+    smem = base.get('session_memory') if isinstance(base.get('session_memory'), dict) else {'tickers': {}, 'notes': []}
+    if isinstance(smem.get('tickers'), dict):
+        smem['tickers'] = dict(list(smem['tickers'].items())[-200:])
+    else:
+        smem['tickers'] = {}
+    smem['notes'] = (smem.get('notes') or [])[:200]
+    base['session_memory'] = smem
+    return base
 
 SCAN_MODES = {
     'morning_gap': {
@@ -1048,6 +1108,9 @@ class AIChatRequest(BaseModel):
     history: list = []
     context: dict = {}
 
+class AIMemoryRequest(BaseModel):
+    profile: dict = {}
+
 @app.post("/api/auth/login")
 async def auth_login(req: LoginRequest):
     uid = req.user_id.lower().strip()
@@ -1058,6 +1121,61 @@ async def auth_login(req: LoginRequest):
         log_alert(f"🔐 Login: {uid}")
         return {'success': True, 'user_id': uid}
     return {'success': False, 'error': 'Incorrect password'}
+
+@app.get("/api/ai/memory/{user_id}")
+async def get_ai_memory(user_id: str):
+    uid = user_id.lower().strip()
+    if uid not in user_state:
+        uid = 'shafkat'
+    with copilot_memory_lock:
+        store = _read_copilot_memory_store()
+        profile = store.get(uid) or _empty_copilot_profile(uid)
+    return {'profile': profile}
+
+@app.post("/api/ai/memory/{user_id}")
+async def save_ai_memory(user_id: str, req: AIMemoryRequest):
+    uid = user_id.lower().strip()
+    if uid not in user_state:
+        return {'error': 'Unknown user'}
+    profile = _trim_copilot_profile(req.profile, uid)
+    with copilot_memory_lock:
+        store = _read_copilot_memory_store()
+        store[uid] = profile
+        _write_copilot_memory_store(store)
+    return {'status': 'ok', 'profile': profile}
+
+@app.get("/api/ai/health/{user_id}")
+async def ai_health(user_id: str):
+    uid = user_id.lower().strip()
+    if uid not in user_state:
+        uid = 'shafkat'
+    s = user_state.get(uid, {})
+    with copilot_memory_lock:
+        store = _read_copilot_memory_store()
+        profile = store.get(uid) or _empty_copilot_profile(uid)
+    return {
+        'status': 'ok',
+        'user_id': uid,
+        'ai_configured': bool(OPENAI_API_KEY),
+        'ai_model': AI_MODEL,
+        'memory_file': str(COPILOT_MEMORY_FILE),
+        'memory_saved': bool(profile.get('updated_at') or profile.get('exported_at')),
+        'memory_counts': {
+            'lessons': len(profile.get('lessons') or []),
+            'feedback': len(profile.get('feedback') or []),
+            'watchlist': len(profile.get('watchlist') or []),
+            'saved_days': len((profile.get('persistent_memory') or {}).get('days') or []),
+            'session_tickers': len((profile.get('session_memory') or {}).get('tickers') or {}),
+            'session_notes': len((profile.get('session_memory') or {}).get('notes') or []),
+        },
+        'scanner': {
+            'mode': s.get('mode'),
+            'running': s.get('running', False),
+            'results': len(s.get('scan_results', [])),
+            'filters': s.get('filters'),
+        },
+        'recent_logs': alert_log[:8],
+    }
 
 def compact_ai_context(context: dict):
     """Keep the copilot grounded while avoiding huge browser payloads."""
@@ -1091,6 +1209,13 @@ def compact_ai_context(context: dict):
         'recent_logs': context.get('recent_logs'),
         'filters': context.get('filters'),
         'running': context.get('running'),
+        'copilot_mode': context.get('copilot_mode'),
+        'session_memory': context.get('session_memory'),
+        'persistent_memory': context.get('persistent_memory'),
+        'user_preferences': context.get('user_preferences'),
+        'learning_notes': context.get('learning_notes'),
+        'feedback_memory': context.get('feedback_memory'),
+        'market_context': context.get('market_context'),
         'scanner_results': compact_results,
     }
 
@@ -1146,6 +1271,8 @@ async def ai_chat(req: AIChatRequest):
         "safe app navigation by ending with action lines. Use ACTION:OPEN_TICKER:SYMBOL to open a ticker. "
         "Use ACTION:OPEN_WORKSPACE:SCANNER, FILTERS, PAPER, NEWS, SCREENER, HEATMAP, POLYMARKET, or CHARTS "
         "to navigate. Use ACTION:WATCHLIST:SYM1,SYM2,SYM3 when the user asks to build a watchlist from context. "
+        "Use copilot_mode to choose response style and priorities. Use user_preferences, learning_notes, and feedback_memory to adapt your ranking and warnings to the user's style. Use session_memory for today's changes and persistent_memory for prior local trading-app observations. "
+        "When market_context is present, synthesize market news, SEC danger headlines, heat map sector strength/weakness, Polymarket signals, scanner results, and active ticker data into one practical brief. Clearly say when a signal is weak, stale, indirect, or only context rather than a stock-specific catalyst. "
         "Action lines must be on their own line. Never use actions to place orders."
     )
     payload = {
@@ -3797,10 +3924,11 @@ async def serve_heatmap():
 @app.get("/")
 async def serve_dashboard():
     try:
-        with open("dashboard.html", "r") as f:
+        dashboard_path = Path(__file__).resolve().parent / "dashboard.html"
+        with dashboard_path.open("r", encoding="utf-8") as f:
             return HTMLResponse(f.read())
-    except:
-        return HTMLResponse("<h1>Dashboard not found</h1>")
+    except Exception as e:
+        return HTMLResponse(f"<h1>Dashboard not found</h1><pre>{str(e)}</pre>", status_code=500)
 
 if __name__ == "__main__":
     import uvicorn

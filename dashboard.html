@@ -92,8 +92,45 @@
     .ai-bubble.user{align-self:flex-end;background:#17365b;color:#eaf5ff;border-color:#2c5f98;}
     .ai-bubble.assistant{align-self:flex-start;background:#101827;color:#d9e8fb;}
     .ai-bubble.error{align-self:flex-start;background:#2b1018;color:#ffb4c0;border-color:#743044;}
+    .ai-feedback{display:flex;gap:5px;margin-top:7px;opacity:.72;}
+    .ai-feedback button{background:#0b1322;border:1px solid #253b5c;border-radius:999px;color:#8fb4df;font-size:.54rem;font-weight:900;padding:3px 7px;}
+    .ai-feedback button:hover{opacity:1;border-color:#8b5cf6;color:#e8f2ff;}
+    .ai-mode-row{display:flex;gap:6px;padding:9px 12px 0;flex-wrap:wrap;border-top:1px solid #101a2d;}
+    .ai-mode-btn{background:#0b1322;border:1px solid #253b5c;border-radius:999px;color:#8fb4df;font-size:.53rem;font-weight:900;padding:5px 8px;}
+    .ai-mode-btn.active{background:#4c1d95;border-color:#a78bfa;color:#fff;box-shadow:0 0 12px rgba(124,58,237,.22);}
+    .ai-context-row{display:flex;gap:6px;flex-wrap:wrap;padding:8px 12px 0;border-top:1px solid #101a2d;}
+    .ai-context-chip{display:inline-flex;align-items:center;gap:4px;background:#0a1628;border:1px solid #243a60;border-radius:999px;color:#9ec7ef;font-size:.52rem;font-weight:900;padding:4px 7px;max-width:178px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+    .ai-context-chip strong{color:#e8f2ff;font-weight:900;}
+    .ai-context-chip.live{border-color:#087a55;color:#c8fff0;background:#052119;}
+    .ai-context-chip.warn{border-color:#7a5a08;color:#ffe8a3;background:#211905;}
+    .ai-sync-row{display:flex;align-items:center;justify-content:space-between;gap:8px;margin:7px 12px 0;padding:6px 8px;border:1px solid #1e3354;border-radius:8px;background:#07101d;color:#7595bd;font-size:.54rem;font-weight:800;}
+    .ai-sync-left{display:flex;align-items:center;gap:6px;min-width:0;}
+    .ai-sync-dot{width:7px;height:7px;border-radius:50%;background:#64748b;box-shadow:0 0 8px rgba(100,116,139,.6);flex-shrink:0;}
+    .ai-sync-row.synced .ai-sync-dot{background:#00c853;box-shadow:0 0 10px rgba(0,200,83,.7);}
+    .ai-sync-row.saving .ai-sync-dot,
+    .ai-sync-row.loading .ai-sync-dot{background:#ffd700;box-shadow:0 0 10px rgba(255,215,0,.65);}
+    .ai-sync-row.error .ai-sync-dot{background:#ff4d6d;box-shadow:0 0 10px rgba(255,77,109,.7);}
+    .ai-sync-text{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+    .ai-sync-btn{background:#102642;border:1px solid #2f5f98;border-radius:999px;color:#cfe9ff;font-size:.5rem;font-weight:900;padding:3px 7px;white-space:nowrap;}
     .ai-quick-row{display:flex;gap:6px;flex-wrap:wrap;padding:10px 12px 0;border-top:1px solid #101a2d;}
     .ai-quick{background:#101b30;border:1px solid #2a4a78;color:#bfe1ff;border-radius:999px;padding:5px 8px;font-size:.56rem;font-weight:800;}
+    .ai-command-palette{display:none;margin:8px 12px 0;padding:8px;border:1px solid #243a60;border-radius:9px;background:#08101d;}
+    .ai-command-palette.visible{display:block;}
+    .ai-command-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:6px;}
+    .ai-command-btn{background:#101b30;border:1px solid #2a4a78;color:#bfe1ff;border-radius:7px;padding:7px 8px;font-size:.55rem;font-weight:900;text-align:left;}
+    .ai-command-btn span{display:block;font-size:.48rem;color:#6f86aa;font-weight:700;margin-top:2px;}
+    .ai-filter-preview{display:none;margin:8px 12px 0;padding:9px;border:1px solid #3b5f94;border-radius:10px;background:#071120;}
+    .ai-filter-preview.visible{display:block;}
+    .ai-filter-head{display:flex;align-items:flex-start;justify-content:space-between;gap:8px;margin-bottom:7px;}
+    .ai-filter-title{font-size:.62rem;color:#eaf5ff;font-weight:900;}
+    .ai-filter-copy{font-size:.54rem;color:#7899c2;line-height:1.35;margin-top:2px;}
+    .ai-filter-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:5px;margin-top:8px;}
+    .ai-filter-cell{background:#0c192d;border:1px solid #1f3558;border-radius:7px;padding:6px;}
+    .ai-filter-label{font-size:.47rem;color:#6d8db8;text-transform:uppercase;font-weight:900;letter-spacing:.5px;}
+    .ai-filter-value{font-size:.64rem;color:#eaf5ff;font-weight:900;margin-top:2px;}
+    .ai-filter-actions{display:flex;gap:6px;margin-top:8px;}
+    .ai-filter-actions button{flex:1;background:#102642;border:1px solid #2f5f98;color:#cfe9ff;border-radius:7px;padding:6px 7px;font-size:.55rem;font-weight:900;}
+    .ai-filter-actions button.primary{background:#065f46;border-color:#00c853;color:#eafff6;}
     .ai-watchlist{display:none;margin:8px 12px 0;padding:8px;border:1px solid #243a60;border-radius:9px;background:#08101d;}
     .ai-watchlist.visible{display:block;}
     .ai-watch-title{font-size:.58rem;color:#8bb7e8;font-weight:900;margin-bottom:6px;text-transform:uppercase;letter-spacing:.7px;}
@@ -103,6 +140,18 @@
     .ai-live-title{font-size:.6rem;color:#eaf5ff;font-weight:900;}
     .ai-live-toggle{border:1px solid #2a4a78;background:#132745;color:#bfe1ff;border-radius:999px;padding:5px 9px;font-size:.56rem;font-weight:900;white-space:nowrap;}
     .ai-live-toggle.on{background:#064e3b;border-color:#00c853;color:#eafff6;}
+    .ai-memory-actions{display:flex;gap:6px;margin:8px 12px 0;}
+    .ai-memory-btn{flex:1;background:#101b30;border:1px solid #2a4a78;color:#bfe1ff;border-radius:7px;padding:6px 8px;font-size:.55rem;font-weight:900;}
+    .ai-prefs{display:none;margin:8px 12px 0;padding:8px;border:1px solid #243a60;border-radius:9px;background:#08101d;}
+    .ai-prefs.visible{display:block;}
+    .ai-prefs-title{font-size:.58rem;color:#8bb7e8;font-weight:900;margin-bottom:6px;text-transform:uppercase;letter-spacing:.7px;}
+    .ai-prefs-text{width:100%;min-height:90px;resize:vertical;background:#060d18;border:1px solid #2a3a5a;border-radius:7px;color:#e8f2ff;font-size:.62rem;line-height:1.45;padding:8px;outline:none;}
+    .ai-prefs-row{display:flex;gap:6px;margin-top:7px;}
+    .ai-lesson-list{margin-top:8px;display:flex;flex-direction:column;gap:5px;max-height:110px;overflow:auto;}
+    .ai-lesson-item{background:#101827;border:1px solid #203757;border-radius:7px;padding:6px 7px;color:#cfe2ff;font-size:.58rem;line-height:1.35;}
+    .ai-feedback-item{background:#101827;border:1px solid #203757;border-radius:7px;padding:6px 7px;color:#cfe2ff;font-size:.56rem;line-height:1.35;}
+    .ai-feedback-kind{display:inline-block;margin-right:5px;padding:1px 5px;border-radius:999px;background:#132745;color:#8bb7e8;font-weight:900;text-transform:uppercase;font-size:.48rem;}
+    .ai-feedback-kind.miss{background:#2b1018;color:#ffb4c0;}
     .ai-input-row{display:flex;gap:7px;padding:10px 12px 12px;}
     .ai-input{flex:1;min-height:38px;max-height:92px;resize:vertical;background:#08101d;border:1px solid #2a3a5a;border-radius:8px;color:#e8f2ff;font-size:.68rem;padding:8px;outline:none;}
     .ai-input:focus{border-color:#8b5cf6;box-shadow:0 0 0 2px rgba(139,92,246,.15);}
@@ -654,12 +703,34 @@
     body.light-theme .ai-sub{color:#64748b!important;}
     body.light-theme .ai-bubble.assistant{background:#f8fafc!important;border-color:#d7e0ef!important;color:#172033!important;}
     body.light-theme .ai-bubble.user{background:#dbeafe!important;border-color:#93c5fd!important;color:#0f172a!important;}
+    body.light-theme .ai-feedback button{background:#ffffff!important;border-color:#cbd5e1!important;color:#334155!important;}
+    body.light-theme .ai-mode-btn{background:#ffffff!important;border-color:#cbd5e1!important;color:#334155!important;}
+    body.light-theme .ai-mode-btn.active{background:#7c3aed!important;border-color:#8b5cf6!important;color:#fff!important;}
+    body.light-theme .ai-context-chip{background:#ffffff!important;border-color:#cbd5e1!important;color:#475569!important;}
+    body.light-theme .ai-context-chip strong{color:#0f172a!important;}
+    body.light-theme .ai-context-chip.live{background:#ecfdf5!important;border-color:#86efac!important;color:#047857!important;}
+    body.light-theme .ai-context-chip.warn{background:#fffbeb!important;border-color:#facc15!important;color:#854d0e!important;}
+    body.light-theme .ai-sync-row{background:#f8fafc!important;border-color:#d7e0ef!important;color:#64748b!important;}
+    body.light-theme .ai-sync-btn{background:#ffffff!important;border-color:#cbd5e1!important;color:#334155!important;}
+    body.light-theme .ai-command-palette{background:#f8fafc!important;border-color:#d7e0ef!important;}
+    body.light-theme .ai-command-btn{background:#ffffff!important;border-color:#cbd5e1!important;color:#334155!important;}
+    body.light-theme .ai-filter-preview{background:#f8fafc!important;border-color:#93c5fd!important;}
+    body.light-theme .ai-filter-title,
+    body.light-theme .ai-filter-value{color:#0f172a!important;}
+    body.light-theme .ai-filter-copy,
+    body.light-theme .ai-filter-label{color:#64748b!important;}
+    body.light-theme .ai-filter-cell{background:#ffffff!important;border-color:#d7e0ef!important;}
     body.light-theme .ai-input{background:#f8fafc!important;border-color:#cbd5e1!important;color:#172033!important;}
     body.light-theme .ai-watchlist{background:#f8fafc!important;border-color:#d7e0ef!important;}
     body.light-theme .ai-watch-chip{background:#e0f2fe!important;border-color:#93c5fd!important;color:#0f172a!important;}
     body.light-theme .ai-live{background:#f8fafc!important;border-color:#d7e0ef!important;}
     body.light-theme .ai-live-title{color:#0f172a!important;}
     body.light-theme .ai-live-copy{color:#64748b!important;}
+    body.light-theme .ai-memory-btn{background:#ffffff!important;border-color:#cbd5e1!important;color:#334155!important;}
+    body.light-theme .ai-prefs{background:#f8fafc!important;border-color:#d7e0ef!important;}
+    body.light-theme .ai-prefs-text{background:#ffffff!important;border-color:#cbd5e1!important;color:#172033!important;}
+    body.light-theme .ai-lesson-item{background:#ffffff!important;border-color:#d7e0ef!important;color:#172033!important;}
+    body.light-theme .ai-feedback-item{background:#ffffff!important;border-color:#d7e0ef!important;color:#172033!important;}
     body.light-theme .ai-quick,
     body.light-theme .ai-close{background:#ffffff!important;border-color:#cbd5e1!important;color:#334155!important;}
     body.light-theme .poly-launch{background:linear-gradient(135deg,#0ea5e9,#2563eb)!important;color:#fff!important;border-color:#93c5fd!important;}
@@ -875,6 +946,21 @@
   <div class="ai-msgs" id="aiMessages">
     <div class="ai-bubble assistant">Ask me about the active ticker, scanner results, catalysts, risk, or what confirmation would matter next.</div>
   </div>
+  <div class="ai-mode-row" id="aiModeRow">
+    <button class="ai-mode-btn" data-mode="fast_scan" onclick="setAiMode('fast_scan')">Fast Scan</button>
+    <button class="ai-mode-btn" data-mode="risk_manager" onclick="setAiMode('risk_manager')">Risk</button>
+    <button class="ai-mode-btn" data-mode="teacher" onclick="setAiMode('teacher')">Teacher</button>
+    <button class="ai-mode-btn" data-mode="catalyst" onclick="setAiMode('catalyst')">Catalyst</button>
+    <button class="ai-mode-btn" data-mode="execution_prep" onclick="setAiMode('execution_prep')">Prep</button>
+  </div>
+  <div class="ai-context-row" id="aiContextChips"></div>
+  <div class="ai-sync-row" id="aiSyncRow">
+    <div class="ai-sync-left">
+      <span class="ai-sync-dot"></span>
+      <span class="ai-sync-text" id="aiSyncText">Memory local only</span>
+    </div>
+    <button class="ai-sync-btn" onclick="syncAiProfileToBackend(false)">Sync</button>
+  </div>
   <div class="ai-quick-row">
     <button class="ai-quick" onclick="aiQuick('Explain the active ticker setup and what would confirm or invalidate it.')">Explain ticker</button>
     <button class="ai-quick" onclick="aiQuick('Summarize the current scanner results and rank the strongest opportunities.')">Summarize scanner</button>
@@ -883,7 +969,30 @@
     <button class="ai-quick" onclick="aiQuick('Compare the top 3 scanner results and tell me which one deserves attention first.')">Compare top 3</button>
     <button class="ai-quick" onclick="aiQuick('Summarize recent scanner log errors and tell me what they mean.')">Scan logs</button>
     <button class="ai-quick" onclick="aiQuick('Build a watchlist from the strongest current scanner results.')">Watchlist</button>
+    <button class="ai-quick" onclick="runAiIntel('market')">Market Intel</button>
+    <button class="ai-quick" onclick="runAiIntel('risk')">News Risk</button>
+    <button class="ai-quick" onclick="aiQuick('Give me a session recap from Live Watch memory and tell me what changed.')">Session recap</button>
+    <button class="ai-quick" onclick="aiQuick('Review my saved memory from prior sessions and tell me what patterns keep repeating.')">Memory recap</button>
+    <button class="ai-quick" onclick="toggleAiCommandPalette()">Commands</button>
   </div>
+  <div class="ai-command-palette" id="aiCommandPalette">
+    <div class="ai-command-grid">
+      <button class="ai-command-btn" onclick="runAiCommand('/watchlist top')">Watchlist Top<span>from current scan</span></button>
+      <button class="ai-command-btn" onclick="runAiCommand('/memory')">Memory Recap<span>local session stats</span></button>
+      <button class="ai-command-btn" onclick="runAiCommand('/mode risk')">Risk Mode<span>stricter warnings</span></button>
+      <button class="ai-command-btn" onclick="runAiCommand('/mode fast')">Fast Mode<span>short ranked answers</span></button>
+      <button class="ai-command-btn" onclick="runAiCommand('/live on')">Live Watch On<span>proactive alerts</span></button>
+      <button class="ai-command-btn" onclick="runAiCommand('/live off')">Live Watch Off<span>quiet mode</span></button>
+      <button class="ai-command-btn" onclick="draftAiFilter('broad')">Draft Broad Scan<span>more tickers</span></button>
+      <button class="ai-command-btn" onclick="draftAiFilter('quality')">Draft Quality Scan<span>stronger setups</span></button>
+      <button class="ai-command-btn" onclick="runAiIntel('market')">Market Intel<span>news + heat map</span></button>
+      <button class="ai-command-btn" onclick="runAiIntel('catalyst')">Catalyst Intel<span>ticker/news focus</span></button>
+      <button class="ai-command-btn" onclick="runAiHealthCheck()">Copilot Health<span>memory + AI config</span></button>
+      <button class="ai-command-btn" onclick="runAiCommand('/help')">Show Help<span>all slash commands</span></button>
+      <button class="ai-command-btn" onclick="runAiCommand('/clear')">Clear Chat<span>keeps memory</span></button>
+    </div>
+  </div>
+  <div class="ai-filter-preview" id="aiFilterPreview"></div>
   <div class="ai-watchlist" id="aiWatchlist"></div>
   <div class="ai-live">
     <div>
@@ -892,8 +1001,42 @@
     </div>
     <button class="ai-live-toggle" id="aiLiveToggle" onclick="toggleAiLiveWatch()">Off</button>
   </div>
+  <div class="ai-memory-actions">
+    <button class="ai-memory-btn" onclick="saveAiMemoryNow()">Save Memory</button>
+    <button class="ai-memory-btn" onclick="toggleAiPrefs()">Prefs</button>
+    <button class="ai-memory-btn" onclick="toggleAiLessons()">Teach</button>
+    <button class="ai-memory-btn" onclick="toggleAiFeedbackPanel()">Feedback</button>
+    <button class="ai-memory-btn" onclick="exportAiProfile()">Export</button>
+    <button class="ai-memory-btn" onclick="document.getElementById('aiProfileImportFile')?.click()">Import</button>
+    <button class="ai-memory-btn" onclick="clearAiMemory()">Clear Memory</button>
+  </div>
+  <input id="aiProfileImportFile" type="file" accept="application/json,.json" style="display:none" onchange="importAiProfileFile(event)">
+  <div class="ai-prefs" id="aiPrefs">
+    <div class="ai-prefs-title">Copilot Preferences</div>
+    <textarea class="ai-prefs-text" id="aiPrefsText"></textarea>
+    <div class="ai-prefs-row">
+      <button class="ai-memory-btn" onclick="saveAiPrefs()">Save Prefs</button>
+      <button class="ai-memory-btn" onclick="resetAiPrefs()">Reset</button>
+    </div>
+  </div>
+  <div class="ai-prefs" id="aiLessons">
+    <div class="ai-prefs-title">Teach The Copilot</div>
+    <textarea class="ai-prefs-text" id="aiLessonText" placeholder="Example: When spread is over 5%, warn me before ranking a ticker highly."></textarea>
+    <div class="ai-prefs-row">
+      <button class="ai-memory-btn" onclick="saveAiLesson()">Save Lesson</button>
+      <button class="ai-memory-btn" onclick="clearAiLessons()">Clear Lessons</button>
+    </div>
+    <div class="ai-lesson-list" id="aiLessonList"></div>
+  </div>
+  <div class="ai-prefs" id="aiFeedbackPanel">
+    <div class="ai-prefs-title">Answer Feedback</div>
+    <div class="ai-lesson-list" id="aiFeedbackList"></div>
+    <div class="ai-prefs-row">
+      <button class="ai-memory-btn" onclick="clearAiFeedback()">Clear Feedback</button>
+    </div>
+  </div>
   <div class="ai-input-row">
-    <textarea class="ai-input" id="aiInput" placeholder="Ask about a ticker, scanner, catalyst, or risk..." onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();sendAiMessage();}"></textarea>
+    <textarea class="ai-input" id="aiInput" placeholder="Ask, or type /open DUOT, /mode risk, /watchlist, /memory..." onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();sendAiMessage();}"></textarea>
     <button class="ai-send" id="aiSendBtn" onclick="sendAiMessage()">Send</button>
   </div>
 </div>
@@ -1304,7 +1447,8 @@
     ['wmUyghur','nrUyghur'].forEach(id => { const el=document.getElementById(id); if(el){el.src=UYGHUR_LOGO;el.onerror=()=>el.style.display='none';} });
   }
   setLogos();
-  window.addEventListener('DOMContentLoaded',()=>{renderAiWatchlist();updateAiLiveToggle();});
+  window.addEventListener('DOMContentLoaded',()=>{renderAiWatchlist();updateAiLiveToggle();syncAiPrefsText();renderAiLessons();renderAiFeedback();renderAiMode();renderAiContextChips();renderAiSyncStatus();});
+  window.addEventListener('beforeunload',()=>{saveAiMemoryNow(true);syncAiProfileToBackend(true);});
 
   function applyLayoutTheme(theme){
     const isLight = theme === 'light';
@@ -1334,19 +1478,254 @@
   let aiLiveWatch = localStorage.getItem('aiLiveWatch') === 'true';
   const aiSeenEvents = new Set();
   const aiLastTickerPrice = {};
+  let aiSessionMemory = loadAiSessionMemory();
+  let aiMode = localStorage.getItem('aiCopilotMode') || 'fast_scan';
+  const aiModeProfiles = {
+    fast_scan:'Fast Scan Mode: keep answers short; rank strongest tickers first; focus on price, change, volume, RVOL, spread, catalyst, and immediate next check.',
+    risk_manager:'Risk Manager Mode: be stricter than usual; lead with spread, liquidity, SEC/dilution, halt, no-news, chase risk, and invalidation.',
+    teacher:'Teacher Mode: explain pattern logic, why it matters, what confirms it, and what would invalidate it. Keep it educational but practical.',
+    catalyst:'News/Catalyst Mode: focus on news, SEC filings, Polymarket/market context, freshness, credibility, and whether the catalyst can sustain attention.',
+    execution_prep:'Execution Prep Mode: build a checklist for confirmation, entry zone, stop/invalidation, liquidity/spread, position-risk thought process, and no-trade conditions.'
+  };
+  const defaultAiPrefs = [
+    'Trading style: small-cap momentum/day trading, Sykes-style pattern awareness.',
+    'Prioritize: real liquidity, tight spreads, fresh catalyst/news, strong relative volume, clean chart confirmation.',
+    'Be skeptical of: wide spreads, low dollar volume, dilution/SEC danger filings, halts, no clear catalyst, late extended moves.',
+    'Tone: concise, direct, risk-first. Compare opportunities instead of hyping them.',
+    'Do not: give guaranteed outcomes, tell me to enter blindly, or ignore invalidation/stop risk.'
+  ].join('\n');
 
   function toggleAiPanel(force){
     const panel=document.getElementById('aiPanel');
     if(!panel)return;
     const open = typeof force === 'boolean' ? force : panel.classList.contains('hidden');
     panel.classList.toggle('hidden', !open);
-    if(open)setTimeout(()=>document.getElementById('aiInput')?.focus(),60);
+    if(open){
+      renderAiContextChips();
+      setTimeout(()=>document.getElementById('aiInput')?.focus(),60);
+    }
+  }
+
+  function setAiMode(mode){
+    aiMode=aiModeProfiles[mode]?mode:'fast_scan';
+    localStorage.setItem('aiCopilotMode', aiMode);
+    renderAiMode();
+    appendAiBubble('assistant', `Copilot mode set to ${aiModeLabel(aiMode)}.`);
+  }
+
+  function aiModeLabel(mode){
+    return ({
+      fast_scan:'Fast Scan',
+      risk_manager:'Risk Manager',
+      teacher:'Teacher',
+      catalyst:'News/Catalyst',
+      execution_prep:'Execution Prep'
+    })[mode]||'Fast Scan';
+  }
+
+  function renderAiMode(){
+    document.querySelectorAll('.ai-mode-btn').forEach(btn=>{
+      btn.classList.toggle('active', btn.dataset.mode===aiMode);
+    });
+    renderAiContextChips();
+  }
+
+  function aiChip(label,value,cls=''){
+    const safeLabel=String(label||'').replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
+    const safeValue=String(value||'--').replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
+    return `<span class="ai-context-chip ${cls}" title="${safeLabel}: ${safeValue}">${safeLabel}: <strong>${safeValue}</strong></span>`;
+  }
+
+  function renderAiContextChips(){
+    const host=document.getElementById('aiContextChips');
+    if(!host)return;
+    const active=activeTickerContext();
+    const tab=workspaceTabs.find(t=>t.id===activeWorkspaceTab);
+    const lessons=loadAiLessons().length;
+    const feedback=loadAiFeedback().length;
+    const memTickers=Object.keys(aiSessionMemory?.tickers||{}).length;
+    const scanLabel=MODES[currentMode]?.label||currentMode||'Scanner';
+    const chips=[
+      aiChip('Mode', aiModeLabel(aiMode)),
+      aiChip('Tab', tab?.title||'Scanner+'),
+      aiChip('Ticker', active.ticker||'none', active.ticker?'live':'warn'),
+      aiChip('Scan', `${scanLabel} (${allResults.length})`),
+      aiChip('Memory', `${memTickers} tickers`),
+      aiChip('Teach', `${lessons}`),
+      aiChip('Feedback', `${feedback}`),
+      aiChip('Watch', aiLiveWatch?'on':'off', aiLiveWatch?'live':'')
+    ];
+    host.innerHTML=chips.join('');
+  }
+
+  let aiSyncState={status:'idle',message:'Memory local only',time:''};
+
+  function setAiSyncStatus(status,message){
+    aiSyncState={
+      status:status||'idle',
+      message:message||'Memory local only',
+      time:new Date().toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit',second:'2-digit',hour12:true,timeZone:'America/New_York'})
+    };
+    renderAiSyncStatus();
+  }
+
+  function renderAiSyncStatus(){
+    const row=document.getElementById('aiSyncRow');
+    const text=document.getElementById('aiSyncText');
+    if(!row||!text)return;
+    row.classList.remove('idle','loading','saving','synced','error');
+    row.classList.add(aiSyncState.status||'idle');
+    text.textContent=aiSyncState.time ? `${aiSyncState.message} · ${aiSyncState.time}` : aiSyncState.message;
+  }
+
+  function loadAiPrefs(){
+    return localStorage.getItem('aiCopilotPrefs') || defaultAiPrefs;
+  }
+
+  function syncAiPrefsText(){
+    const el=document.getElementById('aiPrefsText');
+    if(el)el.value=loadAiPrefs();
+  }
+
+  function toggleAiPrefs(force){
+    const panel=document.getElementById('aiPrefs');
+    if(!panel)return;
+    const open=typeof force==='boolean'?force:!panel.classList.contains('visible');
+    panel.classList.toggle('visible', open);
+    if(open){syncAiPrefsText();setTimeout(()=>document.getElementById('aiPrefsText')?.focus(),40);}
+  }
+
+  function saveAiPrefs(){
+    const el=document.getElementById('aiPrefsText');
+    const text=(el?.value||'').trim()||defaultAiPrefs;
+    localStorage.setItem('aiCopilotPrefs', text);
+    renderAiContextChips();
+    scheduleAiProfileSync();
+    appendAiBubble('assistant','Copilot preferences saved. I will use them when ranking setups and calling out risk.');
+    toggleAiPrefs(false);
+  }
+
+  function resetAiPrefs(){
+    localStorage.setItem('aiCopilotPrefs', defaultAiPrefs);
+    syncAiPrefsText();
+    renderAiContextChips();
+    scheduleAiProfileSync();
+    appendAiBubble('assistant','Copilot preferences reset to the default trading profile.');
+  }
+
+  function loadAiLessons(){
+    try{return JSON.parse(localStorage.getItem('aiCopilotLessons')||'[]');}
+    catch(e){return [];}
+  }
+
+  function saveAiLessons(lessons){
+    localStorage.setItem('aiCopilotLessons', JSON.stringify((lessons||[]).slice(0,30)));
+  }
+
+  function renderAiLessons(){
+    const host=document.getElementById('aiLessonList');
+    if(!host)return;
+    const lessons=loadAiLessons();
+    host.innerHTML=lessons.length?lessons.slice(0,12).map(l=>`<div class="ai-lesson-item">${l.text}</div>`).join(''):'<div class="ai-lesson-item">No lessons saved yet.</div>';
+  }
+
+  function toggleAiLessons(force){
+    const panel=document.getElementById('aiLessons');
+    if(!panel)return;
+    const open=typeof force==='boolean'?force:!panel.classList.contains('visible');
+    panel.classList.toggle('visible', open);
+    if(open){renderAiLessons();setTimeout(()=>document.getElementById('aiLessonText')?.focus(),40);}
+  }
+
+  function saveAiLesson(){
+    const el=document.getElementById('aiLessonText');
+    const text=(el?.value||'').trim();
+    if(!text)return;
+    const lessons=loadAiLessons().filter(l=>l.text!==text);
+    lessons.unshift({text,time:new Date().toLocaleString('en-US',{timeZone:'America/New_York'})});
+    saveAiLessons(lessons);
+    if(el)el.value='';
+    renderAiLessons();
+    renderAiContextChips();
+    scheduleAiProfileSync();
+    appendAiBubble('assistant','Lesson saved. I will include it in future Copilot answers.');
+  }
+
+  function clearAiLessons(){
+    if(!confirm('Clear Copilot lessons from this browser?'))return;
+    localStorage.removeItem('aiCopilotLessons');
+    renderAiLessons();
+    renderAiContextChips();
+    scheduleAiProfileSync();
+    appendAiBubble('assistant','Copilot lessons cleared.');
+  }
+
+  function loadAiFeedback(){
+    try{return JSON.parse(localStorage.getItem('aiCopilotFeedback')||'[]');}
+    catch(e){return [];}
+  }
+
+  function saveAiFeedback(item){
+    const list=loadAiFeedback();
+    list.unshift({...item,time:new Date().toLocaleString('en-US',{timeZone:'America/New_York'})});
+    localStorage.setItem('aiCopilotFeedback', JSON.stringify(list.slice(0,50)));
+    renderAiFeedback();
+    renderAiContextChips();
+    scheduleAiProfileSync();
+  }
+
+  function renderAiFeedback(){
+    const host=document.getElementById('aiFeedbackList');
+    if(!host)return;
+    const list=loadAiFeedback();
+    host.innerHTML=list.length?list.slice(0,12).map(f=>`
+      <div class="ai-feedback-item">
+        <span class="ai-feedback-kind ${f.kind==='miss'?'miss':''}">${f.kind}</span>
+        <span>${f.time||''}</span>
+        <div style="margin-top:4px;color:#9fb7d7;">${String(f.text||'').slice(0,180)}</div>
+      </div>
+    `).join(''):'<div class="ai-feedback-item">No answer feedback saved yet.</div>';
+  }
+
+  function toggleAiFeedbackPanel(force){
+    const panel=document.getElementById('aiFeedbackPanel');
+    if(!panel)return;
+    const open=typeof force==='boolean'?force:!panel.classList.contains('visible');
+    panel.classList.toggle('visible', open);
+    if(open)renderAiFeedback();
+  }
+
+  function clearAiFeedback(){
+    if(!confirm('Clear Copilot answer feedback from this browser?'))return;
+    localStorage.removeItem('aiCopilotFeedback');
+    renderAiFeedback();
+    renderAiContextChips();
+    scheduleAiProfileSync();
+    appendAiBubble('assistant','Copilot answer feedback cleared.');
+  }
+
+  function rateAiAnswer(kind, text){
+    const clipped=String(text||'').slice(0,500);
+    saveAiFeedback({kind,text:clipped});
+    if(kind==='useful'){
+      appendAiBubble('assistant','Got it. I saved that answer as useful guidance.');
+    }else{
+      toggleAiLessons(true);
+      const lesson=document.getElementById('aiLessonText');
+      if(lesson){
+        lesson.value='Correction: ';
+        lesson.focus();
+      }
+      appendAiBubble('assistant','What should I learn from that miss? Add the correction in Teach and save it.');
+    }
   }
 
   function toggleAiLiveWatch(force){
     aiLiveWatch = typeof force === 'boolean' ? force : !aiLiveWatch;
     localStorage.setItem('aiLiveWatch', aiLiveWatch ? 'true' : 'false');
     updateAiLiveToggle();
+    renderAiContextChips();
+    scheduleAiProfileSync();
     if(aiLiveWatch)aiLiveAlert('Live Watch is on. I will flag meaningful scanner and ticker changes here.');
   }
 
@@ -1366,8 +1745,311 @@
     appendAiBubble('assistant', `Live Watch: ${text}`);
   }
 
+  function loadAiSessionMemory(){
+    try{
+      return JSON.parse(sessionStorage.getItem('aiSessionMemory')||'{"tickers":{},"notes":[]}');
+    }catch(e){
+      return {tickers:{},notes:[]};
+    }
+  }
+
+  function saveAiSessionMemory(){
+    try{sessionStorage.setItem('aiSessionMemory', JSON.stringify(aiSessionMemory));}catch(e){}
+  }
+
+  function rememberAiNote(text, key){
+    if(!text)return;
+    const noteKey=key||text;
+    if((aiSessionMemory.notes||[]).some(n=>n.key===noteKey))return;
+    aiSessionMemory.notes=aiSessionMemory.notes||[];
+    aiSessionMemory.notes.unshift({
+      key:noteKey,
+      time:new Date().toLocaleTimeString('en-US',{hour12:true,timeZone:'America/New_York'}),
+      text
+    });
+    aiSessionMemory.notes=aiSessionMemory.notes.slice(0,40);
+    saveAiSessionMemory();
+  }
+
+  function rememberSetupTrend(setup){
+    if(!setup||!setup.ticker)return null;
+    const ticker=setup.ticker;
+    const now=Date.now();
+    const price=Number(setup.price||0);
+    const gap=Number(setup.gap_pct||0);
+    const rvol=Number(setup.rvol||0);
+    const dvol=Number(setup.dollar_vol||setup.dollar_volume||0);
+    aiSessionMemory.tickers=aiSessionMemory.tickers||{};
+    let mem=aiSessionMemory.tickers[ticker];
+    if(!mem){
+      mem={ticker,first_seen:now,last_seen:now,first_price:price,first_gap:gap,high_price:price,high_gap:gap,last_price:price,last_gap:gap,last_rvol:rvol,last_dvol:dvol,grade:setup.grade,pattern:setup.pattern,mode:currentMode,updates:1};
+      aiSessionMemory.tickers[ticker]=mem;
+      rememberAiNote(`${ticker} first seen in ${currentMode}: ${gap>=0?'+':''}${gap.toFixed(1)}%, RVOL ${rvol?rvol.toFixed(1)+'x':'n/a'}.`, `first:${ticker}:${currentMode}`);
+      saveAiSessionMemory();
+      return mem;
+    }
+    const oldGap=Number(mem.last_gap||0);
+    const oldRvol=Number(mem.last_rvol||0);
+    mem.last_seen=now;
+    mem.last_price=price||mem.last_price;
+    mem.last_gap=gap;
+    mem.last_rvol=rvol||mem.last_rvol;
+    mem.last_dvol=dvol||mem.last_dvol;
+    mem.grade=setup.grade||mem.grade;
+    mem.pattern=setup.pattern||mem.pattern;
+    mem.mode=currentMode||mem.mode;
+    mem.updates=(mem.updates||0)+1;
+    if(price>(mem.high_price||0))mem.high_price=price;
+    if(gap>(mem.high_gap||-999))mem.high_gap=gap;
+    const fromFirst=gap-Number(mem.first_gap||0);
+    const fromHigh=gap-Number(mem.high_gap||gap);
+    if(fromFirst>=8){
+      const text=`${ticker} is improving versus first seen: ${mem.first_gap.toFixed(1)}% -> ${gap.toFixed(1)}%.`;
+      aiLiveAlert(text, `trend-up:${ticker}:${Math.floor(gap)}`);
+      rememberAiNote(text, `trend-up:${ticker}:${Math.floor(gap)}`);
+    }
+    if(fromHigh<=-8){
+      const text=`${ticker} is fading from its session high change: ${Number(mem.high_gap||0).toFixed(1)}% -> ${gap.toFixed(1)}%.`;
+      aiLiveAlert(text, `trend-fade:${ticker}:${Math.floor(gap)}`);
+      rememberAiNote(text, `trend-fade:${ticker}:${Math.floor(gap)}`);
+    }
+    if(oldRvol&&rvol>=oldRvol*1.5&&rvol>=2){
+      const text=`${ticker} RVOL is accelerating: ${oldRvol.toFixed(1)}x -> ${rvol.toFixed(1)}x.`;
+      aiLiveAlert(text, `rvol-up:${ticker}:${Math.floor(rvol)}`);
+      rememberAiNote(text, `rvol-up:${ticker}:${Math.floor(rvol)}`);
+    }
+    if(oldGap&&Math.abs(gap-oldGap)>=6){
+      rememberAiNote(`${ticker} changed quickly: ${oldGap.toFixed(1)}% -> ${gap.toFixed(1)}%.`, `gap-shift:${ticker}:${Math.floor(gap)}`);
+    }
+    saveAiSessionMemory();
+    return mem;
+  }
+
+  function rememberQuoteTrend(ticker, price){
+    ticker=String(ticker||'').toUpperCase();
+    if(!ticker||!price)return;
+    aiSessionMemory.tickers=aiSessionMemory.tickers||{};
+    const mem=aiSessionMemory.tickers[ticker]||{ticker,first_seen:Date.now(),first_price:price,high_price:price,updates:0};
+    const old=Number(mem.last_quote||mem.last_price||0);
+    mem.last_quote=price;
+    mem.last_seen=Date.now();
+    mem.high_price=Math.max(Number(mem.high_price||0), price);
+    mem.low_price=mem.low_price?Math.min(Number(mem.low_price), price):price;
+    aiSessionMemory.tickers[ticker]=mem;
+    if(old&&Math.abs((price-old)/old*100)>=5){
+      rememberAiNote(`${ticker} live quote moved from $${old.toFixed(4)} to $${price.toFixed(4)}.`, `quote-note:${ticker}:${Math.round(price*100)}`);
+    }
+    saveAiSessionMemory();
+  }
+
+  function aiSessionSummary(){
+    const tickers=Object.values(aiSessionMemory.tickers||{}).sort((a,b)=>(b.last_seen||0)-(a.last_seen||0)).slice(0,12).map(t=>({
+      ticker:t.ticker,
+      mode:t.mode,
+      first_gap:t.first_gap,
+      last_gap:t.last_gap,
+      high_gap:t.high_gap,
+      last_rvol:t.last_rvol,
+      first_price:t.first_price,
+      last_price:t.last_price||t.last_quote,
+      high_price:t.high_price,
+      grade:t.grade,
+      pattern:t.pattern,
+      updates:t.updates
+    }));
+    return {tickers, notes:(aiSessionMemory.notes||[]).slice(0,12)};
+  }
+
+  function aiTodayKey(){
+    return new Date().toLocaleDateString('en-CA',{timeZone:'America/New_York'});
+  }
+
+  function loadAiPersistentMemory(){
+    try{return JSON.parse(localStorage.getItem('aiPersistentMemory')||'{"days":[]}');}
+    catch(e){return {days:[]};}
+  }
+
+  function saveAiPersistentMemory(mem){
+    try{localStorage.setItem('aiPersistentMemory', JSON.stringify(mem));}catch(e){}
+  }
+
+  function persistentMemorySummary(){
+    const mem=loadAiPersistentMemory();
+    return {
+      days:(mem.days||[]).slice(0,8).map(d=>({
+        date:d.date,
+        saved_at:d.saved_at,
+        top_tickers:(d.tickers||[]).slice(0,8),
+        notes:(d.notes||[]).slice(0,8)
+      }))
+    };
+  }
+
+  function saveAiMemoryNow(silent=false){
+    const summary=aiSessionSummary();
+    const mem=loadAiPersistentMemory();
+    const day={
+      date:aiTodayKey(),
+      saved_at:new Date().toLocaleTimeString('en-US',{hour12:true,timeZone:'America/New_York'}),
+      tickers:summary.tickers.slice(0,20),
+      notes:summary.notes.slice(0,20)
+    };
+    mem.days=[day,...(mem.days||[]).filter(d=>d.date!==day.date)].slice(0,20);
+    saveAiPersistentMemory(mem);
+    renderAiContextChips();
+    scheduleAiProfileSync();
+    if(!silent)appendAiBubble('assistant', `Saved today's Copilot memory: ${day.tickers.length} ticker(s), ${day.notes.length} note(s).`);
+  }
+
+  function clearAiMemory(){
+    if(!confirm('Clear saved Copilot memory from this browser?'))return;
+    localStorage.removeItem('aiPersistentMemory');
+    sessionStorage.removeItem('aiSessionMemory');
+    aiSessionMemory={tickers:{},notes:[]};
+    renderAiContextChips();
+    scheduleAiProfileSync();
+    appendAiBubble('assistant','Copilot memory cleared for this browser.');
+  }
+
+  function loadAiWatchlist(){
+    try{return JSON.parse(localStorage.getItem('aiCopilotWatchlist')||'[]');}
+    catch(e){return [];}
+  }
+
+  function collectAiProfile(){
+    return {
+      schema:'payda-copilot-profile-v1',
+      exported_at:new Date().toISOString(),
+      user_id:currentUser?.id||'browser',
+      copilot_mode:aiMode,
+      live_watch:aiLiveWatch,
+      preferences:loadAiPrefs(),
+      lessons:loadAiLessons(),
+      feedback:loadAiFeedback(),
+      watchlist:loadAiWatchlist(),
+      persistent_memory:loadAiPersistentMemory(),
+      session_memory:aiSessionMemory
+    };
+  }
+
+  let aiProfileSyncTimer=null;
+
+  function scheduleAiProfileSync(){
+    if(!currentUser)return;
+    clearTimeout(aiProfileSyncTimer);
+    setAiSyncStatus('saving','Memory sync pending');
+    aiProfileSyncTimer=setTimeout(()=>syncAiProfileToBackend(true),900);
+  }
+
+  async function syncAiProfileToBackend(silent=false){
+    if(!currentUser)return;
+    setAiSyncStatus('saving','Saving backend memory');
+    try{
+      const r=await fetch(`${API_URL}/api/ai/memory/${encodeURIComponent(currentUser.id)}`,{
+        method:'POST',
+        headers:{'Content-Type':'application/json'},
+        body:JSON.stringify({profile:collectAiProfile()}),
+        keepalive:true
+      });
+      if(!r.ok)throw new Error(`HTTP ${r.status}`);
+      setAiSyncStatus('synced','Memory synced');
+      if(!silent)appendAiBubble('assistant','Copilot backend memory saved.');
+    }catch(e){
+      setAiSyncStatus('error','Memory sync failed');
+      if(!silent)appendAiBubble('error','Could not save Copilot memory to backend.');
+    }
+  }
+
+  async function loadAiProfileFromBackend(userId){
+    setAiSyncStatus('loading','Loading backend memory');
+    try{
+      const r=await fetch(`${API_URL}/api/ai/memory/${encodeURIComponent(userId)}`);
+      if(!r.ok)throw new Error(`HTTP ${r.status}`);
+      const data=await r.json();
+      const profile=data.profile;
+      if(profile&&profile.schema==='payda-copilot-profile-v1'&&(profile.updated_at||profile.exported_at)){
+        importAiProfile(profile,{silent:true,sync:false});
+        setAiSyncStatus('synced','Backend memory loaded');
+        appendAiBubble('assistant','Backend Copilot memory loaded for this user.');
+      }else{
+        setAiSyncStatus('idle','No backend memory yet');
+      }
+    }catch(e){
+      setAiSyncStatus('error','Backend memory unavailable');
+    }
+  }
+
+  function exportAiProfile(){
+    saveAiMemoryNow(true);
+    const profile=collectAiProfile();
+    const blob=new Blob([JSON.stringify(profile,null,2)],{type:'application/json'});
+    const url=URL.createObjectURL(blob);
+    const a=document.createElement('a');
+    const stamp=new Date().toLocaleDateString('en-CA',{timeZone:'America/New_York'});
+    a.href=url;
+    a.download=`payda-copilot-profile-${stamp}.json`;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    setTimeout(()=>URL.revokeObjectURL(url),1000);
+    appendAiBubble('assistant','Copilot profile exported as JSON.');
+  }
+
+  function validateAiProfile(profile){
+    if(!profile||typeof profile!=='object')throw new Error('Invalid profile file');
+    if(profile.schema!=='payda-copilot-profile-v1')throw new Error('This is not a Payda Copilot profile export');
+    return profile;
+  }
+
+  async function importAiProfileFile(event){
+    const file=event?.target?.files?.[0];
+    if(event?.target)event.target.value='';
+    if(!file)return;
+    try{
+      const text=await file.text();
+      const profile=validateAiProfile(JSON.parse(text));
+      const ok=confirm('Import this Copilot profile? This will replace local Copilot preferences, lessons, feedback, watchlist, and memory in this browser.');
+      if(!ok)return;
+      importAiProfile(profile);
+    }catch(e){
+      appendAiBubble('error', `Profile import failed: ${e.message||e}`);
+    }
+  }
+
+  function importAiProfile(profile, opts={}){
+    const sync=opts.sync!==false;
+    const silent=!!opts.silent;
+    if(profile.preferences)localStorage.setItem('aiCopilotPrefs', String(profile.preferences));
+    if(Array.isArray(profile.lessons))localStorage.setItem('aiCopilotLessons', JSON.stringify(profile.lessons.slice(0,30)));
+    if(Array.isArray(profile.feedback))localStorage.setItem('aiCopilotFeedback', JSON.stringify(profile.feedback.slice(0,50)));
+    if(Array.isArray(profile.watchlist))localStorage.setItem('aiCopilotWatchlist', JSON.stringify(profile.watchlist.slice(0,12).map(t=>String(t).toUpperCase())));
+    if(profile.persistent_memory)localStorage.setItem('aiPersistentMemory', JSON.stringify(profile.persistent_memory));
+    if(profile.session_memory){
+      aiSessionMemory=profile.session_memory;
+      sessionStorage.setItem('aiSessionMemory', JSON.stringify(aiSessionMemory));
+    }
+    if(profile.copilot_mode&&aiModeProfiles[profile.copilot_mode]){
+      aiMode=profile.copilot_mode;
+      localStorage.setItem('aiCopilotMode', aiMode);
+    }
+    if(typeof profile.live_watch==='boolean'){
+      aiLiveWatch=profile.live_watch;
+      localStorage.setItem('aiLiveWatch', aiLiveWatch?'true':'false');
+      updateAiLiveToggle();
+    }
+    syncAiPrefsText();
+    renderAiLessons();
+    renderAiFeedback();
+    renderAiWatchlist();
+    renderAiMode();
+    renderAiContextChips();
+    if(sync)scheduleAiProfileSync();
+    if(!silent)appendAiBubble('assistant','Copilot profile imported. Preferences, lessons, feedback, watchlist, and memory were restored.');
+  }
+
   function monitorSetup(setup){
     if(!setup||!setup.ticker)return;
+    rememberSetupTrend(setup);
     const ticker=setup.ticker;
     const gap=Number(setup.gap_pct||0);
     const rvol=Number(setup.rvol||0);
@@ -1384,6 +2066,7 @@
     if(setup.warning){
       aiLiveAlert(`${ticker} is flagged as risky: ${setup.warning}.`, `warning:${ticker}:${setup.warning}`);
     }
+    if((aiSessionMemory.notes||[]).length%8===0)saveAiMemoryNow(true);
   }
 
   function monitorScanBatch(results){
@@ -1439,10 +2122,16 @@
     return {
       user_id:currentUser?.id||'shafkat',
       mode:currentMode,
+      copilot_mode:{id:aiMode,label:aiModeLabel(aiMode),instructions:aiModeProfiles[aiMode]},
       scanner_count:allResults.length,
       active_tab:active.tab?{id:active.tab.id,title:active.tab.title,type:active.tab.type}:null,
       active_ticker:active.ticker,
       active_setup:compactSetupForAi(active.setup),
+      session_memory:aiSessionSummary(),
+      persistent_memory:persistentMemorySummary(),
+      user_preferences:loadAiPrefs(),
+      learning_notes:loadAiLessons().slice(0,20),
+      feedback_memory:loadAiFeedback().slice(0,12),
       scanner_results:allResults.slice(0,30).map(compactSetupForAi)
     };
   }
@@ -1460,29 +2149,119 @@
     }
   }
 
+  function compactNewsForAi(items, limit=8){
+    return (items||[]).slice(0,limit).map(n=>({
+      headline:n.headline||n.title||'',
+      source:n.source||'',
+      datetime:n.datetime||n.time||n.date||'',
+      summary:n.summary||'',
+      url:n.url||''
+    }));
+  }
+
+  function compactSecNewsForAi(items, limit=8){
+    return (items||[]).slice(0,limit).map(n=>({
+      headline:n.headline||n.title||'',
+      source:n.source||'SEC',
+      danger:!!n.danger,
+      datetime:n.datetime||n.time||n.date||'',
+      url:n.url||''
+    }));
+  }
+
+  async function fetchJsonSafe(url, fallback){
+    try{
+      const r=await fetch(url);
+      if(!r.ok)return fallback;
+      return await r.json();
+    }catch(e){
+      return fallback;
+    }
+  }
+
+  async function buildMarketIntelContext(kind='market'){
+    const uid=encodeURIComponent(currentUser?.id||'shafkat');
+    const [marketNews,secNews,heatmap,poly]=await Promise.all([
+      fetchJsonSafe(`${API_URL}/api/news/market`, {news:[]}),
+      fetchJsonSafe(`${API_URL}/api/news/sec`, {news:[]}),
+      fetchJsonSafe(`${API_URL}/api/market/heatmap?user=${uid}`, {sectors:[]}),
+      fetchJsonSafe(`${API_URL}/api/polymarket/markets?limit=40`, {markets:[]})
+    ]);
+    const sectors=(heatmap.sectors||[]).slice(0,12).map(s=>({
+      name:s.name,
+      change_pct:s.change_pct,
+      leaders:(s.cells||s.stocks||[]).slice(0,6).map(c=>({
+        symbol:c.symbol,
+        change_pct:c.change_pct,
+        price:c.price,
+        volume:c.volume
+      }))
+    }));
+    const polymarkets=(poly.markets||[]).slice(0,12).map(m=>({
+      title:m.title,
+      question:m.question,
+      yes_price:m.yes_price,
+      volume_24hr:m.volume_24hr,
+      liquidity:m.liquidity,
+      matched:m.matched,
+      url:m.url
+    }));
+    return {
+      kind,
+      fetched_at:new Date().toLocaleTimeString('en-US',{hour12:true,timeZone:'America/New_York'}),
+      market_news:compactNewsForAi(marketNews.news,10),
+      sec_news:compactSecNewsForAi(secNews.news,10),
+      heatmap:{
+        market_change_pct:heatmap.market_change_pct,
+        sectors
+      },
+      polymarket:polymarkets,
+      scanner_snapshot:allResults.slice(0,20).map(compactSetupForAi),
+      recent_logs:(window.lastAlertsForAi||[]).slice(0,12)
+    };
+  }
+
   function appendAiBubble(role, text){
     const host=document.getElementById('aiMessages');
     if(!host)return;
     const bubble=document.createElement('div');
     bubble.className=`ai-bubble ${role}`;
-    bubble.textContent=text;
+    const body=document.createElement('div');
+    body.textContent=text;
+    bubble.appendChild(body);
+    if(role==='assistant'){
+      const fb=document.createElement('div');
+      fb.className='ai-feedback';
+      const useful=document.createElement('button');
+      useful.type='button';
+      useful.textContent='Useful';
+      useful.onclick=()=>{fb.remove();rateAiAnswer('useful', text);};
+      const miss=document.createElement('button');
+      miss.type='button';
+      miss.textContent='Teach fix';
+      miss.onclick=()=>{fb.remove();rateAiAnswer('miss', text);};
+      fb.appendChild(useful);
+      fb.appendChild(miss);
+      bubble.appendChild(fb);
+    }
     host.appendChild(bubble);
     host.scrollTop=host.scrollHeight;
   }
 
-  async function sendAiMessage(promptOverride){
+  async function sendAiMessage(promptOverride, extraContext=null){
     const input=document.getElementById('aiInput');
     const btn=document.getElementById('aiSendBtn');
     const text=(promptOverride || input?.value || '').trim();
     if(!text||aiBusy)return;
     toggleAiPanel(true);
     if(input&&!promptOverride)input.value='';
+    if(handleAiLocalCommand(text))return;
     appendAiBubble('user', text);
     aiMessages.push({role:'user',content:text});
     aiBusy=true;
     if(btn){btn.disabled=true;btn.textContent='...';}
     try{
-      const context=await buildEnrichedAiContext();
+      const context={...(await buildEnrichedAiContext()),...(extraContext?{market_context:extraContext}: {})};
       const r=await fetch(`${API_URL}/api/ai/chat`,{
         method:'POST',
         headers:{'Content-Type':'application/json'},
@@ -1512,6 +2291,321 @@
 
   function aiQuick(text){
     sendAiMessage(text);
+  }
+
+  async function runAiIntel(kind='market'){
+    if(aiBusy)return;
+    toggleAiPanel(true);
+    toggleAiCommandPalette(false);
+    appendAiBubble('assistant','Gathering market intelligence: news, SEC risk, heat map, Polymarket, scanner context...');
+    const ctx=await buildMarketIntelContext(kind);
+    const active=activeTickerContext();
+    const prompts={
+      market:'Give me a concise trading intelligence brief from the market_context. Lead with sector heat map, important market news, SEC danger headlines, Polymarket signals, and whether the current scanner results line up with the tape.',
+      risk:'Use market_context to call out news/SEC/liquidity risk that could affect the active ticker or top scanner results. Be skeptical and practical.',
+      catalyst:`Use market_context plus the active ticker ${active.ticker||''} to summarize catalysts, news quality, SEC danger, and whether the move has a real story or just price action.`
+    };
+    await sendAiMessage(prompts[kind]||prompts.market, ctx);
+  }
+
+  async function runAiHealthCheck(){
+    toggleAiPanel(true);
+    toggleAiCommandPalette(false);
+    appendAiBubble('assistant','Checking Copilot health...');
+    try{
+      const uid=encodeURIComponent(currentUser?.id||'shafkat');
+      const r=await fetch(`${API_URL}/api/ai/health/${uid}`);
+      const h=await r.json();
+      if(!r.ok||h.error)throw new Error(h.error||`HTTP ${r.status}`);
+      const counts=h.memory_counts||{};
+      const scanner=h.scanner||{};
+      const lines=[
+        'Copilot health:',
+        `Backend memory: ${h.memory_saved?'saved profile found':'no saved profile yet'}`,
+        `AI provider: ${h.ai_configured?`configured (${h.ai_model})`:'not configured - set OPENAI_API_KEY'}`,
+        `Memory: ${counts.lessons||0} lesson(s), ${counts.feedback||0} feedback item(s), ${counts.watchlist||0} watchlist ticker(s), ${counts.saved_days||0} saved day(s)`,
+        `Session: ${counts.session_tickers||0} ticker(s), ${counts.session_notes||0} note(s)`,
+        `Scanner: ${scanner.mode||'unknown'} | ${scanner.running?'running':'stopped'} | ${scanner.results||0} result(s)`,
+        `Recent logs: ${(h.recent_logs||[]).length}`
+      ];
+      setAiSyncStatus(h.memory_saved?'synced':'idle', h.memory_saved?'Memory reachable':'No backend memory yet');
+      appendAiBubble('assistant', lines.join('\n'));
+    }catch(e){
+      setAiSyncStatus('error','Health check failed');
+      appendAiBubble('error', `Copilot health check failed: ${e.message||e}`);
+    }
+  }
+
+  function toggleAiCommandPalette(force){
+    const panel=document.getElementById('aiCommandPalette');
+    if(!panel)return;
+    const open=typeof force==='boolean'?force:!panel.classList.contains('visible');
+    panel.classList.toggle('visible', open);
+  }
+
+  function runAiCommand(command){
+    handleAiLocalCommand(command);
+  }
+
+  let aiFilterDraft=null;
+
+  function formatAiMoney(v){
+    v=Number(v||0);
+    if(v>=1e6)return `$${(v/1e6).toFixed(v>=1e7?0:1)}M`;
+    if(v>=1e3)return `$${(v/1e3).toFixed(0)}K`;
+    return `$${v.toFixed(0)}`;
+  }
+
+  function nearestSliderIndex(values,target){
+    target=Number(target||0);
+    let best=0,dist=Infinity;
+    values.forEach((v,i)=>{const d=Math.abs(v-target);if(d<dist){best=i;dist=d;}});
+    return best;
+  }
+
+  function currentFilterValues(){
+    return {
+      min_price:parseFloat(document.getElementById('fMinPrice')?.value)||0.10,
+      max_price:parseFloat(document.getElementById('fMaxPrice')?.value)||50,
+      min_gap_pct:parseFloat(document.getElementById('fMinGap')?.value)||5,
+      min_dollar_vol:dvolFromSlider(parseFloat(document.getElementById('fMinDvol')?.value)||5),
+      min_volume:volFromSlider(parseFloat(document.getElementById('fMinVol')?.value)||1),
+      min_rvol:parseFloat(document.getElementById('fMinRvol')?.value)||0,
+      max_float_m:parseFloat(document.getElementById('fMaxFloat')?.value)||0,
+      max_market_cap_m:parseFloat(document.getElementById('fMaxMktCap')?.value)||0,
+      require_news:!!newsOn
+    };
+  }
+
+  function buildAiFilterDraft(kind='adaptive'){
+    const count=allResults.length;
+    const active=activeTickerContext();
+    const base={
+      title:'Adaptive Scanner',
+      reason:'Balances enough results with basic liquidity and risk checks.',
+      filters:{min_price:0.10,max_price:20,min_gap_pct:5,min_dollar_vol:250000,min_volume:50000,min_rvol:0,max_float_m:50,max_market_cap_m:0,require_news:false}
+    };
+    const presets={
+      broad:{
+        title:'Broad Opportunity Scan',
+        reason:'Looser scan for finding more candidates when the market is quiet or the current scan is too narrow.',
+        filters:{min_price:0.10,max_price:50,min_gap_pct:3,min_dollar_vol:100000,min_volume:25000,min_rvol:0,max_float_m:100,max_market_cap_m:0,require_news:false}
+      },
+      quality:{
+        title:'Quality Momentum Scan',
+        reason:'Tighter scan for cleaner small-cap momentum: better liquidity, stronger move, and some RVOL.',
+        filters:{min_price:0.50,max_price:20,min_gap_pct:12,min_dollar_vol:1000000,min_volume:100000,min_rvol:1.5,max_float_m:50,max_market_cap_m:0,require_news:false}
+      },
+      morning:{
+        title:'Morning Gap Finder',
+        reason:'Close to the MorningGap button, but still editable before you run it.',
+        filters:{min_price:0.10,max_price:50,min_gap_pct:5,min_dollar_vol:250000,min_volume:50000,min_rvol:0,max_float_m:20,max_market_cap_m:0,require_news:false}
+      },
+      afterhrs:{
+        title:'After-Hours Starter',
+        reason:'Looser after-hours idea finder for small moves with real volume, before tightening manually.',
+        filters:{min_price:0.10,max_price:10,min_gap_pct:1,min_dollar_vol:25000,min_volume:10000,min_rvol:0,max_float_m:80,max_market_cap_m:0,require_news:false}
+      }
+    };
+    let draft=presets[kind]||base;
+    if(kind==='adaptive'){
+      if(currentMode==='afterhrs')draft=presets.afterhrs;
+      else if(count===0)draft=presets.broad;
+      else if(count>60)draft=presets.quality;
+      else if(active.ticker)draft={...presets.quality,reason:`Uses stricter liquidity/quality because ${active.ticker} is active; review before scanning.`};
+    }
+    return JSON.parse(JSON.stringify(draft));
+  }
+
+  function draftAiFilter(kind='adaptive'){
+    aiFilterDraft=buildAiFilterDraft(kind);
+    renderAiFilterDraft();
+    toggleAiPanel(true);
+    toggleAiCommandPalette(false);
+    appendAiBubble('assistant', `Drafted ${aiFilterDraft.title}. Review the preview, then choose Apply Fields or Apply + Scan.`);
+  }
+
+  function renderAiFilterDraft(){
+    const host=document.getElementById('aiFilterPreview');
+    if(!host)return;
+    if(!aiFilterDraft){
+      host.classList.remove('visible');
+      host.innerHTML='';
+      return;
+    }
+    const f=aiFilterDraft.filters;
+    const rows=[
+      ['Price', `$${Number(f.min_price).toFixed(2)} - $${Number(f.max_price).toFixed(2)}`],
+      ['Change', `${Number(f.min_gap_pct).toFixed(1)}%+`],
+      ['Dollar Vol', `${formatAiMoney(f.min_dollar_vol)}+`],
+      ['Raw Vol', `${Number(f.min_volume||0).toLocaleString()}+`],
+      ['RVOL', `${Number(f.min_rvol||0).toFixed(1)}x+`],
+      ['Float', f.max_float_m?`<= ${f.max_float_m}M`:'Any'],
+      ['Market Cap', f.max_market_cap_m?`<= ${formatAiMoney(f.max_market_cap_m*1000000)}`:'Any'],
+      ['News', f.require_news?'Required':'Optional']
+    ];
+    host.classList.add('visible');
+    host.innerHTML=`
+      <div class="ai-filter-head">
+        <div>
+          <div class="ai-filter-title">${aiFilterDraft.title}</div>
+          <div class="ai-filter-copy">${aiFilterDraft.reason}</div>
+        </div>
+      </div>
+      <div class="ai-filter-grid">
+        ${rows.map(([k,v])=>`<div class="ai-filter-cell"><div class="ai-filter-label">${k}</div><div class="ai-filter-value">${v}</div></div>`).join('')}
+      </div>
+      <div class="ai-filter-actions">
+        <button onclick="applyAiFilterDraft(false)">Apply Fields</button>
+        <button class="primary" onclick="applyAiFilterDraft(true)">Apply + Scan</button>
+        <button onclick="clearAiFilterDraft()">Cancel</button>
+      </div>
+    `;
+  }
+
+  function setCustomFilterFields(filters){
+    if(!filters)return;
+    const set=(id,val)=>{const el=document.getElementById(id);if(el)el.value=val;};
+    set('fMinPrice', Number(filters.min_price||0.10).toFixed(2));
+    set('fMaxPrice', Number(filters.max_price||50));
+    set('fMinGap', Number(filters.min_gap_pct||5));
+    set('fMinDvol', nearestSliderIndex(DVOL_VALUES, filters.min_dollar_vol||250000));
+    set('fMinVol', nearestSliderIndex(VOL_VALUES, filters.min_volume||50000));
+    set('fMinRvol', Number(filters.min_rvol||0));
+    set('fMaxFloat', Number(filters.max_float_m||0));
+    set('fMaxMktCap', Number(filters.max_market_cap_m||0));
+    newsOn=!!filters.require_news;
+    document.getElementById('newsToggle')?.classList.toggle('on', newsOn);
+    updatePriceLabel();
+    document.getElementById('fGapLabel').textContent=`${Number(filters.min_gap_pct||5)}%`;
+    updateDvolLabel(document.getElementById('fMinDvol')?.value||5);
+    updateVolLabel(document.getElementById('fMinVol')?.value||1);
+    document.getElementById('fRvolLabel').textContent=`${Number(filters.min_rvol||0).toFixed(1)}x`;
+    document.getElementById('fFloatLabel').textContent=filters.max_float_m?`${filters.max_float_m}M`:'Any';
+    document.getElementById('fMktCapLabel').textContent=filters.max_market_cap_m?`$${filters.max_market_cap_m}M`:'Any';
+  }
+
+  async function applyAiFilterDraft(runScan=false){
+    if(!aiFilterDraft)return;
+    setCustomFilterFields(aiFilterDraft.filters);
+    openCommandWorkspace('filters');
+    appendAiBubble('assistant', runScan ? `Applied ${aiFilterDraft.title} and started a custom scan.` : `Applied ${aiFilterDraft.title} to the Filters tab. Review or run when ready.`);
+    const shouldRun=!!runScan;
+    clearAiFilterDraft();
+    if(shouldRun)await applyFilters();
+  }
+
+  function clearAiFilterDraft(){
+    aiFilterDraft=null;
+    renderAiFilterDraft();
+  }
+
+  function showAiCommandHelp(){
+    appendAiBubble('assistant', [
+      'Local commands:',
+      '/open TICKER - open a ticker tab',
+      '/mode fast | risk | teacher | catalyst | prep - switch Copilot mode',
+      '/filter broad | quality | morning | afterhrs | adaptive - draft scanner filters',
+      '/intel market | risk | catalyst - fetch news, SEC, heat map, and Polymarket context',
+      '/watchlist AAPL,TSLA or /watchlist top - set Copilot watchlist',
+      '/memory - summarize local session and saved memory',
+      '/export - download Copilot profile JSON',
+      '/import - open the profile import picker',
+      '/sync - save Copilot memory to backend now',
+      '/health - check backend memory, AI config, scanner context',
+      '/live on | off - toggle Live Watch',
+      '/clear - clear Copilot chat messages'
+    ].join('\n'));
+  }
+
+  function handleAiLocalCommand(text){
+    if(!text.startsWith('/'))return false;
+    appendAiBubble('user', text);
+    const [raw,...rest]=text.trim().split(/\s+/);
+    const cmd=raw.toLowerCase();
+    const arg=rest.join(' ').trim();
+    if(cmd==='/open'){
+      const ticker=(rest[0]||'').toUpperCase();
+      if(!ticker){appendAiBubble('error','Usage: /open TICKER');return true;}
+      openTickerTab(ticker);
+      appendAiBubble('assistant', `Opened ${ticker}.`);
+      return true;
+    }
+    if(cmd==='/mode'){
+      const aliases={fast:'fast_scan',scan:'fast_scan',risk:'risk_manager',teacher:'teacher',teach:'teacher',catalyst:'catalyst',news:'catalyst',prep:'execution_prep',execution:'execution_prep'};
+      const mode=aliases[(rest[0]||'').toLowerCase()]||rest[0];
+      if(!aiModeProfiles[mode]){appendAiBubble('error','Usage: /mode fast | risk | teacher | catalyst | prep');return true;}
+      setAiMode(mode);
+      return true;
+    }
+    if(cmd==='/watchlist'){
+      let tickers=[];
+      if(/^top$/i.test(arg)){
+        tickers=[...allResults].sort((a,b)=>(Number(b.gap_pct||0)-Number(a.gap_pct||0))).slice(0,8).map(s=>s.ticker);
+      }else{
+        tickers=arg.split(',').flatMap(x=>x.split(/\s+/)).map(t=>t.trim().toUpperCase()).filter(Boolean);
+      }
+      if(!tickers.length){appendAiBubble('error','Usage: /watchlist TICK1,TICK2 or /watchlist top');return true;}
+      saveAiWatchlist(tickers);
+      return true;
+    }
+    if(cmd==='/filter'||cmd==='/filters'){
+      const kind=(rest[0]||'adaptive').toLowerCase();
+      const allowed=['adaptive','broad','quality','morning','afterhrs'];
+      if(!allowed.includes(kind)){appendAiBubble('error','Usage: /filter broad | quality | morning | afterhrs | adaptive');return true;}
+      draftAiFilter(kind);
+      return true;
+    }
+    if(cmd==='/intel'||cmd==='/market'){
+      const kind=(rest[0]||'market').toLowerCase();
+      const allowed=['market','risk','catalyst'];
+      if(!allowed.includes(kind)){appendAiBubble('error','Usage: /intel market | risk | catalyst');return true;}
+      runAiIntel(kind);
+      return true;
+    }
+    if(cmd==='/memory'){
+      const s=aiSessionSummary();
+      const p=persistentMemorySummary();
+      const top=s.tickers.slice(0,6).map(t=>`${t.ticker}${t.last_gap!=null?` ${Number(t.last_gap).toFixed(1)}%`:''}`).join(', ')||'none';
+      appendAiBubble('assistant', `Session memory: ${s.tickers.length} ticker(s), ${s.notes.length} note(s). Recent: ${top}.\nSaved memory days: ${(p.days||[]).length}.`);
+      return true;
+    }
+    if(cmd==='/export'){
+      exportAiProfile();
+      return true;
+    }
+    if(cmd==='/import'){
+      document.getElementById('aiProfileImportFile')?.click();
+      return true;
+    }
+    if(cmd==='/sync'){
+      syncAiProfileToBackend(false);
+      return true;
+    }
+    if(cmd==='/health'){
+      runAiHealthCheck();
+      return true;
+    }
+    if(cmd==='/live'){
+      const val=(rest[0]||'').toLowerCase();
+      if(val==='on')toggleAiLiveWatch(true);
+      else if(val==='off')toggleAiLiveWatch(false);
+      else toggleAiLiveWatch();
+      appendAiBubble('assistant', `Live Watch is ${aiLiveWatch?'on':'off'}.`);
+      return true;
+    }
+    if(cmd==='/clear'){
+      const host=document.getElementById('aiMessages');
+      if(host)host.innerHTML='<div class="ai-bubble assistant"><div>Copilot chat cleared. Memory, lessons, feedback, and preferences are still saved.</div></div>';
+      aiMessages.length=0;
+      return true;
+    }
+    if(cmd==='/help'||cmd==='/commands'){
+      showAiCommandHelp();
+      return true;
+    }
+    appendAiBubble('error', 'Unknown command. Try /help.');
+    return true;
   }
 
   function parseAiActions(reply){
@@ -1570,6 +2664,7 @@
     if(!unique.length)return;
     localStorage.setItem('aiCopilotWatchlist', JSON.stringify(unique));
     renderAiWatchlist(unique);
+    scheduleAiProfileSync();
     appendAiBubble('assistant', `Watchlist ready: ${unique.join(', ')}`);
   }
 
@@ -1609,6 +2704,7 @@
     activeWorkspaceTab=tabId;
     renderWorkspaceTabs();
     applyWorkspaceView();
+    renderAiContextChips();
   }
 
   function closeWorkspaceTab(event,tabId){
@@ -1622,6 +2718,7 @@
     if(activeWorkspaceTab===tabId)activeWorkspaceTab='scanner';
     renderWorkspaceTabs();
     applyWorkspaceView();
+    renderAiContextChips();
   }
 
   function addBlankWorkspaceTab(){
@@ -1630,6 +2727,7 @@
     activeWorkspaceTab=id;
     renderWorkspaceTabs();
     applyWorkspaceView();
+    renderAiContextChips();
   }
 
   function applyWorkspaceView(){
@@ -1687,6 +2785,7 @@
     activeWorkspaceTab=tab.id;
     renderWorkspaceTabs();
     applyWorkspaceView();
+    renderAiContextChips();
   }
 
   function renderUtilityWorkspace(tab){
@@ -1713,6 +2812,7 @@
     activeWorkspaceTab=id;
     renderWorkspaceTabs();
     applyWorkspaceView();
+    renderAiContextChips();
   }
 
   function renderExternalWorkspace(tab){
@@ -1751,6 +2851,7 @@
     activeWorkspaceTab=id;
     renderWorkspaceTabs();
     applyWorkspaceView();
+    renderAiContextChips();
   }
 
   function renderTickerWorkspace(tab){
@@ -1913,6 +3014,7 @@
         }
       }
       aiLastTickerPrice[ticker]=d.c;
+      rememberQuoteTrend(ticker, d.c);
     }catch(e){}
   }
 
@@ -2453,6 +3555,7 @@ run();
     connectWS(id);
     loadUserResults(id);
     loadNewsTab();
+    loadAiProfileFromBackend(id);
   }
 
   function resetLocalState(){
@@ -2738,13 +3841,14 @@ run();
           if(isLoading&&!allResults.length)showEmptyScanResult({message:'Scan finished with no matching stocks.'});
           hideProgress();
         }
-        if(msg.mode){currentMode=msg.mode;updateActiveModeLabel(msg.mode);}
+        if(msg.mode){currentMode=msg.mode;updateActiveModeLabel(msg.mode);renderAiContextChips();}
       }
       if(msg.type==='scan_status')updateProgress(msg.status);
       if(msg.type==='new_ticker'&&msg.setup){
         if(isLoading)clearLoadingScreen();
         addTickerToDOM(msg.setup);updateScreener();
         monitorSetup(msg.setup);
+        renderAiContextChips();
       }
       if(msg.type==='scan_results'){
         const data=msg.data||[];
@@ -2756,7 +3860,8 @@ run();
         renderAlerts(msg.alerts);updateStats(allResults,msg.time);
         if(msg.scan_status)updateProgress(msg.scan_status);
         if(msg.scan_status?.phase==='done'&&!data.length&&!allResults.length)showEmptyScanResult(msg.scan_status);
-        if(msg.mode){currentMode=msg.mode;updateActiveModeLabel(msg.mode);}
+        renderAiContextChips();
+        if(msg.mode){currentMode=msg.mode;updateActiveModeLabel(msg.mode);renderAiContextChips();}
       }
     }catch(e){}
   }
@@ -2779,7 +3884,7 @@ run();
               monitorSetup(s);
             }
           });
-          if(added){updateScreener();updateStats(allResults,data.time);}
+          if(added){updateScreener();updateStats(allResults,data.time);renderAiContextChips();}
         }
         if(data.running===false&&isRunning){
           const doneStatus={
@@ -2854,6 +3959,8 @@ run();
       isRunning=false;isPaused=false;stopPolling();
     }
     allResults=[];isLoading=true;
+    currentMode=mode;
+    renderAiContextChips();
     document.getElementById('results').innerHTML=`
       <div class="no-results">
         <div class="no-results-logos">
@@ -2878,8 +3985,8 @@ run();
       clearResults();
       return;
     }
-    currentMode=mode;
     updateActiveModeLabel(mode);
+    renderAiContextChips();
     try{
       await fetch(`${API_URL}/api/scanner/start/${currentUser.id}`,{method:'POST'});
       isRunning=true;isPaused=false;
@@ -3893,6 +5000,7 @@ loadChart();
 
   function renderAlerts(alerts){
     if(!alerts||!alerts.length)return;
+    window.lastAlertsForAi=alerts.slice(0,20);
     monitorAlerts(alerts);
     document.getElementById('alertLog').innerHTML=alerts.map(a=>
       `<div class="alert-item"><div class="alert-time">${a.time}</div><div class="alert-msg">${a.message}</div></div>`
