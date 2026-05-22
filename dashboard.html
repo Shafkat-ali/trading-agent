@@ -213,7 +213,9 @@
     .workspace-tab{height:29px;min-width:118px;max-width:210px;background:#101827;border:1px solid #1e2d4a;border-bottom:none;border-radius:7px 7px 0 0;color:#8fa6c7;font-size:.68rem;font-weight:800;display:flex;align-items:center;gap:7px;padding:0 10px;white-space:nowrap;transition:all .18s;}
     .workspace-tab:hover{background:#17243a;color:#d8e8ff;border-color:#2b4772;}
     .workspace-tab.active{height:33px;background:#162942;color:#fff;border-color:#2f5c91;box-shadow:inset 0 2px 0 #2fc7ff;}
-    .workspace-tab-icon{font-size:.78rem;line-height:1;}
+    .workspace-tab-icon{font-size:.78rem;line-height:1;display:inline-flex;align-items:center;justify-content:center;min-width:16px;}
+    .ticker-tab-dollar{color:#00ff88;font-size:.9rem;font-weight:950;text-shadow:0 0 8px rgba(0,255,136,.35);}
+    .ticker-tab-money-badge{width:16px;height:16px;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;background:linear-gradient(135deg,#21f381,#07964a);color:#03180b;border:1px solid rgba(170,255,205,.7);box-shadow:0 0 10px rgba(0,255,136,.28);font-size:.68rem;font-weight:950;font-family:'Segoe UI',sans-serif;}
     .workspace-tab-title{overflow:hidden;text-overflow:ellipsis;}
     .workspace-tab-close{margin-left:auto;color:#5f789e;font-size:.72rem;padding:0 2px;}
     .workspace-tab-close:hover{color:#ff8080;}
@@ -2923,12 +2925,28 @@
   ];
   let activeWorkspaceTab='scanner';
 
+  function randomTickerTabIcon(){
+    const icons=[
+      '<span class="ticker-tab-dollar">$</span>',
+      '💰',
+      '💵',
+      '<span class="ticker-tab-money-badge">$</span>',
+    ];
+    return icons[Math.floor(Math.random()*icons.length)];
+  }
+
   function renderWorkspaceTabs(){
     const bar=document.getElementById('workspaceTabs');
     if(!bar)return;
+    workspaceTabs.forEach(tab=>{
+      if(tab.type==='ticker'&&!tab.iconHtml){
+        tab.iconHtml=randomTickerTabIcon();
+        tab.icon='';
+      }
+    });
     bar.innerHTML=workspaceTabs.map(tab=>`
       <button class="workspace-tab ${tab.id===activeWorkspaceTab?'active':''}" onclick="activateWorkspaceTab('${tab.id}')">
-        <span class="workspace-tab-icon">${tab.icon||''}</span>
+        <span class="workspace-tab-icon">${tab.iconHtml||tab.icon||''}</span>
         <span class="workspace-tab-title">${tab.title}</span>
         ${tab.closable?`<span class="workspace-tab-close" onclick="closeWorkspaceTab(event,'${tab.id}')">×</span>`:''}
       </button>
@@ -3074,14 +3092,15 @@
         tab=activeTab;
         tab.id=id;
         tab.title=ticker;
-        tab.icon='🟡';
+        tab.icon='';
+        tab.iconHtml=randomTickerTabIcon();
         tab.type='ticker';
         tab.ticker=ticker;
         tab.setup=setup||allResults.find(r=>r.ticker===ticker)||null;
       }
     }
     if(!tab){
-      tab={id:id,title:ticker,icon:'🟡',type:'ticker',closable:true,ticker:ticker,setup:setup||allResults.find(r=>r.ticker===ticker)||null};
+      tab={id:id,title:ticker,icon:'',iconHtml:randomTickerTabIcon(),type:'ticker',closable:true,ticker:ticker,setup:setup||allResults.find(r=>r.ticker===ticker)||null};
       workspaceTabs.push(tab);
     }else if(setup){
       tab.setup=setup;
