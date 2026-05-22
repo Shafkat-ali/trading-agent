@@ -78,6 +78,27 @@
     .heat-launch{display:flex;align-items:center;gap:7px;background:linear-gradient(135deg,#064e3b,#00c853);border:1px solid rgba(110,231,183,.55);border-radius:999px;color:#eafff6;font-size:.68rem;font-weight:900;padding:7px 13px;box-shadow:0 0 18px rgba(0,200,83,.18);white-space:nowrap;}
     .heat-launch:hover{transform:translateY(-1px);filter:brightness(1.12);}
     .heat-dot{width:8px;height:8px;border-radius:2px;background:#86efac;box-shadow:0 0 10px #86efac;}
+    .ai-launch{display:flex;align-items:center;gap:7px;background:linear-gradient(135deg,#172554,#7c3aed);border:1px solid rgba(196,181,253,.55);border-radius:999px;color:#f5f3ff;font-size:.68rem;font-weight:900;padding:7px 13px;box-shadow:0 0 18px rgba(124,58,237,.18);white-space:nowrap;}
+    .ai-launch:hover{transform:translateY(-1px);filter:brightness(1.12);}
+    .ai-dot{width:8px;height:8px;border-radius:50%;background:#c4b5fd;box-shadow:0 0 10px #c4b5fd;}
+    .ai-panel{position:fixed;right:14px;top:86px;bottom:14px;width:min(390px,calc(100vw - 28px));z-index:9600;background:#0b1220;border:1px solid #284064;border-radius:12px;display:flex;flex-direction:column;box-shadow:0 22px 70px rgba(0,0,0,.48);overflow:hidden;}
+    .ai-panel.hidden{display:none;}
+    .ai-head{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:12px 14px;border-bottom:1px solid #1e2d4a;background:#0f1729;}
+    .ai-title{font-size:.78rem;font-weight:900;color:#f5f3ff;letter-spacing:.3px;}
+    .ai-sub{font-size:.54rem;color:#6f86aa;margin-top:2px;}
+    .ai-close{background:#16233a;border:1px solid #2b4772;border-radius:6px;color:#bfe1ff;font-size:.62rem;font-weight:800;padding:5px 8px;}
+    .ai-msgs{flex:1;overflow:auto;padding:12px;display:flex;flex-direction:column;gap:9px;}
+    .ai-bubble{max-width:92%;border:1px solid #1e2d4a;border-radius:10px;padding:9px 10px;font-size:.68rem;line-height:1.45;white-space:pre-wrap;}
+    .ai-bubble.user{align-self:flex-end;background:#17365b;color:#eaf5ff;border-color:#2c5f98;}
+    .ai-bubble.assistant{align-self:flex-start;background:#101827;color:#d9e8fb;}
+    .ai-bubble.error{align-self:flex-start;background:#2b1018;color:#ffb4c0;border-color:#743044;}
+    .ai-quick-row{display:flex;gap:6px;flex-wrap:wrap;padding:10px 12px 0;border-top:1px solid #101a2d;}
+    .ai-quick{background:#101b30;border:1px solid #2a4a78;color:#bfe1ff;border-radius:999px;padding:5px 8px;font-size:.56rem;font-weight:800;}
+    .ai-input-row{display:flex;gap:7px;padding:10px 12px 12px;}
+    .ai-input{flex:1;min-height:38px;max-height:92px;resize:vertical;background:#08101d;border:1px solid #2a3a5a;border-radius:8px;color:#e8f2ff;font-size:.68rem;padding:8px;outline:none;}
+    .ai-input:focus{border-color:#8b5cf6;box-shadow:0 0 0 2px rgba(139,92,246,.15);}
+    .ai-send{background:linear-gradient(135deg,#7c3aed,#06b6d4);border:none;border-radius:8px;color:#fff;font-size:.62rem;font-weight:900;padding:0 11px;}
+    .ai-send:disabled{opacity:.5;cursor:wait!important;}
 
     .search-bar{display:flex;align-items:center;gap:4px;background:#0f1729;border:1px solid #1e2d4a;border-radius:6px;padding:4px 8px;transition:border-color .2s;min-width:310px;}
     .search-bar:focus-within{border-color:#ffd700;}
@@ -618,6 +639,15 @@
     body.light-theme .ticker-shell-symbol{color:#0f172a!important;}
     body.light-theme .tab-btn{color:#64748b!important;}
     body.light-theme .tab-btn.active{color:#0369a1!important;background:#e0f2fe!important;border-bottom-color:#0284c7!important;}
+    body.light-theme .ai-panel,
+    body.light-theme .ai-head{background:#ffffff!important;border-color:#d7e0ef!important;color:#172033!important;}
+    body.light-theme .ai-title{color:#0f172a!important;}
+    body.light-theme .ai-sub{color:#64748b!important;}
+    body.light-theme .ai-bubble.assistant{background:#f8fafc!important;border-color:#d7e0ef!important;color:#172033!important;}
+    body.light-theme .ai-bubble.user{background:#dbeafe!important;border-color:#93c5fd!important;color:#0f172a!important;}
+    body.light-theme .ai-input{background:#f8fafc!important;border-color:#cbd5e1!important;color:#172033!important;}
+    body.light-theme .ai-quick,
+    body.light-theme .ai-close{background:#ffffff!important;border-color:#cbd5e1!important;color:#334155!important;}
     body.light-theme .poly-launch{background:linear-gradient(135deg,#0ea5e9,#2563eb)!important;color:#fff!important;border-color:#93c5fd!important;}
     body.light-theme .heat-launch{background:linear-gradient(135deg,#059669,#22c55e)!important;color:#fff!important;border-color:#86efac!important;}
     body.light-theme .progress-label,
@@ -798,6 +828,10 @@
       <span id="themeToggleText">Dark</span>
     </button>
   </div>
+  <button class="ai-launch" onclick="toggleAiPanel()" title="Open Trading Copilot">
+    <span class="ai-dot"></span>
+    AI Copilot
+  </button>
   <button class="heat-launch" onclick="openHeatMapPage()" title="Open live stock market heat map">
     <span class="heat-dot"></span>
     Market Heat Map
@@ -813,6 +847,29 @@
       <span class="status-text" id="statusText">Offline</span>
     </div>
     <span class="clock" id="clock">--:--:-- EST</span>
+  </div>
+</div>
+
+<div class="ai-panel hidden" id="aiPanel">
+  <div class="ai-head">
+    <div>
+      <div class="ai-title">AI Trading Copilot</div>
+      <div class="ai-sub">Reads the active ticker and scanner context. Education only.</div>
+    </div>
+    <button class="ai-close" onclick="toggleAiPanel(false)">Close</button>
+  </div>
+  <div class="ai-msgs" id="aiMessages">
+    <div class="ai-bubble assistant">Ask me about the active ticker, scanner results, catalysts, risk, or what confirmation would matter next.</div>
+  </div>
+  <div class="ai-quick-row">
+    <button class="ai-quick" onclick="aiQuick('Explain the active ticker setup and what would confirm or invalidate it.')">Explain ticker</button>
+    <button class="ai-quick" onclick="aiQuick('Summarize the current scanner results and rank the strongest opportunities.')">Summarize scanner</button>
+    <button class="ai-quick" onclick="aiQuick('Call out the biggest risks in the active ticker or scan list.')">Find risks</button>
+    <button class="ai-quick" onclick="aiQuick('Look at the available catalyst/news fields in context and tell me what matters.')">Catalysts</button>
+  </div>
+  <div class="ai-input-row">
+    <textarea class="ai-input" id="aiInput" placeholder="Ask about a ticker, scanner, catalyst, or risk..." onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();sendAiMessage();}"></textarea>
+    <button class="ai-send" id="aiSendBtn" onclick="sendAiMessage()">Send</button>
   </div>
 </div>
 
@@ -1244,6 +1301,115 @@
   function openHeatMapPage(){
     const uid = currentUser?.id || 'shafkat';
     openExternalWorkspaceTab('heatmap','Market Heat Map','🟩',`/heatmap?user=${encodeURIComponent(uid)}`);
+  }
+
+  const aiMessages = [];
+  let aiBusy = false;
+
+  function toggleAiPanel(force){
+    const panel=document.getElementById('aiPanel');
+    if(!panel)return;
+    const open = typeof force === 'boolean' ? force : panel.classList.contains('hidden');
+    panel.classList.toggle('hidden', !open);
+    if(open)setTimeout(()=>document.getElementById('aiInput')?.focus(),60);
+  }
+
+  function activeTickerContext(){
+    const tab=workspaceTabs.find(t=>t.id===activeWorkspaceTab);
+    if(tab?.type==='ticker'){
+      const setup=tab.setup||allResults.find(r=>r.ticker===tab.ticker)||null;
+      return {tab, ticker:tab.ticker, setup};
+    }
+    return {tab, ticker:null, setup:null};
+  }
+
+  function compactSetupForAi(setup){
+    if(!setup)return null;
+    return {
+      ticker:setup.ticker,
+      company_name:setup.company_name,
+      price:setup.price,
+      prev_day_price:setup.prev_close,
+      change_pct:setup.gap_pct,
+      volume:setup.volume,
+      dollar_volume:setup.dollar_vol,
+      rvol:setup.rvol,
+      float_m:setup.float_m,
+      grade:setup.grade,
+      pattern:setup.pattern,
+      catalyst:setup.catalyst,
+      entry_zone:setup.entry_zone,
+      stop_loss:setup.stop_loss,
+      target1:setup.target1,
+      target2:setup.target2,
+      pattern_criteria:(setup.pattern_criteria||[]).slice(0,8),
+      news_title:setup.news_title||setup.headline||''
+    };
+  }
+
+  function buildAiContext(){
+    const active=activeTickerContext();
+    return {
+      user_id:currentUser?.id||'shafkat',
+      mode:currentMode,
+      scanner_count:allResults.length,
+      active_tab:active.tab?{id:active.tab.id,title:active.tab.title,type:active.tab.type}:null,
+      active_ticker:active.ticker,
+      active_setup:compactSetupForAi(active.setup),
+      scanner_results:allResults.slice(0,30).map(compactSetupForAi)
+    };
+  }
+
+  function appendAiBubble(role, text){
+    const host=document.getElementById('aiMessages');
+    if(!host)return;
+    const bubble=document.createElement('div');
+    bubble.className=`ai-bubble ${role}`;
+    bubble.textContent=text;
+    host.appendChild(bubble);
+    host.scrollTop=host.scrollHeight;
+  }
+
+  async function sendAiMessage(promptOverride){
+    const input=document.getElementById('aiInput');
+    const btn=document.getElementById('aiSendBtn');
+    const text=(promptOverride || input?.value || '').trim();
+    if(!text||aiBusy)return;
+    toggleAiPanel(true);
+    if(input&&!promptOverride)input.value='';
+    appendAiBubble('user', text);
+    aiMessages.push({role:'user',content:text});
+    aiBusy=true;
+    if(btn){btn.disabled=true;btn.textContent='...';}
+    try{
+      const r=await fetch(`${API_URL}/api/ai/chat`,{
+        method:'POST',
+        headers:{'Content-Type':'application/json'},
+        body:JSON.stringify({
+          user_id:currentUser?.id||'shafkat',
+          message:text,
+          history:aiMessages.slice(-8),
+          context:buildAiContext()
+        })
+      });
+      const data=await r.json();
+      if(data.error){
+        appendAiBubble('error', data.error);
+      }else{
+        const reply=data.reply||'No AI response returned.';
+        appendAiBubble('assistant', reply);
+        aiMessages.push({role:'assistant',content:reply});
+      }
+    }catch(e){
+      appendAiBubble('error', 'AI chat could not connect to the server.');
+    }finally{
+      aiBusy=false;
+      if(btn){btn.disabled=false;btn.textContent='Send';}
+    }
+  }
+
+  function aiQuick(text){
+    sendAiMessage(text);
   }
 
   let workspaceTabs=[

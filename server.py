@@ -31,6 +31,8 @@ EMAIL_PASSWORD     = os.getenv('EMAIL_PASSWORD', '')
 EMAIL_TO           = os.getenv('EMAIL_TO', '')
 EMAIL_ALERTS_ENABLED = os.getenv('EMAIL_ALERTS_ENABLED', 'false').lower() in {'1','true','yes','on'}
 email_alerts_available = True
+OPENAI_API_KEY     = os.getenv('OPENAI_API_KEY') or os.getenv('AI_API_KEY', '')
+AI_MODEL           = os.getenv('AI_MODEL', 'gpt-4o-mini')
 
 # ── User auth — passwords stored as SHA-256 hashes, never in plaintext ──
 import hashlib
@@ -1040,6 +1042,12 @@ class LoginRequest(BaseModel):
     user_id:  str
     password: str
 
+class AIChatRequest(BaseModel):
+    user_id: str = 'shafkat'
+    message: str
+    history: list = []
+    context: dict = {}
+
 @app.post("/api/auth/login")
 async def auth_login(req: LoginRequest):
     uid = req.user_id.lower().strip()
@@ -1050,6 +1058,86 @@ async def auth_login(req: LoginRequest):
         log_alert(f"🔐 Login: {uid}")
         return {'success': True, 'user_id': uid}
     return {'success': False, 'error': 'Incorrect password'}
+
+def compact_ai_context(context: dict):
+    """Keep the copilot grounded while avoiding huge browser payloads."""
+    context = context or {}
+    results = context.get('scanner_results') or []
+    compact_results = []
+    for row in results[:30]:
+        compact_results.append({
+            'ticker': row.get('ticker'),
+            'price': row.get('price'),
+            'change_pct': row.get('gap_pct', row.get('change_pct')),
+            'volume': row.get('volume'),
+            'dollar_volume': row.get('dollar_vol'),
+            'rvol': row.get('rvol'),
+            'grade': row.get('grade'),
+            'pattern': row.get('pattern'),
+            'catalyst': row.get('catalyst'),
+            'news': row.get('news_title') or row.get('headline'),
+        })
+    return {
+        'user_id': context.get('user_id'),
+        'scanner_mode': context.get('mode'),
+        'scanner_count': context.get('scanner_count', len(results)),
+        'active_tab': context.get('active_tab'),
+        'active_ticker': context.get('active_ticker'),
+        'active_setup': context.get('active_setup'),
+        'scanner_results': compact_results,
+    }
+
+@app.post("/api/ai/chat")
+async def ai_chat(req: AIChatRequest):
+    if not OPENAI_API_KEY:
+        return {'error': 'AI chat is not configured. Set OPENAI_API_KEY in your .env file and restart the app.'}
+
+    message = (req.message or '').strip()
+    if not message:
+        return {'error': 'Message required'}
+
+    context = compact_ai_context(req.context)
+    history = []
+    for item in (req.history or [])[-8:]:
+        role = item.get('role')
+        content = (item.get('content') or '').strip()
+        if role in ('user', 'assistant') and content:
+            history.append({'role': role, 'content': content[:1800]})
+
+    system_prompt = (
+        "You are Payda x UyghurKid Trading Copilot, an educational trading assistant inside a real-time "
+        "small-cap scanner. Use the provided app context for current scanner/ticker state. Be practical, "
+        "brief, and risk-aware. Do not claim certainty, do not guarantee outcomes, and do not place or "
+        "recommend exact trades as instructions. When discussing setups, explain confirmation, invalidation, "
+        "liquidity, spread, halt/news risk, and what data is missing. If asked about current news or market "
+        "facts not present in context, say that live browsing/news context was not provided."
+    )
+    payload = {
+        'model': AI_MODEL,
+        'messages': [
+            {'role': 'system', 'content': system_prompt},
+            {'role': 'system', 'content': 'APP_CONTEXT_JSON:\n' + json.dumps(context, ensure_ascii=True)[:12000]},
+            *history,
+            {'role': 'user', 'content': message[:3000]},
+        ],
+        'temperature': 0.35,
+        'max_tokens': 700,
+    }
+
+    try:
+        r = requests.post(
+            'https://api.openai.com/v1/chat/completions',
+            headers={'Authorization': f'Bearer {OPENAI_API_KEY}', 'Content-Type': 'application/json'},
+            json=payload,
+            timeout=25,
+        )
+        if r.status_code >= 400:
+            return {'error': f'AI provider HTTP {r.status_code}: {r.text[:220]}'}
+        data = r.json()
+        reply = data.get('choices', [{}])[0].get('message', {}).get('content', '').strip()
+        return {'reply': reply or 'I did not get a usable answer from the AI provider.', 'model': AI_MODEL}
+    except Exception as e:
+        return {'error': f'AI chat failed: {str(e)}'}
 
 class PaperOrderRequest(BaseModel):
     ticker:   str
