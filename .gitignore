@@ -5,3 +5,4 @@ __pycache__/
 config.py
 *.log
 data/copilot_memory.json
+data/scan_history.json

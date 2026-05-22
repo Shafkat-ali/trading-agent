@@ -112,6 +112,15 @@
     .ai-sync-row.error .ai-sync-dot{background:#ff4d6d;box-shadow:0 0 10px rgba(255,77,109,.7);}
     .ai-sync-text{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
     .ai-sync-btn{background:#102642;border:1px solid #2f5f98;border-radius:999px;color:#cfe9ff;font-size:.5rem;font-weight:900;padding:3px 7px;white-space:nowrap;}
+    .ai-provider-row{display:flex;align-items:center;justify-content:space-between;gap:8px;margin:6px 12px 0;padding:6px 8px;border:1px solid #453a14;border-radius:8px;background:#161204;color:#d7bd72;font-size:.54rem;font-weight:800;}
+    .ai-provider-row.ready{border-color:#087a55;background:#052119;color:#bdfbe8;}
+    .ai-provider-row.error{border-color:#743044;background:#2b1018;color:#ffb4c0;}
+    .ai-provider-left{display:flex;align-items:center;gap:6px;min-width:0;}
+    .ai-provider-dot{width:7px;height:7px;border-radius:50%;background:#ffd700;box-shadow:0 0 8px rgba(255,215,0,.65);flex-shrink:0;}
+    .ai-provider-row.ready .ai-provider-dot{background:#00c853;box-shadow:0 0 10px rgba(0,200,83,.7);}
+    .ai-provider-row.error .ai-provider-dot{background:#ff4d6d;box-shadow:0 0 10px rgba(255,77,109,.7);}
+    .ai-provider-text{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+    .ai-provider-btn{background:#102642;border:1px solid #2f5f98;border-radius:999px;color:#cfe9ff;font-size:.5rem;font-weight:900;padding:3px 7px;white-space:nowrap;}
     .ai-quick-row{display:flex;gap:6px;flex-wrap:wrap;padding:10px 12px 0;border-top:1px solid #101a2d;}
     .ai-quick{background:#101b30;border:1px solid #2a4a78;color:#bfe1ff;border-radius:999px;padding:5px 8px;font-size:.56rem;font-weight:800;}
     .ai-command-palette{display:none;margin:8px 12px 0;padding:8px;border:1px solid #243a60;border-radius:9px;background:#08101d;}
@@ -712,6 +721,10 @@
     body.light-theme .ai-context-chip.warn{background:#fffbeb!important;border-color:#facc15!important;color:#854d0e!important;}
     body.light-theme .ai-sync-row{background:#f8fafc!important;border-color:#d7e0ef!important;color:#64748b!important;}
     body.light-theme .ai-sync-btn{background:#ffffff!important;border-color:#cbd5e1!important;color:#334155!important;}
+    body.light-theme .ai-provider-row{background:#fffbeb!important;border-color:#facc15!important;color:#854d0e!important;}
+    body.light-theme .ai-provider-row.ready{background:#ecfdf5!important;border-color:#86efac!important;color:#047857!important;}
+    body.light-theme .ai-provider-row.error{background:#fef2f2!important;border-color:#fecdd3!important;color:#991b1b!important;}
+    body.light-theme .ai-provider-btn{background:#ffffff!important;border-color:#cbd5e1!important;color:#334155!important;}
     body.light-theme .ai-command-palette{background:#f8fafc!important;border-color:#d7e0ef!important;}
     body.light-theme .ai-command-btn{background:#ffffff!important;border-color:#cbd5e1!important;color:#334155!important;}
     body.light-theme .ai-filter-preview{background:#f8fafc!important;border-color:#93c5fd!important;}
@@ -961,6 +974,13 @@
     </div>
     <button class="ai-sync-btn" onclick="syncAiProfileToBackend(false)">Sync</button>
   </div>
+  <div class="ai-provider-row" id="aiProviderRow">
+    <div class="ai-provider-left">
+      <span class="ai-provider-dot"></span>
+      <span class="ai-provider-text" id="aiProviderText">AI provider checking...</span>
+    </div>
+    <button class="ai-provider-btn" onclick="runAiSetupCheck()">Setup</button>
+  </div>
   <div class="ai-quick-row">
     <button class="ai-quick" onclick="aiQuick('Explain the active ticker setup and what would confirm or invalidate it.')">Explain ticker</button>
     <button class="ai-quick" onclick="aiQuick('Summarize the current scanner results and rank the strongest opportunities.')">Summarize scanner</button>
@@ -973,6 +993,8 @@
     <button class="ai-quick" onclick="runAiIntel('risk')">News Risk</button>
     <button class="ai-quick" onclick="aiQuick('Give me a session recap from Live Watch memory and tell me what changed.')">Session recap</button>
     <button class="ai-quick" onclick="aiQuick('Review my saved memory from prior sessions and tell me what patterns keep repeating.')">Memory recap</button>
+    <button class="ai-quick" onclick="runAiScanHistory()">Scan history</button>
+    <button class="ai-quick" onclick="runAiScanComparison()">Scan compare</button>
     <button class="ai-quick" onclick="toggleAiCommandPalette()">Commands</button>
   </div>
   <div class="ai-command-palette" id="aiCommandPalette">
@@ -987,7 +1009,10 @@
       <button class="ai-command-btn" onclick="draftAiFilter('quality')">Draft Quality Scan<span>stronger setups</span></button>
       <button class="ai-command-btn" onclick="runAiIntel('market')">Market Intel<span>news + heat map</span></button>
       <button class="ai-command-btn" onclick="runAiIntel('catalyst')">Catalyst Intel<span>ticker/news focus</span></button>
+      <button class="ai-command-btn" onclick="runAiScanHistory()">Scan History<span>recent scanner runs</span></button>
+      <button class="ai-command-btn" onclick="runAiScanComparison()">Scan Compare<span>current vs previous</span></button>
       <button class="ai-command-btn" onclick="runAiHealthCheck()">Copilot Health<span>memory + AI config</span></button>
+      <button class="ai-command-btn" onclick="runAiSetupCheck()">AI Setup<span>provider status</span></button>
       <button class="ai-command-btn" onclick="runAiCommand('/help')">Show Help<span>all slash commands</span></button>
       <button class="ai-command-btn" onclick="runAiCommand('/clear')">Clear Chat<span>keeps memory</span></button>
     </div>
@@ -1447,7 +1472,7 @@
     ['wmUyghur','nrUyghur'].forEach(id => { const el=document.getElementById(id); if(el){el.src=UYGHUR_LOGO;el.onerror=()=>el.style.display='none';} });
   }
   setLogos();
-  window.addEventListener('DOMContentLoaded',()=>{renderAiWatchlist();updateAiLiveToggle();syncAiPrefsText();renderAiLessons();renderAiFeedback();renderAiMode();renderAiContextChips();renderAiSyncStatus();});
+  window.addEventListener('DOMContentLoaded',()=>{renderAiWatchlist();updateAiLiveToggle();syncAiPrefsText();renderAiLessons();renderAiFeedback();renderAiMode();renderAiContextChips();renderAiSyncStatus();renderAiProviderStatus();});
   window.addEventListener('beforeunload',()=>{saveAiMemoryNow(true);syncAiProfileToBackend(true);});
 
   function applyLayoutTheme(theme){
@@ -1559,6 +1584,7 @@
   }
 
   let aiSyncState={status:'idle',message:'Memory local only',time:''};
+  let aiProviderState={status:'checking',message:'AI provider checking...',model:'local-copilot'};
 
   function setAiSyncStatus(status,message){
     aiSyncState={
@@ -1576,6 +1602,43 @@
     row.classList.remove('idle','loading','saving','synced','error');
     row.classList.add(aiSyncState.status||'idle');
     text.textContent=aiSyncState.time ? `${aiSyncState.message} · ${aiSyncState.time}` : aiSyncState.message;
+  }
+
+  function setAiProviderStatus(status,message,model='local-copilot'){
+    aiProviderState={status:status||'local',message:message||'Local Copilot mode',model:model||'local-copilot'};
+    renderAiProviderStatus();
+  }
+
+  function renderAiProviderStatus(){
+    const row=document.getElementById('aiProviderRow');
+    const text=document.getElementById('aiProviderText');
+    if(!row||!text)return;
+    row.classList.remove('ready','local','checking','error');
+    row.classList.add(aiProviderState.status||'local');
+    text.textContent=aiProviderState.message||'Local Copilot mode';
+  }
+
+  async function refreshAiProviderStatus(silent=true){
+    if(!currentUser){
+      setAiProviderStatus('local','AI provider checks after login');
+      return null;
+    }
+    try{
+      const uid=encodeURIComponent(currentUser.id);
+      const r=await fetch(`${API_URL}/api/ai/health/${uid}`);
+      const h=await r.json();
+      if(!r.ok||h.error)throw new Error(h.error||`HTTP ${r.status}`);
+      if(h.ai_configured){
+        setAiProviderStatus('ready', `LLM ready: ${h.ai_model||'configured'}`, h.ai_model);
+      }else{
+        setAiProviderStatus('local', 'Local Copilot mode - add OPENAI_API_KEY for full AI', 'local-copilot');
+      }
+      return h;
+    }catch(e){
+      setAiProviderStatus('error', 'AI provider status unavailable', 'unknown');
+      if(!silent)appendAiBubble('error', `AI setup check failed: ${e.message||e}`);
+      return null;
+    }
   }
 
   function loadAiPrefs(){
@@ -2075,6 +2138,46 @@
     if(strong.length>=3)aiLiveAlert(`Strong scan cluster: ${strong.join(', ')}. Worth comparing catalysts, spreads, and relative volume.`, `cluster:${currentMode}:${strong.join('-')}`);
   }
 
+  let lastAiScanBriefKey='';
+
+  async function autoBriefCompletedScan(scanStatus=null){
+    if(!allResults.length)return;
+    const statusPhase=scanStatus?.phase||'done';
+    if(statusPhase!=='done')return;
+    const tickers=allResults.slice(0,12).map(s=>s.ticker).join(',');
+    const key=`${currentMode}:${allResults.length}:${tickers}`;
+    if(key===lastAiScanBriefKey)return;
+    lastAiScanBriefKey=key;
+    try{
+      const uid=encodeURIComponent(currentUser?.id||'shafkat');
+      const r=await fetch(`${API_URL}/api/scanner/compare/${uid}?mode=${encodeURIComponent(currentMode||'')}`);
+      const data=await r.json();
+      const c=data.comparison||{};
+      const top=allResults.slice(0,5).map(s=>{
+        const pct=Number(s.gap_pct||s.change_pct||0);
+        return `${s.ticker} ${pct>=0?'+':''}${pct.toFixed(1)}%${s.grade?` ${s.grade}`:''}`;
+      }).join(', ');
+      const newTickers=(c.new_tickers||[]).slice(0,8).join(', ')||'none';
+      const removed=(c.removed_tickers||[]).slice(0,8).join(', ')||'none';
+      const msg=[
+        `Scan brief: ${currentMode} finished with ${allResults.length} setup(s).`,
+        `Top: ${top||'none'}.`,
+        c.previous_run
+          ? `Vs previous: ${c.count_delta>=0?'+':''}${c.count_delta||0} setup(s). New: ${newTickers}. Dropped: ${removed}.`
+          : 'No previous run to compare yet.'
+      ].join('\n');
+      if(aiLiveWatch)aiLiveAlert(msg, `scan-brief:${key}`);
+      if(document.getElementById('aiPanel')?.classList.contains('visible')){
+        appendAiBubble('assistant', msg);
+      }
+      aiSessionMemory.notes=(aiSessionMemory.notes||[]);
+      aiSessionMemory.notes.unshift({time:new Date().toISOString(),type:'scan_brief',text:msg});
+      aiSessionMemory.notes=aiSessionMemory.notes.slice(0,200);
+      sessionStorage.setItem('aiSessionMemory', JSON.stringify(aiSessionMemory));
+      scheduleAiProfileSync();
+    }catch(e){}
+  }
+
   function monitorAlerts(alerts){
     (alerts||[]).slice(0,10).forEach(a=>{
       const msg=String(a.message||'');
@@ -2221,7 +2324,7 @@
     };
   }
 
-  function appendAiBubble(role, text){
+  function appendAiBubble(role, text, opts={}){
     const host=document.getElementById('aiMessages');
     if(!host)return;
     const bubble=document.createElement('div');
@@ -2229,7 +2332,7 @@
     const body=document.createElement('div');
     body.textContent=text;
     bubble.appendChild(body);
-    if(role==='assistant'){
+    if(role==='assistant'&&!opts.noFeedback){
       const fb=document.createElement('div');
       fb.className='ai-feedback';
       const useful=document.createElement('button');
@@ -2246,6 +2349,11 @@
     }
     host.appendChild(bubble);
     host.scrollTop=host.scrollHeight;
+    return bubble;
+  }
+
+  function removeAiBubble(bubble){
+    if(bubble&&bubble.parentNode)bubble.parentNode.removeChild(bubble);
   }
 
   async function sendAiMessage(promptOverride, extraContext=null){
@@ -2276,6 +2384,8 @@
       if(data.error){
         appendAiBubble('error', data.error);
       }else{
+        if(data.ai_configured===false)setAiProviderStatus('local','Local Copilot mode - add OPENAI_API_KEY for full AI','local-copilot');
+        else if(data.model)setAiProviderStatus('ready', `LLM ready: ${data.model}`, data.model);
         const parsed=parseAiActions(data.reply||'No AI response returned.');
         appendAiBubble('assistant', parsed.display);
         aiMessages.push({role:'assistant',content:parsed.display});
@@ -2297,8 +2407,9 @@
     if(aiBusy)return;
     toggleAiPanel(true);
     toggleAiCommandPalette(false);
-    appendAiBubble('assistant','Gathering market intelligence: news, SEC risk, heat map, Polymarket, scanner context...');
+    const loading=appendAiBubble('assistant','Gathering market intelligence: news, SEC risk, heat map, Polymarket, scanner context...',{noFeedback:true});
     const ctx=await buildMarketIntelContext(kind);
+    removeAiBubble(loading);
     const active=activeTickerContext();
     const prompts={
       market:'Give me a concise trading intelligence brief from the market_context. Lead with sector heat map, important market news, SEC danger headlines, Polymarket signals, and whether the current scanner results line up with the tape.',
@@ -2311,7 +2422,7 @@
   async function runAiHealthCheck(){
     toggleAiPanel(true);
     toggleAiCommandPalette(false);
-    appendAiBubble('assistant','Checking Copilot health...');
+    const loading=appendAiBubble('assistant','Checking Copilot health...',{noFeedback:true});
     try{
       const uid=encodeURIComponent(currentUser?.id||'shafkat');
       const r=await fetch(`${API_URL}/api/ai/health/${uid}`);
@@ -2329,10 +2440,98 @@
         `Recent logs: ${(h.recent_logs||[]).length}`
       ];
       setAiSyncStatus(h.memory_saved?'synced':'idle', h.memory_saved?'Memory reachable':'No backend memory yet');
+      if(h.ai_configured)setAiProviderStatus('ready', `LLM ready: ${h.ai_model||'configured'}`, h.ai_model);
+      else setAiProviderStatus('local','Local Copilot mode - add OPENAI_API_KEY for full AI','local-copilot');
+      removeAiBubble(loading);
       appendAiBubble('assistant', lines.join('\n'));
     }catch(e){
+      removeAiBubble(loading);
       setAiSyncStatus('error','Health check failed');
       appendAiBubble('error', `Copilot health check failed: ${e.message||e}`);
+    }
+  }
+
+  async function runAiSetupCheck(){
+    toggleAiPanel(true);
+    toggleAiCommandPalette(false);
+    const loading=appendAiBubble('assistant','Checking AI setup...',{noFeedback:true});
+    const h=await refreshAiProviderStatus(false);
+    if(!h){removeAiBubble(loading);return;}
+    const envs=(h.accepted_ai_env_vars||['OPENAI_API_KEY','AI_API_KEY']).join(' or ');
+    const lines=[
+      'AI setup:',
+      `Provider: ${h.ai_configured?`LLM ready (${h.ai_model})`:'Local Copilot mode only'}`,
+      `Accepted key names: ${envs}`,
+      h.ai_configured
+        ? 'Full natural-language AI chat is enabled.'
+        : 'To enable full LLM chat: add OPENAI_API_KEY=your_key_here to .env, then restart the server.',
+      `Memory file: ${h.memory_file||'unknown'}`,
+      `Scan history file: ${h.scan_history_file||'unknown'}`
+    ];
+    removeAiBubble(loading);
+    appendAiBubble('assistant', lines.join('\n'));
+  }
+
+  function formatAiScanRun(run){
+    const top=(run.top_results||[]).slice(0,5).map(r=>{
+      const pct=Number(r.change_pct||0);
+      return `${r.ticker||'?'} ${pct>=0?'+':''}${pct.toFixed(1)}%${r.grade?` ${r.grade}`:''}`;
+    }).join(', ')||'no tickers';
+    const label=(run.mode||'scan').replace('_',' ');
+    return `${run.time||''} ${label} | ${run.count||0} setup(s), ${run.aplus_count||0} A+ | ${run.source||'live'} | Top: ${top}`;
+  }
+
+  async function runAiScanHistory(){
+    toggleAiPanel(true);
+    toggleAiCommandPalette(false);
+    const loading=appendAiBubble('assistant','Loading recent scan history...',{noFeedback:true});
+    try{
+      const uid=encodeURIComponent(currentUser?.id||'shafkat');
+      const r=await fetch(`${API_URL}/api/scanner/history/${uid}?limit=10`);
+      const data=await r.json();
+      if(!r.ok||data.error)throw new Error(data.error||`HTTP ${r.status}`);
+      const runs=data.runs||[];
+      removeAiBubble(loading);
+      if(!runs.length){
+        appendAiBubble('assistant','No saved scanner history yet. Complete a scan and I will start tracking runs here.');
+        return;
+      }
+      appendAiBubble('assistant', ['Recent scan history:', ...runs.map((run,i)=>`${i+1}. ${formatAiScanRun(run)}`)].join('\n'));
+    }catch(e){
+      removeAiBubble(loading);
+      appendAiBubble('error', `Scan history failed: ${e.message||e}`);
+    }
+  }
+
+  async function runAiScanComparison(){
+    toggleAiPanel(true);
+    toggleAiCommandPalette(false);
+    const loading=appendAiBubble('assistant','Comparing current scan with the previous saved run...',{noFeedback:true});
+    try{
+      const uid=encodeURIComponent(currentUser?.id||'shafkat');
+      const r=await fetch(`${API_URL}/api/scanner/compare/${uid}?mode=${encodeURIComponent(currentMode||'')}`);
+      const data=await r.json();
+      if(!r.ok||data.error)throw new Error(data.error||`HTTP ${r.status}`);
+      const c=data.comparison||{};
+      const prev=c.previous_run;
+      removeAiBubble(loading);
+      if(!prev){
+        appendAiBubble('assistant', `No previous ${currentMode||'scan'} run yet. Current scan has ${c.current_count||0} setup(s).`);
+        return;
+      }
+      const changed=(c.changed_tickers||[]).slice(0,6).map(x=>`${x.ticker} ${x.delta_pct>=0?'+':''}${Number(x.delta_pct||0).toFixed(1)} pts`).join(', ')||'none';
+      const lines=[
+        `Scan comparison (${c.mode||currentMode}):`,
+        `Current: ${c.current_count||0} setup(s). Previous: ${c.previous_count||0} setup(s) at ${prev.time||'unknown time'} (${prev.source||'saved'}).`,
+        `Delta: ${c.count_delta>=0?'+':''}${c.count_delta||0} setup(s).`,
+        `New: ${(c.new_tickers||[]).slice(0,12).join(', ')||'none'}`,
+        `Dropped: ${(c.removed_tickers||[]).slice(0,12).join(', ')||'none'}`,
+        `Biggest changes: ${changed}`
+      ];
+      appendAiBubble('assistant', lines.join('\n'));
+    }catch(e){
+      removeAiBubble(loading);
+      appendAiBubble('error', `Scan comparison failed: ${e.message||e}`);
     }
   }
 
@@ -2513,6 +2712,9 @@
       '/import - open the profile import picker',
       '/sync - save Copilot memory to backend now',
       '/health - check backend memory, AI config, scanner context',
+      '/setup - check AI provider setup and key status',
+      '/history - show recent scanner runs',
+      '/compare - compare current scan against previous saved run',
       '/live on | off - toggle Live Watch',
       '/clear - clear Copilot chat messages'
     ].join('\n'));
@@ -2584,6 +2786,18 @@
     }
     if(cmd==='/health'){
       runAiHealthCheck();
+      return true;
+    }
+    if(cmd==='/setup'||cmd==='/ai'){
+      runAiSetupCheck();
+      return true;
+    }
+    if(cmd==='/history'||cmd==='/scanhistory'){
+      runAiScanHistory();
+      return true;
+    }
+    if(cmd==='/compare'||cmd==='/scancompare'){
+      runAiScanComparison();
       return true;
     }
     if(cmd==='/live'){
@@ -3556,6 +3770,7 @@ run();
     loadUserResults(id);
     loadNewsTab();
     loadAiProfileFromBackend(id);
+    refreshAiProviderStatus(true);
   }
 
   function resetLocalState(){
@@ -3860,6 +4075,7 @@ run();
         renderAlerts(msg.alerts);updateStats(allResults,msg.time);
         if(msg.scan_status)updateProgress(msg.scan_status);
         if(msg.scan_status?.phase==='done'&&!data.length&&!allResults.length)showEmptyScanResult(msg.scan_status);
+        if(msg.scan_status?.phase==='done')autoBriefCompletedScan(msg.scan_status);
         renderAiContextChips();
         if(msg.mode){currentMode=msg.mode;updateActiveModeLabel(msg.mode);renderAiContextChips();}
       }
@@ -3894,6 +4110,7 @@ run();
             total:allResults.length
           };
           updateProgress(doneStatus);
+          autoBriefCompletedScan(doneStatus);
         }
       }catch(e){}
     },5000);

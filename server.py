@@ -113,6 +113,8 @@ scan_cache = {}
 scan_cache_locks = {}
 COPILOT_MEMORY_FILE = Path(os.getenv('COPILOT_MEMORY_FILE', 'data/copilot_memory.json'))
 copilot_memory_lock = threading.Lock()
+SCAN_HISTORY_FILE = Path(os.getenv('SCAN_HISTORY_FILE', 'data/scan_history.json'))
+scan_history_lock = threading.Lock()
 
 def _empty_copilot_profile(user_id='shafkat'):
     return {
@@ -170,6 +172,164 @@ def _trim_copilot_profile(profile, user_id='shafkat'):
     smem['notes'] = (smem.get('notes') or [])[:200]
     base['session_memory'] = smem
     return base
+
+def _read_scan_history_store():
+    try:
+        if not SCAN_HISTORY_FILE.exists():
+            return {}
+        with SCAN_HISTORY_FILE.open('r', encoding='utf-8') as f:
+            data = json.load(f)
+            return data if isinstance(data, dict) else {}
+    except Exception as e:
+        log_alert(f"Scan history read failed: {e}")
+        return {}
+
+def _write_scan_history_store(store):
+    SCAN_HISTORY_FILE.parent.mkdir(parents=True, exist_ok=True)
+    tmp = SCAN_HISTORY_FILE.with_suffix('.tmp')
+    with tmp.open('w', encoding='utf-8') as f:
+        json.dump(store, f, ensure_ascii=True, indent=2)
+    tmp.replace(SCAN_HISTORY_FILE)
+
+def compact_scan_result_for_history(row):
+    return {
+        'ticker': row.get('ticker'),
+        'price': row.get('price'),
+        'prev_close': row.get('prev_close'),
+        'change_pct': row.get('gap_pct', row.get('change_pct')),
+        'volume': row.get('volume'),
+        'dollar_volume': row.get('dollar_vol', row.get('dollar_volume')),
+        'trades': row.get('trades'),
+        'rvol': row.get('rvol'),
+        'grade': row.get('grade'),
+        'pattern': row.get('pattern'),
+        'catalyst': row.get('catalyst'),
+        'warning': row.get('warning'),
+        'news': row.get('news_title') or row.get('headline') or '',
+        'source': row.get('source'),
+    }
+
+def _trim_filters_for_history(filters):
+    filters = filters or {}
+    allowed = [
+        'min_price', 'max_price', 'min_gap_pct', 'min_dollar_vol', 'min_volume',
+        'min_trades', 'min_rvol', 'max_float_m', 'max_market_cap_m',
+        'require_news', 'max_gap_pct', 'max_spread_pct', 'min_ah_volume',
+        'min_volume_surge'
+    ]
+    return {k: filters.get(k) for k in allowed if k in filters}
+
+def save_scan_history(user_id, mode, filters, results, done_status=None, source='live'):
+    uid = user_id if user_id in user_state else 'shafkat'
+    results = results or []
+    now = datetime.now()
+    run = {
+        'id': f"{now.strftime('%Y%m%d%H%M%S')}-{mode}-{len(results)}",
+        'user_id': uid,
+        'mode': mode,
+        'source': source,
+        'timestamp': now.isoformat(),
+        'date': now.strftime('%Y-%m-%d'),
+        'time': now.strftime('%H:%M:%S'),
+        'count': len(results),
+        'aplus_count': len([r for r in results if r.get('grade') == 'A+']),
+        'a_count': len([r for r in results if r.get('grade') == 'A']),
+        'filters': _trim_filters_for_history(filters),
+        'status': {
+            'phase': (done_status or {}).get('phase'),
+            'message': (done_status or {}).get('message'),
+            'progress': (done_status or {}).get('progress'),
+            'total': (done_status or {}).get('total'),
+        },
+        'top_results': [compact_scan_result_for_history(r) for r in results[:50]],
+    }
+    try:
+        with scan_history_lock:
+            store = _read_scan_history_store()
+            runs = store.get(uid, [])
+            runs.insert(0, run)
+            store[uid] = runs[:100]
+            _write_scan_history_store(store)
+    except Exception as e:
+        log_alert(f"Scan history save failed: {e}")
+    return run
+
+def get_scan_history_summary(user_id, limit=10, mode=''):
+    uid = user_id if user_id in user_state else 'shafkat'
+    try:
+        limit = max(1, min(int(limit or 10), 50))
+    except:
+        limit = 10
+    with scan_history_lock:
+        store = _read_scan_history_store()
+        runs = store.get(uid, [])
+    if mode:
+        runs = [r for r in runs if r.get('mode') == mode]
+    return runs[:limit]
+
+def compare_scan_to_previous(user_id, mode, current_results):
+    current_results = current_results or []
+    current_by_symbol = {str(r.get('ticker') or '').upper(): r for r in current_results if r.get('ticker')}
+    history = get_scan_history_summary(user_id, limit=12, mode=mode)
+    previous = None
+    current_symbols = set(current_by_symbol)
+    for run in history:
+        prior_symbols = {str(r.get('ticker') or '').upper() for r in (run.get('top_results') or []) if r.get('ticker')}
+        # Skip the just-saved run if it is effectively identical to current.
+        if prior_symbols and prior_symbols != current_symbols:
+            previous = run
+            break
+    if not previous and history:
+        previous = history[1] if len(history) > 1 else history[0]
+    if not previous:
+        return {
+            'mode': mode,
+            'current_count': len(current_results),
+            'previous_count': 0,
+            'new_tickers': [],
+            'removed_tickers': [],
+            'kept_tickers': [],
+            'count_delta': len(current_results),
+            'previous_run': None,
+        }
+    previous_results = previous.get('top_results') or []
+    previous_by_symbol = {str(r.get('ticker') or '').upper(): r for r in previous_results if r.get('ticker')}
+    prev_symbols = set(previous_by_symbol)
+    new_symbols = sorted(current_symbols - prev_symbols)
+    removed_symbols = sorted(prev_symbols - current_symbols)
+    kept_symbols = sorted(current_symbols & prev_symbols)
+    movers = []
+    for sym in kept_symbols:
+        cur = current_by_symbol.get(sym, {})
+        prev = previous_by_symbol.get(sym, {})
+        cur_pct = float(cur.get('gap_pct', cur.get('change_pct') or 0) or 0)
+        prev_pct = float(prev.get('change_pct') or 0)
+        movers.append({
+            'ticker': sym,
+            'current_change_pct': round(cur_pct, 2),
+            'previous_change_pct': round(prev_pct, 2),
+            'delta_pct': round(cur_pct - prev_pct, 2),
+            'current_grade': cur.get('grade'),
+            'previous_grade': prev.get('grade'),
+        })
+    movers.sort(key=lambda x: abs(x['delta_pct']), reverse=True)
+    return {
+        'mode': mode,
+        'current_count': len(current_results),
+        'previous_count': int(previous.get('count') or len(previous_results)),
+        'count_delta': len(current_results) - int(previous.get('count') or len(previous_results)),
+        'new_tickers': new_symbols[:25],
+        'removed_tickers': removed_symbols[:25],
+        'kept_tickers': kept_symbols[:25],
+        'changed_tickers': movers[:15],
+        'previous_run': {
+            'id': previous.get('id'),
+            'time': previous.get('time'),
+            'date': previous.get('date'),
+            'source': previous.get('source'),
+            'count': previous.get('count'),
+        },
+    }
 
 SCAN_MODES = {
     'morning_gap': {
@@ -647,6 +807,26 @@ async def get_user_results(user_id: str):
             'time':datetime.now().strftime('%H:%M:%S'),'mode':s['mode'],
             'running':s.get('running', False)}
 
+@app.get("/api/scanner/history/{user_id}")
+async def get_scanner_history(user_id: str, limit: int = 12, mode: str = ''):
+    if user_id not in user_state:
+        return {'error': 'Unknown user', 'runs': []}
+    return {
+        'user_id': user_id,
+        'runs': get_scan_history_summary(user_id, limit=limit, mode=(mode or '').strip()),
+    }
+
+@app.get("/api/scanner/compare/{user_id}")
+async def get_scanner_compare(user_id: str, mode: str = ''):
+    if user_id not in user_state:
+        return {'error': 'Unknown user'}
+    s = user_state[user_id]
+    scan_mode = (mode or s.get('mode') or '').strip()
+    return {
+        'user_id': user_id,
+        'comparison': compare_scan_to_previous(user_id, scan_mode, s.get('scan_results', [])),
+    }
+
 @app.post("/api/scanner/start/{user_id}")
 async def start_scanner(user_id: str):
     if user_id not in user_state: return {'error':'Unknown user'}
@@ -668,6 +848,7 @@ async def start_scanner(user_id: str):
             'scan_status':done_status,'mode':mode,'filters':s['filters'],
         })
         await broadcast_to_user(user_id, {'type':'status','running':False,'mode':mode})
+        save_scan_history(user_id, mode, cached.get('filters') or s['filters'], cached['results'], done_status, source='cache')
         asyncio.create_task(refresh_scan_cache(user_id, mode, force=True))
         log_alert(f"⚡ [{user_id}] Served {mode} from live cache ({int(cached.get('age', 0))}s old)")
         return {'status':'cached','mode':mode,'age':cached.get('age', 0),'count':len(cached['results'])}
@@ -1158,7 +1339,10 @@ async def ai_health(user_id: str):
         'user_id': uid,
         'ai_configured': bool(OPENAI_API_KEY),
         'ai_model': AI_MODEL,
+        'accepted_ai_env_vars': ['OPENAI_API_KEY', 'AI_API_KEY'],
+        'ai_config_message': 'AI chat is ready' if OPENAI_API_KEY else 'Add OPENAI_API_KEY or AI_API_KEY to .env, then restart the server for full LLM chat.',
         'memory_file': str(COPILOT_MEMORY_FILE),
+        'scan_history_file': str(SCAN_HISTORY_FILE),
         'memory_saved': bool(profile.get('updated_at') or profile.get('exported_at')),
         'memory_counts': {
             'lessons': len(profile.get('lessons') or []),
@@ -1173,6 +1357,7 @@ async def ai_health(user_id: str):
             'running': s.get('running', False),
             'results': len(s.get('scan_results', [])),
             'filters': s.get('filters'),
+            'history_runs': len(get_scan_history_summary(uid, limit=50)),
         },
         'recent_logs': alert_log[:8],
     }
@@ -1216,6 +1401,8 @@ def compact_ai_context(context: dict):
         'learning_notes': context.get('learning_notes'),
         'feedback_memory': context.get('feedback_memory'),
         'market_context': context.get('market_context'),
+        'scan_history': context.get('scan_history'),
+        'scan_comparison': context.get('scan_comparison'),
         'scanner_results': compact_results,
     }
 
@@ -1223,12 +1410,15 @@ def compact_ai_context(context: dict):
 async def ai_context(user_id: str, ticker: str = ''):
     uid = user_id if user_id in user_state else 'shafkat'
     s = user_state.get(uid, {})
+    current_results = s.get('scan_results', [])
     data = {
         'user_id': uid,
         'mode': s.get('mode'),
         'filters': s.get('filters'),
         'running': s.get('running', False),
-        'scanner_count': len(s.get('scan_results', [])),
+        'scanner_count': len(current_results),
+        'scan_history': get_scan_history_summary(uid, limit=8),
+        'scan_comparison': compare_scan_to_previous(uid, s.get('mode'), current_results),
         'recent_logs': alert_log[:20],
     }
     symbol = (ticker or '').upper().strip()
@@ -1244,16 +1434,121 @@ async def ai_context(user_id: str, ticker: str = ''):
         data['metrics'] = metrics.get('metric', {}) if isinstance(metrics, dict) else {}
     return data
 
+def _ai_num(value, default=0):
+    try:
+        return float(value if value is not None else default)
+    except:
+        return default
+
+def _ai_money(value):
+    v = _ai_num(value)
+    sign = '-' if v < 0 else ''
+    v = abs(v)
+    if v >= 1_000_000_000:
+        return f"{sign}${v/1_000_000_000:.1f}B"
+    if v >= 1_000_000:
+        return f"{sign}${v/1_000_000:.1f}M"
+    if v >= 1_000:
+        return f"{sign}${v/1_000:.0f}K"
+    return f"{sign}${v:.2f}"
+
+def _ai_top_rows(rows, limit=5):
+    out = []
+    for r in (rows or [])[:limit]:
+        pct = _ai_num(r.get('change_pct', r.get('gap_pct')))
+        dvol = r.get('dollar_volume', r.get('dollar_vol'))
+        bits = [
+            str(r.get('ticker') or '?'),
+            f"{pct:+.1f}%",
+        ]
+        if r.get('grade'):
+            bits.append(str(r.get('grade')))
+        if dvol is not None:
+            bits.append(_ai_money(dvol))
+        if r.get('rvol'):
+            bits.append(f"RVOL {_ai_num(r.get('rvol')):.1f}x")
+        if r.get('pattern'):
+            bits.append(str(r.get('pattern')))
+        out.append(' '.join(bits))
+    return out
+
+def local_copilot_reply(message, context):
+    """Deterministic fallback when no OpenAI key is configured."""
+    msg = (message or '').lower()
+    results = context.get('scanner_results') or []
+    active = context.get('active_setup') or {}
+    quote = context.get('live_quote') or {}
+    comparison = context.get('scan_comparison') or {}
+    history = context.get('scan_history') or []
+    mode = context.get('scanner_mode') or context.get('mode') or 'scanner'
+    lines = [
+        "Local Copilot mode: OPENAI_API_KEY or AI_API_KEY is not configured, so this is a rule-based answer from the app context.",
+    ]
+
+    wants_compare = any(w in msg for w in ['compare', 'changed', 'change since', 'previous', 'last scan', 'new ticker', 'dropped'])
+    wants_history = any(w in msg for w in ['history', 'recent scan', 'past scan'])
+    wants_risk = any(w in msg for w in ['risk', 'danger', 'warning', 'avoid'])
+    wants_ticker = bool(active) or any(w in msg for w in ['ticker', 'setup', 'explain'])
+
+    if wants_compare and comparison:
+        prev = comparison.get('previous_run') or {}
+        lines += [
+            f"Scan comparison for {comparison.get('mode') or mode}: current {comparison.get('current_count', 0)} setup(s), previous {comparison.get('previous_count', 0)} setup(s) at {prev.get('time', 'unknown time')}.",
+            f"Net change: {comparison.get('count_delta', 0):+} setup(s).",
+            "New: " + (', '.join((comparison.get('new_tickers') or [])[:12]) or 'none'),
+            "Dropped: " + (', '.join((comparison.get('removed_tickers') or [])[:12]) or 'none'),
+        ]
+        changed = comparison.get('changed_tickers') or []
+        if changed:
+            lines.append("Biggest movers vs previous: " + ', '.join(
+                f"{x.get('ticker')} {float(x.get('delta_pct') or 0):+.1f} pts" for x in changed[:6]
+            ))
+    elif wants_history and history:
+        lines.append("Recent scan history:")
+        for i, run in enumerate(history[:6], 1):
+            top = ', '.join((r.get('ticker') or '?') for r in (run.get('top_results') or [])[:5]) or 'none'
+            lines.append(f"{i}. {run.get('time', '')} {run.get('mode', 'scan')} - {run.get('count', 0)} setup(s), {run.get('aplus_count', 0)} A+ | top: {top}")
+    elif wants_ticker and active:
+        pct = _ai_num(active.get('change_pct', active.get('gap_pct')))
+        lines += [
+            f"{active.get('ticker', 'Ticker')} setup: {pct:+.1f}% at ${_ai_num(active.get('price')):.4f}, grade {active.get('grade', 'n/a')}.",
+            f"Pattern: {active.get('pattern') or 'not classified'}",
+            f"Catalyst: {active.get('catalyst') or 'no clear catalyst in context'}",
+            f"Liquidity: {_ai_money(active.get('dollar_volume', active.get('dollar_vol')))} dollar volume, RVOL {_ai_num(active.get('rvol')):.1f}x.",
+        ]
+        if quote and not quote.get('error'):
+            lines.append(f"Live quote context: last ${_ai_num(quote.get('c')):.4f}, bid ${_ai_num(quote.get('bid')):.4f}, ask ${_ai_num(quote.get('ask')):.4f}, source {quote.get('source', 'unknown')}.")
+    elif wants_risk:
+        warning_rows = [r for r in results if r.get('warning')]
+        lines.append(f"Risk scan: {len(warning_rows)} warning-flagged setup(s) in the current {mode} list.")
+        if warning_rows:
+            lines += [f"{r.get('ticker')}: {r.get('warning')}" for r in warning_rows[:6]]
+        else:
+            lines.append("No explicit warning flags in the compact scanner context. Still check spread, halt risk, SEC filings, and whether the move has real catalyst support.")
+    elif results:
+        lines.append(f"Current {mode} scan has {context.get('scanner_count', len(results))} setup(s). Top names:")
+        lines += [f"- {row}" for row in _ai_top_rows(results, 8)]
+    else:
+        lines.append("I do not see scanner results in context yet. Run MorningGap, ScanOpp, AfterHrs, or open a ticker tab first.")
+
+    lines.append("For full natural-language market/news reasoning, add OPENAI_API_KEY or AI_API_KEY to .env and restart the server.")
+    return '\n'.join(lines)
+
 @app.post("/api/ai/chat")
 async def ai_chat(req: AIChatRequest):
-    if not OPENAI_API_KEY:
-        return {'error': 'AI chat is not configured. Set OPENAI_API_KEY in your .env file and restart the app.'}
-
     message = (req.message or '').strip()
     if not message:
         return {'error': 'Message required'}
 
     context = compact_ai_context(req.context)
+    if not OPENAI_API_KEY:
+        return {
+            'reply': local_copilot_reply(message, context),
+            'model': 'local-copilot',
+            'ai_configured': False,
+            'config_hint': 'Add OPENAI_API_KEY or AI_API_KEY to .env, then restart the server.',
+        }
+
     history = []
     for item in (req.history or [])[-8:]:
         role = item.get('role')
@@ -1271,7 +1566,7 @@ async def ai_chat(req: AIChatRequest):
         "safe app navigation by ending with action lines. Use ACTION:OPEN_TICKER:SYMBOL to open a ticker. "
         "Use ACTION:OPEN_WORKSPACE:SCANNER, FILTERS, PAPER, NEWS, SCREENER, HEATMAP, POLYMARKET, or CHARTS "
         "to navigate. Use ACTION:WATCHLIST:SYM1,SYM2,SYM3 when the user asks to build a watchlist from context. "
-        "Use copilot_mode to choose response style and priorities. Use user_preferences, learning_notes, and feedback_memory to adapt your ranking and warnings to the user's style. Use session_memory for today's changes and persistent_memory for prior local trading-app observations. "
+        "Use copilot_mode to choose response style and priorities. Use user_preferences, learning_notes, and feedback_memory to adapt your ranking and warnings to the user's style. Use session_memory for today's changes, scan_history and scan_comparison for recent scanner run comparisons, and persistent_memory for prior local trading-app observations. "
         "When market_context is present, synthesize market news, SEC danger headlines, heat map sector strength/weakness, Polymarket signals, scanner results, and active ticker data into one practical brief. Clearly say when a signal is weak, stale, indirect, or only context rather than a stock-specific catalyst. "
         "Action lines must be on their own line. Never use actions to place orders."
     )
@@ -3587,6 +3882,7 @@ async def scanner_loop(user_id, scan_id):
                 'count':len(results),'alerts':alert_log[:20],
                 'scan_status':done_status,'mode':s['mode'],'filters':s['filters'],
             })
+            save_scan_history(user_id, s['mode'], s['filters'], results, done_status, source='live')
             s['running'] = False
         except Exception as e:
             msg = f"Scanner error: {e}"
