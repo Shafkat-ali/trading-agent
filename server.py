@@ -5,6 +5,7 @@ from pydantic import BaseModel
 import asyncio
 import yfinance as yf
 import requests
+import ssl
 import smtplib
 import threading
 import csv
@@ -14,11 +15,34 @@ from pathlib import Path
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from dotenv import load_dotenv
 import os
 
 load_dotenv(override=False)
+
+def install_requests_ssl_compat():
+    """Keep TLS verification on while accepting Windows/proxy CA chains OpenSSL marks non-strict."""
+    try:
+        from requests.adapters import HTTPAdapter
+        if getattr(HTTPAdapter, '_payda_ssl_compat', False):
+            return
+        original_init_poolmanager = HTTPAdapter.init_poolmanager
+
+        def init_poolmanager(self, connections, maxsize, block=False, **pool_kwargs):
+            if 'ssl_context' not in pool_kwargs:
+                context = ssl.create_default_context()
+                if hasattr(ssl, 'VERIFY_X509_STRICT'):
+                    context.verify_flags &= ~ssl.VERIFY_X509_STRICT
+                pool_kwargs['ssl_context'] = context
+            return original_init_poolmanager(self, connections, maxsize, block=block, **pool_kwargs)
+
+        HTTPAdapter.init_poolmanager = init_poolmanager
+        HTTPAdapter._payda_ssl_compat = True
+    except Exception as e:
+        print(f"SSL compatibility setup skipped: {e}")
+
+install_requests_ssl_compat()
 
 app = FastAPI(title="Payda x UyghurKid Trading Agent")
 app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"])
@@ -2874,11 +2898,37 @@ def get_listed_symbol_universe():
     return result
 
 
+def tradier_quote_live_price(q):
+    """Use bid/ask midpoint in extended hours when Tradier last is stale at prior close."""
+    last = float(q.get('last') or 0)
+    bid = float(q.get('bid') or 0)
+    ask = float(q.get('ask') or 0)
+    prev_close = float(q.get('prevclose') or 0)
+    mid = ((bid + ask) / 2) if bid > 0 and ask > 0 else 0
+
+    ET = timezone(timedelta(hours=-4))
+    now_et = datetime.now(ET)
+    is_extended = (
+        now_et.hour < 9 or
+        (now_et.hour == 9 and now_et.minute < 30) or
+        now_et.hour >= 16
+    )
+
+    if is_extended and mid > 0:
+        if last <= 0:
+            return mid
+        if prev_close > 0 and abs(last - prev_close) <= max(0.01, prev_close * 0.005):
+            return mid
+        if abs(mid - last) > max(0.03, last * 0.08):
+            return mid
+    return last or mid
+
+
 def filter_tradier_quote_map(quote_map, filters, source):
     candidates = []
     for sym, q in quote_map.items():
         try:
-            price      = float(q.get('last') or q.get('bid') or 0)
+            price      = tradier_quote_live_price(q)
             prev_close = float(q.get('prevclose') or 0)
             volume     = float(q.get('volume') or 0)
             trades     = float(q.get('trades') or q.get('trade_count') or q.get('num_trades') or 0)
@@ -3054,7 +3104,7 @@ def get_tradier_movers(filters, user_id='shafkat'):
     candidates = []
     for sym, q in quote_map.items():
         try:
-            last       = float(q.get('last') or q.get('bid') or 0)
+            last       = tradier_quote_live_price(q)
             close      = float(q.get('close') or 0)      # today's 4pm close
             prev_close = float(q.get('prevclose') or 0)  # yesterday's close
             volume     = float(q.get('volume') or 0)
@@ -3504,7 +3554,7 @@ async def do_scan(user_id, scan_id=None, mode_override=None, filters_override=No
             # Filter the quotes
             for sym, q in quote_map.items():
                 try:
-                    price      = float(q.get('last') or q.get('bid') or 0)
+                    price      = tradier_quote_live_price(q)
                     prev_close = float(q.get('prevclose') or 0)
                     volume     = float(q.get('volume') or 0)
                     trades     = float(q.get('trades') or q.get('trade_count') or q.get('num_trades') or 0)
@@ -3546,7 +3596,7 @@ async def do_scan(user_id, scan_id=None, mode_override=None, filters_override=No
             before = len(candidates)
             for sym, q in lookup_quotes.items():
                 try:
-                    price      = float(q.get('last') or q.get('bid') or 0)
+                    price      = tradier_quote_live_price(q)
                     prev_close = float(q.get('prevclose') or 0)
                     volume     = float(q.get('volume') or 0)
                     trades     = float(q.get('trades') or q.get('trade_count') or q.get('num_trades') or 0)
@@ -3656,7 +3706,7 @@ async def do_scan(user_id, scan_id=None, mode_override=None, filters_override=No
         if universe and 'quote_map' in locals() and quote_map:
             for sym, q in quote_map.items():
                 try:
-                    price      = float(q.get('last') or q.get('bid') or 0)
+                    price      = tradier_quote_live_price(q)
                     prev_close = float(q.get('prevclose') or 0)
                     volume     = float(q.get('volume') or 0)
                     trades     = float(q.get('trades') or q.get('trade_count') or q.get('num_trades') or 0)

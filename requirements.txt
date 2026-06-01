@@ -5,4 +5,5 @@ python-dotenv
 yfinance
 pandas
 requests
+python-certifi-win32
 pytz
