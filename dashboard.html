@@ -84,13 +84,13 @@
     .ai-panel{position:fixed;right:14px;top:86px;bottom:14px;width:min(430px,calc(100vw - 28px));max-height:calc(100vh - 100px);z-index:9600;background:#0b1220;border:1px solid #284064;border-radius:12px;display:flex;flex-direction:column;box-shadow:0 22px 70px rgba(0,0,0,.48);overflow:hidden;min-height:0;}
     .ai-panel.hidden{display:none;}
     .ai-head{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:12px 14px;border-bottom:1px solid #1e2d4a;background:#0f1729;flex-shrink:0;}
-    .ai-scroll{flex:1;min-height:0;overflow:auto;overflow-x:hidden;padding-bottom:10px;}
+    .ai-scroll{flex:1;min-height:0;overflow:hidden;display:flex;flex-direction:column;}
     .ai-scroll::-webkit-scrollbar{width:8px;}
     .ai-scroll::-webkit-scrollbar-thumb{background:#243a60;border-radius:999px;}
     .ai-title{font-size:.78rem;font-weight:900;color:#f5f3ff;letter-spacing:.3px;}
     .ai-sub{font-size:.54rem;color:#6f86aa;margin-top:2px;}
     .ai-close{background:#16233a;border:1px solid #2b4772;border-radius:6px;color:#bfe1ff;font-size:.62rem;font-weight:800;padding:5px 8px;}
-    .ai-msgs{max-height:42vh;min-height:100px;overflow:auto;padding:12px;display:flex;flex-direction:column;gap:9px;}
+    .ai-msgs{flex:1;min-height:0;overflow:auto;padding:12px;display:flex;flex-direction:column;gap:9px;}
     .ai-bubble{max-width:92%;border:1px solid #1e2d4a;border-radius:10px;padding:9px 10px;font-size:.68rem;line-height:1.45;white-space:pre-wrap;}
     .ai-bubble.user{align-self:flex-end;background:#17365b;color:#eaf5ff;border-color:#2c5f98;}
     .ai-bubble.assistant{align-self:flex-start;background:#101827;color:#d9e8fb;}
@@ -172,7 +172,7 @@
     @media(max-height:760px){
       .ai-panel{top:58px;bottom:8px;max-height:calc(100vh - 66px);}
       .ai-head{padding:9px 12px;}
-      .ai-msgs{max-height:28vh;min-height:78px;padding:9px;}
+      .ai-msgs{min-height:0;padding:9px;}
       .ai-mode-row,.ai-context-row,.ai-quick-row{padding-left:9px;padding-right:9px;}
       .ai-sync-row,.ai-provider-row,.ai-live,.ai-memory-actions,.ai-prefs,.ai-command-palette,.ai-filter-preview,.ai-watchlist{margin-left:9px;margin-right:9px;}
       .ai-quick,.ai-mode-btn,.ai-context-chip{font-size:.5rem;padding:4px 6px;}
@@ -981,101 +981,9 @@
     <button class="ai-close" onclick="toggleAiPanel(false)">Close</button>
   </div>
   <div class="ai-scroll">
-  <div class="ai-msgs" id="aiMessages">
-    <div class="ai-bubble assistant">Fresh start: ask about the active ticker, or hit X/News Intel to have Grok pull recent X posts and news around the stock.</div>
-  </div>
-  <div class="ai-mode-row" id="aiModeRow" style="display:none">
-    <button class="ai-mode-btn" data-mode="fast_scan" onclick="setAiMode('fast_scan')">Fast Scan</button>
-    <button class="ai-mode-btn" data-mode="risk_manager" onclick="setAiMode('risk_manager')">Risk</button>
-    <button class="ai-mode-btn" data-mode="teacher" onclick="setAiMode('teacher')">Teacher</button>
-    <button class="ai-mode-btn" data-mode="catalyst" onclick="setAiMode('catalyst')">Catalyst</button>
-    <button class="ai-mode-btn" data-mode="execution_prep" onclick="setAiMode('execution_prep')">Prep</button>
-  </div>
-  <div class="ai-context-row" id="aiContextChips"></div>
-  <div class="ai-sync-row" id="aiSyncRow" style="display:none">
-    <div class="ai-sync-left">
-      <span class="ai-sync-dot"></span>
-      <span class="ai-sync-text" id="aiSyncText">Memory local only</span>
+    <div class="ai-msgs" id="aiMessages">
+      <div class="ai-bubble assistant">Ask me about a ticker. If a ticker tab is open, I will use it automatically and pull recent X/news context through Grok when configured.</div>
     </div>
-    <button class="ai-sync-btn" onclick="syncAiProfileToBackend(false)">Sync</button>
-  </div>
-  <div class="ai-provider-row" id="aiProviderRow">
-    <div class="ai-provider-left">
-      <span class="ai-provider-dot"></span>
-      <span class="ai-provider-text" id="aiProviderText">AI provider checking...</span>
-    </div>
-    <button class="ai-provider-btn" onclick="runAiSetupCheck()">Setup</button>
-  </div>
-  <div class="ai-quick-row">
-    <button class="ai-quick" onclick="runGrokStockIntel()">X/News Intel</button>
-    <button class="ai-quick" onclick="aiQuick('Use recent X posts and recent news to summarize the active ticker catalyst, sentiment, and risk flags.')">Ask Grok</button>
-    <button class="ai-quick" onclick="aiQuick('What recent news or social chatter matters for the active ticker, and what should I verify on the chart?')">Verify Catalyst</button>
-    <button class="ai-quick" onclick="runAiSetupCheck()">Grok Setup</button>
-    <button class="ai-quick" onclick="runAiCommand('/clear')">Clear Chat</button>
-  </div>
-  <div class="ai-command-palette" id="aiCommandPalette" style="display:none">
-    <div class="ai-command-grid">
-      <button class="ai-command-btn" onclick="runAiCommand('/watchlist top')">Watchlist Top<span>from current scan</span></button>
-      <button class="ai-command-btn" onclick="runAiCommand('/memory')">Memory Recap<span>local session stats</span></button>
-      <button class="ai-command-btn" onclick="runAiCommand('/mode risk')">Risk Mode<span>stricter warnings</span></button>
-      <button class="ai-command-btn" onclick="runAiCommand('/mode fast')">Fast Mode<span>short ranked answers</span></button>
-      <button class="ai-command-btn" onclick="runAiCommand('/live on')">Live Watch On<span>proactive alerts</span></button>
-      <button class="ai-command-btn" onclick="runAiCommand('/live off')">Live Watch Off<span>quiet mode</span></button>
-      <button class="ai-command-btn" onclick="draftAiFilter('broad')">Draft Broad Scan<span>more tickers</span></button>
-      <button class="ai-command-btn" onclick="draftAiFilter('quality')">Draft Quality Scan<span>stronger setups</span></button>
-      <button class="ai-command-btn" onclick="runAiIntel('market')">Market Intel<span>news + heat map</span></button>
-      <button class="ai-command-btn" onclick="runAiIntel('catalyst')">Catalyst Intel<span>ticker/news focus</span></button>
-      <button class="ai-command-btn" onclick="runAiScanHistory()">Scan History<span>recent scanner runs</span></button>
-      <button class="ai-command-btn" onclick="runAiScanComparison()">Scan Compare<span>current vs previous</span></button>
-      <button class="ai-command-btn" onclick="runAiHealthCheck()">Copilot Health<span>memory + AI config</span></button>
-      <button class="ai-command-btn" onclick="runAiSetupCheck()">AI Setup<span>provider status</span></button>
-      <button class="ai-command-btn" onclick="runAiCommand('/help')">Show Help<span>all slash commands</span></button>
-      <button class="ai-command-btn" onclick="runAiCommand('/clear')">Clear Chat<span>keeps memory</span></button>
-    </div>
-  </div>
-  <div class="ai-filter-preview" id="aiFilterPreview"></div>
-  <div class="ai-watchlist" id="aiWatchlist"></div>
-  <div class="ai-live" style="display:none">
-    <div>
-      <div class="ai-live-title">Live Watch</div>
-      <div class="ai-live-copy">Flags new A+ setups, wide spreads, SEC danger, scanner errors, and fast ticker changes.</div>
-    </div>
-    <button class="ai-live-toggle" id="aiLiveToggle" onclick="toggleAiLiveWatch()">Off</button>
-  </div>
-  <div class="ai-memory-actions" style="display:none">
-    <button class="ai-memory-btn" onclick="saveAiMemoryNow()">Save Memory</button>
-    <button class="ai-memory-btn" onclick="toggleAiPrefs()">Prefs</button>
-    <button class="ai-memory-btn" onclick="toggleAiLessons()">Teach</button>
-    <button class="ai-memory-btn" onclick="toggleAiFeedbackPanel()">Feedback</button>
-    <button class="ai-memory-btn" onclick="exportAiProfile()">Export</button>
-    <button class="ai-memory-btn" onclick="document.getElementById('aiProfileImportFile')?.click()">Import</button>
-    <button class="ai-memory-btn" onclick="clearAiMemory()">Clear Memory</button>
-  </div>
-  <input id="aiProfileImportFile" type="file" accept="application/json,.json" style="display:none" onchange="importAiProfileFile(event)">
-  <div class="ai-prefs" id="aiPrefs">
-    <div class="ai-prefs-title">Copilot Preferences</div>
-    <textarea class="ai-prefs-text" id="aiPrefsText"></textarea>
-    <div class="ai-prefs-row">
-      <button class="ai-memory-btn" onclick="saveAiPrefs()">Save Prefs</button>
-      <button class="ai-memory-btn" onclick="resetAiPrefs()">Reset</button>
-    </div>
-  </div>
-  <div class="ai-prefs" id="aiLessons">
-    <div class="ai-prefs-title">Teach The Copilot</div>
-    <textarea class="ai-prefs-text" id="aiLessonText" placeholder="Example: When spread is over 5%, warn me before ranking a ticker highly."></textarea>
-    <div class="ai-prefs-row">
-      <button class="ai-memory-btn" onclick="saveAiLesson()">Save Lesson</button>
-      <button class="ai-memory-btn" onclick="clearAiLessons()">Clear Lessons</button>
-    </div>
-    <div class="ai-lesson-list" id="aiLessonList"></div>
-  </div>
-  <div class="ai-prefs" id="aiFeedbackPanel">
-    <div class="ai-prefs-title">Answer Feedback</div>
-    <div class="ai-lesson-list" id="aiFeedbackList"></div>
-    <div class="ai-prefs-row">
-      <button class="ai-memory-btn" onclick="clearAiFeedback()">Clear Feedback</button>
-    </div>
-  </div>
   </div>
   <div class="ai-input-row">
     <textarea class="ai-input" id="aiInput" placeholder="Ask Grok about recent X posts/news for the active ticker..." onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();sendAiMessage();}"></textarea>

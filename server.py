@@ -11,6 +11,7 @@ import threading
 import csv
 import io
 import json
+import re
 from pathlib import Path
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from email.mime.text import MIMEText
@@ -1634,6 +1635,18 @@ def grok_stock_intel_prompt(ticker, context=None, user_message=''):
         "App context JSON:\n" + json.dumps(compact, ensure_ascii=True)[:7000]
     )
 
+def infer_ticker_from_text(text):
+    words = re.findall(r'\$?([A-Za-z]{1,5})\b', text or '')
+    skip = {
+        'THE','AND','FOR','WITH','NEWS','TWEET','TWEETS','ABOUT','WHAT','RISK','CHAT',
+        'X','AI','GROK','STOCK','TODAY','WHY','HOW','IS','ARE','THIS','THAT','PULL'
+    }
+    for word in words:
+        sym = word.upper()
+        if sym not in skip:
+            return sym
+    return ''
+
 @app.post("/api/ai/chat")
 async def ai_chat(req: AIChatRequest):
     message = (req.message or '').strip()
@@ -1657,7 +1670,7 @@ async def ai_chat(req: AIChatRequest):
             history.append({'role': role, 'content': content[:1800]})
 
     try:
-        ticker = (context.get('active_ticker') or '').upper().strip()
+        ticker = (context.get('active_ticker') or infer_ticker_from_text(message)).upper().strip()
         prompt = grok_stock_intel_prompt(ticker, context, message) if ticker else (
             "You are Payda x UyghurKid Grok Copilot. Use recent X/web search when useful, but stay educational and risk-aware. "
             "No buy/sell instructions, no certainty. App context JSON:\n"
