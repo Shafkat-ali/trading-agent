@@ -1957,10 +1957,9 @@
       const profile=data.profile;
       if(profile&&profile.schema==='payda-copilot-profile-v1'&&(profile.updated_at||profile.exported_at)){
         importAiProfile(profile,{silent:true,sync:false});
-        setAiSyncStatus('synced','Backend memory loaded');
-        appendAiBubble('assistant','Backend Copilot memory loaded for this user.');
+        setAiSyncStatus('synced','Profile loaded');
       }else{
-        setAiSyncStatus('idle','No backend memory yet');
+        setAiSyncStatus('idle','No saved profile');
       }
     }catch(e){
       setAiSyncStatus('error','Backend memory unavailable');
@@ -2281,6 +2280,18 @@
     if(bubble&&bubble.parentNode)bubble.parentNode.removeChild(bubble);
   }
 
+  function formatAiError(data){
+    const msg=String(data?.error||'AI request failed.');
+    if(data?.ai_configured===false||/XAI_API_KEY|Grok is not configured/i.test(msg)){
+      return [
+        'Grok is not connected yet.',
+        'Open .env and fill in XAI_API_KEY=your_xai_key_here.',
+        'Then restart the server and ask again.'
+      ].join('\n');
+    }
+    return msg;
+  }
+
   async function sendAiMessage(promptOverride, extraContext=null){
     const input=document.getElementById('aiInput');
     const btn=document.getElementById('aiSendBtn');
@@ -2307,7 +2318,7 @@
       });
       const data=await r.json();
       if(data.error){
-        appendAiBubble('error', data.error);
+        appendAiBubble('error', formatAiError(data));
       }else{
         if(data.ai_configured===false)setAiProviderStatus('local','Add XAI_API_KEY for Grok X/news intel','local-copilot');
         else if(data.model)setAiProviderStatus('ready', `Grok ready: ${data.model}`, data.model);
