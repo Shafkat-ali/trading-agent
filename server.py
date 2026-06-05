@@ -1656,9 +1656,10 @@ async def ai_chat(req: AIChatRequest):
     context = compact_ai_context(req.context)
     if not XAI_API_KEY:
         return {
-            'reply': local_copilot_reply(message, context),
-            'model': 'local-copilot',
+            'error': 'Grok is not configured. Add XAI_API_KEY to .env, restart the server, then ask again.',
+            'model': XAI_MODEL,
             'ai_configured': False,
+            'accepted_ai_env_vars': ['XAI_API_KEY', 'GROK_API_KEY'],
             'config_hint': 'Add XAI_API_KEY to .env, then restart the server.',
         }
 
