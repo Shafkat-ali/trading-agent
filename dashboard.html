@@ -3144,6 +3144,7 @@
             </div>
             <div class="ticker-shell-actions">
               <button class="ticker-shell-btn" onclick="openStockPopup('${tab.ticker}')">Quick View</button>
+              <button class="ticker-shell-btn" onclick="popoutTickerTabChart('${tab.ticker}','${domId}','${tab.id}')">Pop Out Chart</button>
               <button class="ticker-shell-btn" onclick="activateWorkspaceTab('scanner')">Scanner+</button>
             </div>
           </div>
@@ -3476,6 +3477,7 @@
           ${[['1Min','1m'],['5Min','5m'],['15Min','15m'],['1Hour','1h'],['1Day','1D']].map(([v,l])=>`<option value="${v}"${st.tf===v?' selected':''}>${l}</option>`).join('')}
         </select>
         <button onclick="buildTickerTabChart('${ticker}','${domId}','${tabId}')" style="background:#16345f;border:1px solid #2a5f9d;border-radius:4px;color:#c8e5ff;font-size:.56rem;padding:2px 8px;cursor:pointer;">Load</button>
+        <button onclick="popoutTickerTabChart('${ticker}','${domId}','${tabId}')" title="Open chart only full screen" style="background:#0f1a2e;border:1px solid #2a3a5a;border-radius:4px;color:#a0c4ff;font-size:.56rem;padding:2px 8px;cursor:pointer;">Pop Out</button>
         <div style="display:flex;gap:3px;margin-left:6px;">
           ${indBtn('Vol','Vol','#4a8aff')}
           ${indBtn('VWAP','VWAP','#ffd700')}
@@ -3494,6 +3496,13 @@
     const st=tickerTabIndicators[tabId];if(!st)return;
     st[key]=!st[key];
     buildTickerTabChart(ticker, domId, tabId);
+  }
+
+  function popoutTickerTabChart(ticker, domId, tabId){
+    const st=tickerTabIndicators[tabId]||{};
+    const range=document.getElementById(`${domId}Range`)?.value||st.range||'2D';
+    const tf=document.getElementById(`${domId}Tf`)?.value||st.tf||'1Min';
+    popoutPopupChart(ticker, range, tf);
   }
 
   function tickerTabChartDoc(cfg){
@@ -4646,19 +4655,19 @@ window.addEventListener('message',ev=>{const d=ev.data||{};if(d.type!=='ticker-l
     popupLoadChart(ticker || popupCurrentTicker);
   }
 
-  function popoutPopupChart(ticker){
+  function popoutPopupChart(ticker, rangeOverride=null, tfOverride=null){
     const tk    = ticker || popupCurrentTicker || '';
     if(!tk) return;
-    const range = document.getElementById('popupRange')?.value || '2D';
-    const tf    = document.getElementById('popupTf')?.value    || '1Min';
+    const range = rangeOverride || document.getElementById('popupRange')?.value || '2D';
+    const tf    = tfOverride    || document.getElementById('popupTf')?.value    || '1Min';
     const apiUrl = API_URL;
-    const RANGES_MAP = {'1D':1,'2D':2,'5D':5,'10D':10,'15D':15,'1M':30,'3M':90,'6M':180,'1Y':365};
-    const AUTO_TF_MAP = {'1D':'1Min','2D':'1Min','5D':'1Min','10D':'1Min','15D':'1Min','1M':'5Min','3M':'1Day','6M':'1Day','1Y':'1Day'};
+    const RANGES_MAP = {'1D':1,'2D':2,'5D':5,'10D':10,'15D':15,'1M':30,'2M':60,'3M':90,'6M':180,'1Y':365,'2Y':730,'3Y':1095,'5Y':1825,'10Y':3650,'20Y':7300};
+    const AUTO_TF_MAP = {'1D':'1Min','2D':'1Min','5D':'1Min','10D':'1Min','15D':'1Min','1M':'5Min','2M':'1Day','3M':'1Day','6M':'1Day','1Y':'1Day','2Y':'1Day','3Y':'1Day','5Y':'1Day','10Y':'1Day','20Y':'1Day'};
     const w = window.open('', '_blank');
     if(!w) return;
-    const rangeOpts = ['1D','2D','5D','10D','15D','1M','3M','6M','1Y']
+    const rangeOpts = ['1D','2D','5D','10D','15D','1M','2M','3M','6M','1Y','2Y','3Y','5Y','10Y','20Y']
       .map(r=>`<option value="${r}"${r===range?' selected':''}>${r}</option>`).join('');
-    const tfOpts = [['1Min','1m'],['5Min','5m'],['15Min','15m'],['1Day','1D']]
+    const tfOpts = [['1Min','1m'],['5Min','5m'],['15Min','15m'],['1Hour','1h'],['1Day','1D']]
       .map(([v,l])=>`<option value="${v}"${v===tf?' selected':''}>${l}</option>`).join('');
     w.document.write(`<!DOCTYPE html><html><head><meta charset="UTF-8">
 <title>${tk} — Live Chart</title>
@@ -5727,7 +5736,6 @@ init();
 
   function buildChartsPage(){
     const apiUrl = typeof API_URL !== 'undefined' ? API_URL : window.location.origin;
-    return buildTradingViewChartsPage(apiUrl);
     return `<!DOCTYPE html>
 <html>
 <head>
