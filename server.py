@@ -56,8 +56,8 @@ EMAIL_PASSWORD     = os.getenv('EMAIL_PASSWORD', '')
 EMAIL_TO           = os.getenv('EMAIL_TO', '')
 EMAIL_ALERTS_ENABLED = os.getenv('EMAIL_ALERTS_ENABLED', 'false').lower() in {'1','true','yes','on'}
 email_alerts_available = True
-OPENAI_API_KEY     = os.getenv('OPENAI_API_KEY') or os.getenv('AI_API_KEY', '')
-AI_MODEL           = os.getenv('AI_MODEL', 'gpt-4o-mini')
+XAI_API_KEY        = os.getenv('XAI_API_KEY') or os.getenv('GROK_API_KEY') or os.getenv('AI_API_KEY', '')
+XAI_MODEL          = os.getenv('XAI_MODEL', os.getenv('AI_MODEL', 'grok-4.3'))
 
 # ── User auth — passwords stored as SHA-256 hashes, never in plaintext ──
 import hashlib
@@ -1361,10 +1361,10 @@ async def ai_health(user_id: str):
     return {
         'status': 'ok',
         'user_id': uid,
-        'ai_configured': bool(OPENAI_API_KEY),
-        'ai_model': AI_MODEL,
-        'accepted_ai_env_vars': ['OPENAI_API_KEY', 'AI_API_KEY'],
-        'ai_config_message': 'AI chat is ready' if OPENAI_API_KEY else 'Add OPENAI_API_KEY or AI_API_KEY to .env, then restart the server for full LLM chat.',
+        'ai_configured': bool(XAI_API_KEY),
+        'ai_model': XAI_MODEL,
+        'accepted_ai_env_vars': ['XAI_API_KEY', 'GROK_API_KEY', 'AI_API_KEY'],
+        'ai_config_message': 'Grok Copilot is ready' if XAI_API_KEY else 'Add XAI_API_KEY to .env, then restart the server for Grok-powered X/news intelligence.',
         'memory_file': str(COPILOT_MEMORY_FILE),
         'scan_history_file': str(SCAN_HISTORY_FILE),
         'memory_saved': bool(profile.get('updated_at') or profile.get('exported_at')),
@@ -1497,7 +1497,7 @@ def _ai_top_rows(rows, limit=5):
     return out
 
 def local_copilot_reply(message, context):
-    """Deterministic fallback when no OpenAI key is configured."""
+    """Deterministic fallback when no Grok key is configured."""
     msg = (message or '').lower()
     results = context.get('scanner_results') or []
     active = context.get('active_setup') or {}
@@ -1506,7 +1506,7 @@ def local_copilot_reply(message, context):
     history = context.get('scan_history') or []
     mode = context.get('scanner_mode') or context.get('mode') or 'scanner'
     lines = [
-        "Local Copilot mode: OPENAI_API_KEY or AI_API_KEY is not configured, so this is a rule-based answer from the app context.",
+        "Local fallback: XAI_API_KEY is not configured, so this is a rule-based answer from the app context.",
     ]
 
     wants_compare = any(w in msg for w in ['compare', 'changed', 'change since', 'previous', 'last scan', 'new ticker', 'dropped'])
@@ -1555,8 +1555,84 @@ def local_copilot_reply(message, context):
     else:
         lines.append("I do not see scanner results in context yet. Run MorningGap, ScanOpp, AfterHrs, or open a ticker tab first.")
 
-    lines.append("For full natural-language market/news reasoning, add OPENAI_API_KEY or AI_API_KEY to .env and restart the server.")
+    lines.append("For Grok-powered recent X/news intelligence, add XAI_API_KEY to .env and restart the server.")
     return '\n'.join(lines)
+
+def _extract_xai_text(data):
+    if not isinstance(data, dict):
+        return ''
+    direct = data.get('output_text') or data.get('text')
+    if isinstance(direct, str) and direct.strip():
+        return direct.strip()
+    chunks = []
+    for item in data.get('output') or []:
+        for part in item.get('content') or []:
+            text = part.get('text') or part.get('content')
+            if isinstance(text, str) and text.strip():
+                chunks.append(text.strip())
+    if chunks:
+        return '\n'.join(chunks).strip()
+    choice = (data.get('choices') or [{}])[0]
+    msg = choice.get('message') or {}
+    return str(msg.get('content') or '').strip()
+
+def _extract_xai_citations(data):
+    cites = data.get('citations') if isinstance(data, dict) else None
+    if isinstance(cites, list):
+        return cites[:12]
+    sources = data.get('sources') if isinstance(data, dict) else None
+    if isinstance(sources, list):
+        return sources[:12]
+    return []
+
+def _xai_responses_request(prompt, tools, max_tokens=900):
+    payload = {
+        'model': XAI_MODEL,
+        'input': [{'role': 'user', 'content': prompt}],
+        'tools': tools,
+        'max_output_tokens': max_tokens,
+    }
+    r = requests.post(
+        'https://api.x.ai/v1/responses',
+        headers={'Authorization': f'Bearer {XAI_API_KEY}', 'Content-Type': 'application/json'},
+        json=payload,
+        timeout=45,
+    )
+    if r.status_code >= 400:
+        raise RuntimeError(f'xAI HTTP {r.status_code}: {r.text[:300]}')
+    data = r.json()
+    return {
+        'reply': _extract_xai_text(data) or 'Grok did not return a readable answer.',
+        'citations': _extract_xai_citations(data),
+        'raw_usage': data.get('usage') if isinstance(data, dict) else None,
+    }
+
+def grok_stock_intel_prompt(ticker, context=None, user_message=''):
+    ticker = (ticker or '').upper().strip()
+    today = datetime.now(timezone.utc).date().isoformat()
+    setup = (context or {}).get('active_setup') or {}
+    scanner = (context or {}).get('scanner_results') or []
+    compact = {
+        'active_setup': setup,
+        'scanner_results': scanner[:10],
+        'recent_news_already_in_app': (context or {}).get('recent_news') or [],
+        'sec_filings_already_in_app': (context or {}).get('sec_filings') or [],
+        'live_quote': (context or {}).get('live_quote') or {},
+    }
+    return (
+        f"Today is {today}. You are Payda x UyghurKid Grok Stock Intel, an educational trading assistant.\n"
+        f"Ticker: {ticker or 'unknown'}.\n"
+        f"User request: {user_message or 'Pull recent X posts and news about this stock.'}\n\n"
+        "Use X Search for recent public X posts and Web Search for recent stock news. Prefer the last 7 days, and say when results are thin, promotional, stale, or not ticker-specific. "
+        "Do not give buy/sell instructions or certainty. Focus on catalyst freshness, source quality, rumor risk, sentiment, dilution/SEC risk, and what needs chart/volume confirmation.\n\n"
+        "Return a concise brief with these sections:\n"
+        "1. X / social chatter\n"
+        "2. Recent news catalysts\n"
+        "3. Risk flags\n"
+        "4. Trading read-through\n"
+        "5. Sources / citations if available\n\n"
+        "App context JSON:\n" + json.dumps(compact, ensure_ascii=True)[:7000]
+    )
 
 @app.post("/api/ai/chat")
 async def ai_chat(req: AIChatRequest):
@@ -1565,12 +1641,12 @@ async def ai_chat(req: AIChatRequest):
         return {'error': 'Message required'}
 
     context = compact_ai_context(req.context)
-    if not OPENAI_API_KEY:
+    if not XAI_API_KEY:
         return {
             'reply': local_copilot_reply(message, context),
             'model': 'local-copilot',
             'ai_configured': False,
-            'config_hint': 'Add OPENAI_API_KEY or AI_API_KEY to .env, then restart the server.',
+            'config_hint': 'Add XAI_API_KEY to .env, then restart the server.',
         }
 
     history = []
@@ -1580,46 +1656,64 @@ async def ai_chat(req: AIChatRequest):
         if role in ('user', 'assistant') and content:
             history.append({'role': role, 'content': content[:1800]})
 
-    system_prompt = (
-        "You are Payda x UyghurKid Trading Copilot, an educational trading assistant inside a real-time "
-        "small-cap scanner. Use the provided app context for current scanner/ticker state. Be practical, "
-        "brief, and risk-aware. Do not claim certainty, do not guarantee outcomes, and do not place or "
-        "recommend exact trades as instructions. When discussing setups, explain confirmation, invalidation, "
-        "liquidity, spread, halt/news risk, and what data is missing. If asked about current news or market "
-        "facts not present in context, say that live browsing/news context was not provided. You can request "
-        "safe app navigation by ending with action lines. Use ACTION:OPEN_TICKER:SYMBOL to open a ticker. "
-        "Use ACTION:OPEN_WORKSPACE:SCANNER, FILTERS, PAPER, NEWS, SCREENER, HEATMAP, POLYMARKET, or CHARTS "
-        "to navigate. Use ACTION:WATCHLIST:SYM1,SYM2,SYM3 when the user asks to build a watchlist from context. "
-        "Use copilot_mode to choose response style and priorities. Use user_preferences, learning_notes, and feedback_memory to adapt your ranking and warnings to the user's style. Use session_memory for today's changes, scan_history and scan_comparison for recent scanner run comparisons, and persistent_memory for prior local trading-app observations. "
-        "When market_context is present, synthesize market news, SEC danger headlines, heat map sector strength/weakness, Polymarket signals, scanner results, and active ticker data into one practical brief. Clearly say when a signal is weak, stale, indirect, or only context rather than a stock-specific catalyst. "
-        "Action lines must be on their own line. Never use actions to place orders."
-    )
-    payload = {
-        'model': AI_MODEL,
-        'messages': [
-            {'role': 'system', 'content': system_prompt},
-            {'role': 'system', 'content': 'APP_CONTEXT_JSON:\n' + json.dumps(context, ensure_ascii=True)[:12000]},
-            *history,
-            {'role': 'user', 'content': message[:3000]},
-        ],
-        'temperature': 0.35,
-        'max_tokens': 700,
-    }
-
     try:
-        r = requests.post(
-            'https://api.openai.com/v1/chat/completions',
-            headers={'Authorization': f'Bearer {OPENAI_API_KEY}', 'Content-Type': 'application/json'},
-            json=payload,
-            timeout=25,
+        ticker = (context.get('active_ticker') or '').upper().strip()
+        prompt = grok_stock_intel_prompt(ticker, context, message) if ticker else (
+            "You are Payda x UyghurKid Grok Copilot. Use recent X/web search when useful, but stay educational and risk-aware. "
+            "No buy/sell instructions, no certainty. App context JSON:\n"
+            + json.dumps(context, ensure_ascii=True)[:9000]
+            + "\n\nUser request:\n" + message[:3000]
         )
-        if r.status_code >= 400:
-            return {'error': f'AI provider HTTP {r.status_code}: {r.text[:220]}'}
-        data = r.json()
-        reply = data.get('choices', [{}])[0].get('message', {}).get('content', '').strip()
-        return {'reply': reply or 'I did not get a usable answer from the AI provider.', 'model': AI_MODEL}
+        result = _xai_responses_request(prompt, [{'type': 'x_search'}, {'type': 'web_search'}], max_tokens=1000)
+        return {'reply': result['reply'], 'model': XAI_MODEL, 'citations': result.get('citations') or [], 'ai_configured': True}
     except Exception as e:
-        return {'error': f'AI chat failed: {str(e)}'}
+        return {'error': f'Grok Copilot failed: {str(e)}'}
+
+@app.get("/api/ai/stock-intel/{ticker}")
+async def ai_stock_intel(ticker: str, user_id: str = 'shafkat'):
+    symbol = (ticker or '').upper().strip()
+    if not symbol:
+        return {'error': 'Ticker required'}
+    if not XAI_API_KEY:
+        return {
+            'error': 'Grok is not configured. Add XAI_API_KEY to .env and restart the server.',
+            'ai_configured': False,
+            'accepted_ai_env_vars': ['XAI_API_KEY', 'GROK_API_KEY', 'AI_API_KEY'],
+        }
+    uid = user_id if user_id in user_state else 'shafkat'
+    context = {'active_ticker': symbol}
+    try:
+        quote = await get_stock_quote(symbol, uid)
+        news = await get_stock_news(symbol)
+        sec = await get_sec_filings(symbol)
+        context['live_quote'] = quote if not quote.get('error') else {'error': quote.get('error')}
+        context['recent_news'] = (news.get('news') or [])[:8]
+        context['sec_filings'] = (sec.get('filings') or [])[:8]
+    except Exception:
+        pass
+    try:
+        prompt = grok_stock_intel_prompt(symbol, context, f"Pull recent X posts and recent news about ${symbol}.")
+        from_date = (datetime.now(timezone.utc) - timedelta(days=7)).date().isoformat()
+        to_date = datetime.now(timezone.utc).date().isoformat()
+        result = _xai_responses_request(
+            prompt,
+            [
+                {'type': 'x_search', 'from_date': from_date, 'to_date': to_date},
+                {'type': 'web_search'},
+            ],
+            max_tokens=1000,
+        )
+        return {
+            'ticker': symbol,
+            'reply': result['reply'],
+            'citations': result.get('citations') or [],
+            'model': XAI_MODEL,
+            'from_date': from_date,
+            'to_date': to_date,
+            'ai_configured': True,
+        }
+    except Exception as e:
+        return {'error': f'Grok stock intel failed: {str(e)}'}
 
 class PaperOrderRequest(BaseModel):
     ticker:   str

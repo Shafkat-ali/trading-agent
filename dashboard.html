@@ -975,16 +975,16 @@
 <div class="ai-panel hidden" id="aiPanel">
   <div class="ai-head">
     <div>
-      <div class="ai-title">AI Trading Copilot</div>
-      <div class="ai-sub">Reads the active ticker and scanner context. Education only.</div>
+      <div class="ai-title">Grok Stock Intel</div>
+      <div class="ai-sub">Pulls recent X chatter and news for the active ticker. Education only.</div>
     </div>
     <button class="ai-close" onclick="toggleAiPanel(false)">Close</button>
   </div>
   <div class="ai-scroll">
   <div class="ai-msgs" id="aiMessages">
-    <div class="ai-bubble assistant">Ask me about the active ticker, scanner results, catalysts, risk, or what confirmation would matter next.</div>
+    <div class="ai-bubble assistant">Fresh start: ask about the active ticker, or hit X/News Intel to have Grok pull recent X posts and news around the stock.</div>
   </div>
-  <div class="ai-mode-row" id="aiModeRow">
+  <div class="ai-mode-row" id="aiModeRow" style="display:none">
     <button class="ai-mode-btn" data-mode="fast_scan" onclick="setAiMode('fast_scan')">Fast Scan</button>
     <button class="ai-mode-btn" data-mode="risk_manager" onclick="setAiMode('risk_manager')">Risk</button>
     <button class="ai-mode-btn" data-mode="teacher" onclick="setAiMode('teacher')">Teacher</button>
@@ -992,7 +992,7 @@
     <button class="ai-mode-btn" data-mode="execution_prep" onclick="setAiMode('execution_prep')">Prep</button>
   </div>
   <div class="ai-context-row" id="aiContextChips"></div>
-  <div class="ai-sync-row" id="aiSyncRow">
+  <div class="ai-sync-row" id="aiSyncRow" style="display:none">
     <div class="ai-sync-left">
       <span class="ai-sync-dot"></span>
       <span class="ai-sync-text" id="aiSyncText">Memory local only</span>
@@ -1007,22 +1007,13 @@
     <button class="ai-provider-btn" onclick="runAiSetupCheck()">Setup</button>
   </div>
   <div class="ai-quick-row">
-    <button class="ai-quick" onclick="aiQuick('Explain the active ticker setup and what would confirm or invalidate it.')">Explain ticker</button>
-    <button class="ai-quick" onclick="aiQuick('Summarize the current scanner results and rank the strongest opportunities.')">Summarize scanner</button>
-    <button class="ai-quick" onclick="aiQuick('Call out the biggest risks in the active ticker or scan list.')">Find risks</button>
-    <button class="ai-quick" onclick="aiQuick('Look at the available catalyst/news fields in context and tell me what matters.')">Catalysts</button>
-    <button class="ai-quick" onclick="aiQuick('Compare the top 3 scanner results and tell me which one deserves attention first.')">Compare top 3</button>
-    <button class="ai-quick" onclick="aiQuick('Summarize recent scanner log errors and tell me what they mean.')">Scan logs</button>
-    <button class="ai-quick" onclick="aiQuick('Build a watchlist from the strongest current scanner results.')">Watchlist</button>
-    <button class="ai-quick" onclick="runAiIntel('market')">Market Intel</button>
-    <button class="ai-quick" onclick="runAiIntel('risk')">News Risk</button>
-    <button class="ai-quick" onclick="aiQuick('Give me a session recap from Live Watch memory and tell me what changed.')">Session recap</button>
-    <button class="ai-quick" onclick="aiQuick('Review my saved memory from prior sessions and tell me what patterns keep repeating.')">Memory recap</button>
-    <button class="ai-quick" onclick="runAiScanHistory()">Scan history</button>
-    <button class="ai-quick" onclick="runAiScanComparison()">Scan compare</button>
-    <button class="ai-quick" onclick="toggleAiCommandPalette()">Commands</button>
+    <button class="ai-quick" onclick="runGrokStockIntel()">X/News Intel</button>
+    <button class="ai-quick" onclick="aiQuick('Use recent X posts and recent news to summarize the active ticker catalyst, sentiment, and risk flags.')">Ask Grok</button>
+    <button class="ai-quick" onclick="aiQuick('What recent news or social chatter matters for the active ticker, and what should I verify on the chart?')">Verify Catalyst</button>
+    <button class="ai-quick" onclick="runAiSetupCheck()">Grok Setup</button>
+    <button class="ai-quick" onclick="runAiCommand('/clear')">Clear Chat</button>
   </div>
-  <div class="ai-command-palette" id="aiCommandPalette">
+  <div class="ai-command-palette" id="aiCommandPalette" style="display:none">
     <div class="ai-command-grid">
       <button class="ai-command-btn" onclick="runAiCommand('/watchlist top')">Watchlist Top<span>from current scan</span></button>
       <button class="ai-command-btn" onclick="runAiCommand('/memory')">Memory Recap<span>local session stats</span></button>
@@ -1044,14 +1035,14 @@
   </div>
   <div class="ai-filter-preview" id="aiFilterPreview"></div>
   <div class="ai-watchlist" id="aiWatchlist"></div>
-  <div class="ai-live">
+  <div class="ai-live" style="display:none">
     <div>
       <div class="ai-live-title">Live Watch</div>
       <div class="ai-live-copy">Flags new A+ setups, wide spreads, SEC danger, scanner errors, and fast ticker changes.</div>
     </div>
     <button class="ai-live-toggle" id="aiLiveToggle" onclick="toggleAiLiveWatch()">Off</button>
   </div>
-  <div class="ai-memory-actions">
+  <div class="ai-memory-actions" style="display:none">
     <button class="ai-memory-btn" onclick="saveAiMemoryNow()">Save Memory</button>
     <button class="ai-memory-btn" onclick="toggleAiPrefs()">Prefs</button>
     <button class="ai-memory-btn" onclick="toggleAiLessons()">Teach</button>
@@ -1087,7 +1078,7 @@
   </div>
   </div>
   <div class="ai-input-row">
-    <textarea class="ai-input" id="aiInput" placeholder="Ask, or type /open DUOT, /mode risk, /watchlist, /memory..." onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();sendAiMessage();}"></textarea>
+    <textarea class="ai-input" id="aiInput" placeholder="Ask Grok about recent X posts/news for the active ticker..." onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();sendAiMessage();}"></textarea>
     <button class="ai-send" id="aiSendBtn" onclick="sendAiMessage()">Send</button>
   </div>
 </div>
@@ -1610,7 +1601,7 @@
   }
 
   let aiSyncState={status:'idle',message:'Memory local only',time:''};
-  let aiProviderState={status:'checking',message:'AI provider checking...',model:'local-copilot'};
+  let aiProviderState={status:'checking',message:'Grok provider checking...',model:'local-copilot'};
 
   function setAiSyncStatus(status,message){
     aiSyncState={
@@ -1631,7 +1622,7 @@
   }
 
   function setAiProviderStatus(status,message,model='local-copilot'){
-    aiProviderState={status:status||'local',message:message||'Local Copilot mode',model:model||'local-copilot'};
+    aiProviderState={status:status||'local',message:message||'Grok not configured',model:model||'local-copilot'};
     renderAiProviderStatus();
   }
 
@@ -1641,12 +1632,12 @@
     if(!row||!text)return;
     row.classList.remove('ready','local','checking','error');
     row.classList.add(aiProviderState.status||'local');
-    text.textContent=aiProviderState.message||'Local Copilot mode';
+    text.textContent=aiProviderState.message||'Grok not configured';
   }
 
   async function refreshAiProviderStatus(silent=true){
     if(!currentUser){
-      setAiProviderStatus('local','AI provider checks after login');
+      setAiProviderStatus('local','Grok checks after login');
       return null;
     }
     try{
@@ -1655,9 +1646,9 @@
       const h=await r.json();
       if(!r.ok||h.error)throw new Error(h.error||`HTTP ${r.status}`);
       if(h.ai_configured){
-        setAiProviderStatus('ready', `LLM ready: ${h.ai_model||'configured'}`, h.ai_model);
+        setAiProviderStatus('ready', `Grok ready: ${h.ai_model||'configured'}`, h.ai_model);
       }else{
-        setAiProviderStatus('local', 'Local Copilot mode - add OPENAI_API_KEY for full AI', 'local-copilot');
+        setAiProviderStatus('local', 'Add XAI_API_KEY for Grok X/news intel', 'local-copilot');
       }
       return h;
     }catch(e){
@@ -2410,8 +2401,8 @@
       if(data.error){
         appendAiBubble('error', data.error);
       }else{
-        if(data.ai_configured===false)setAiProviderStatus('local','Local Copilot mode - add OPENAI_API_KEY for full AI','local-copilot');
-        else if(data.model)setAiProviderStatus('ready', `LLM ready: ${data.model}`, data.model);
+        if(data.ai_configured===false)setAiProviderStatus('local','Add XAI_API_KEY for Grok X/news intel','local-copilot');
+        else if(data.model)setAiProviderStatus('ready', `Grok ready: ${data.model}`, data.model);
         const parsed=parseAiActions(data.reply||'No AI response returned.');
         appendAiBubble('assistant', parsed.display);
         aiMessages.push({role:'assistant',content:parsed.display});
@@ -2427,6 +2418,44 @@
 
   function aiQuick(text){
     sendAiMessage(text);
+  }
+
+  async function runGrokStockIntel(tickerOverride=''){
+    if(aiBusy)return;
+    toggleAiPanel(true);
+    const active=activeTickerContext();
+    const inputTicker=String(tickerOverride||'').trim().toUpperCase();
+    const typed=(document.getElementById('aiInput')?.value||'').match(/\b[A-Z]{1,5}\b/);
+    const ticker=inputTicker||active.ticker||typed?.[0]||'';
+    if(!ticker){
+      appendAiBubble('error','Open a ticker tab first, or type a ticker like AAPL and try X/News Intel again.');
+      return;
+    }
+    aiBusy=true;
+    const btn=document.getElementById('aiSendBtn');
+    if(btn){btn.disabled=true;btn.textContent='...';}
+    const loading=appendAiBubble('assistant',`Grok is pulling recent X posts and news for ${ticker}...`,{noFeedback:true});
+    try{
+      const uid=encodeURIComponent(currentUser?.id||'shafkat');
+      const r=await fetch(`${API_URL}/api/ai/stock-intel/${encodeURIComponent(ticker)}?user_id=${uid}`);
+      const data=await r.json();
+      removeAiBubble(loading);
+      if(!r.ok||data.error){
+        appendAiBubble('error', data.error||`Grok stock intel failed: HTTP ${r.status}`);
+        if(data.ai_configured===false)setAiProviderStatus('local','Add XAI_API_KEY for Grok X/news intel','local-copilot');
+      }else{
+        setAiProviderStatus('ready', `Grok ready: ${data.model||'configured'}`, data.model);
+        const citeText=(data.citations||[]).length?`\n\nCitations:\n${(data.citations||[]).slice(0,6).map((c,i)=>`${i+1}. ${typeof c==='string'?c:(c.url||c.title||JSON.stringify(c).slice(0,140))}`).join('\n')}`:'';
+        appendAiBubble('assistant', `${data.reply||'No Grok response returned.'}${citeText}`);
+        aiMessages.push({role:'assistant',content:data.reply||''});
+      }
+    }catch(e){
+      removeAiBubble(loading);
+      appendAiBubble('error','Grok stock intel could not connect to the server.');
+    }finally{
+      aiBusy=false;
+      if(btn){btn.disabled=false;btn.textContent='Send';}
+    }
   }
 
   async function runAiIntel(kind='market'){
@@ -2459,15 +2488,15 @@
       const lines=[
         'Copilot health:',
         `Backend memory: ${h.memory_saved?'saved profile found':'no saved profile yet'}`,
-        `AI provider: ${h.ai_configured?`configured (${h.ai_model})`:'not configured - set OPENAI_API_KEY'}`,
+        `Grok provider: ${h.ai_configured?`configured (${h.ai_model})`:'not configured - set XAI_API_KEY'}`,
         `Memory: ${counts.lessons||0} lesson(s), ${counts.feedback||0} feedback item(s), ${counts.watchlist||0} watchlist ticker(s), ${counts.saved_days||0} saved day(s)`,
         `Session: ${counts.session_tickers||0} ticker(s), ${counts.session_notes||0} note(s)`,
         `Scanner: ${scanner.mode||'unknown'} | ${scanner.running?'running':'stopped'} | ${scanner.results||0} result(s)`,
         `Recent logs: ${(h.recent_logs||[]).length}`
       ];
       setAiSyncStatus(h.memory_saved?'synced':'idle', h.memory_saved?'Memory reachable':'No backend memory yet');
-      if(h.ai_configured)setAiProviderStatus('ready', `LLM ready: ${h.ai_model||'configured'}`, h.ai_model);
-      else setAiProviderStatus('local','Local Copilot mode - add OPENAI_API_KEY for full AI','local-copilot');
+      if(h.ai_configured)setAiProviderStatus('ready', `Grok ready: ${h.ai_model||'configured'}`, h.ai_model);
+      else setAiProviderStatus('local','Add XAI_API_KEY for Grok X/news intel','local-copilot');
       removeAiBubble(loading);
       appendAiBubble('assistant', lines.join('\n'));
     }catch(e){
@@ -2483,14 +2512,14 @@
     const loading=appendAiBubble('assistant','Checking AI setup...',{noFeedback:true});
     const h=await refreshAiProviderStatus(false);
     if(!h){removeAiBubble(loading);return;}
-    const envs=(h.accepted_ai_env_vars||['OPENAI_API_KEY','AI_API_KEY']).join(' or ');
+    const envs=(h.accepted_ai_env_vars||['XAI_API_KEY','GROK_API_KEY','AI_API_KEY']).join(' or ');
     const lines=[
       'AI setup:',
-      `Provider: ${h.ai_configured?`LLM ready (${h.ai_model})`:'Local Copilot mode only'}`,
+      `Provider: ${h.ai_configured?`Grok ready (${h.ai_model})`:'Grok not configured'}`,
       `Accepted key names: ${envs}`,
       h.ai_configured
-        ? 'Full natural-language AI chat is enabled.'
-        : 'To enable full LLM chat: add OPENAI_API_KEY=your_key_here to .env, then restart the server.',
+        ? 'Grok X/news stock intelligence is enabled.'
+        : 'To enable Grok: add XAI_API_KEY=your_key_here to .env, then restart the server.',
       `Memory file: ${h.memory_file||'unknown'}`,
       `Scan history file: ${h.scan_history_file||'unknown'}`
     ];
