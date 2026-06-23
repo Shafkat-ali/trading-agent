@@ -12,6 +12,7 @@ import csv
 import io
 import json
 import re
+import uuid
 from pathlib import Path
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from email.mime.text import MIMEText
@@ -66,6 +67,7 @@ USER_PASSWORDS = {
     'shafkat': os.getenv('SHAFKAT_PW_HASH', '00c19523772ea30a3755c6fa1c5642a93e4e56e8dbcf977420ad2d4395448f5c'),
     'irfan':   os.getenv('IRFAN_PW_HASH',   '6f596603a921a50a83c118911b9774b95a5fb081600b14429a34f3e66ee84176'),
 }
+DEMO_USER_ID = 'demo'
 
 # Tradier — Shafkat's keys (production real-time + sandbox paper trading)
 TRADIER_TOKEN         = os.getenv('TRADIER_TOKEN',        'TJuXpKVavQJ6ad8GMiot6JWISGQG')
@@ -117,9 +119,24 @@ user_state = {
                 'filters':{'min_price':0.10,'max_price':50.00,'min_gap_pct':5.0,
                            'min_dollar_vol':250000,'min_volume':50000,'min_rvol':0,
                            'max_float_m':20.0,'max_market_cap_m':0,'require_news':False}},
+    'demo':    {'scan_results':[], 'alerted':set(), 'mode':'morning_gap', 'running':False, 'scan_id':0,
+                'filters':{'min_price':0.10,'max_price':50.00,'min_gap_pct':5.0,
+                           'min_dollar_vol':250000,'min_volume':50000,'min_rvol':0,
+                           'max_float_m':20.0,'max_market_cap_m':0,'require_news':False}},
 }
-user_clients = {'shafkat':[], 'irfan':[]}
+user_clients = {'shafkat':[], 'irfan':[], 'demo':[]}
 alert_log    = []
+
+demo_paper_lock = threading.Lock()
+demo_paper = {
+    'starting_cash': 100000.0,
+    'cash': 100000.0,
+    'positions': {},
+    'orders': [],
+}
+
+def alerts_for_user(user_id):
+    return [] if user_id == DEMO_USER_ID else alert_log[:20]
 
 # NYSE halt cache
 halted_tickers = {}
@@ -246,6 +263,8 @@ def _trim_filters_for_history(filters):
 
 def save_scan_history(user_id, mode, filters, results, done_status=None, source='live'):
     uid = user_id if user_id in user_state else 'shafkat'
+    if uid == DEMO_USER_ID:
+        return
     results = results or []
     now = datetime.now()
     run = {
@@ -826,9 +845,9 @@ async def get_user_status(user_id: str):
 
 @app.get("/api/results/{user_id}")
 async def get_user_results(user_id: str):
-    if user_id not in user_state: return {'data':[],'alerts':alert_log[:20]}
+    if user_id not in user_state: return {'data':[],'alerts':[]}
     s = user_state[user_id]
-    return {'data':s['scan_results'],'alerts':alert_log[:20],
+    return {'data':s['scan_results'],'alerts':alerts_for_user(user_id),
             'time':datetime.now().strftime('%H:%M:%S'),'mode':s['mode'],
             'running':s.get('running', False)}
 
@@ -869,7 +888,7 @@ async def start_scanner(user_id: str):
         await broadcast_to_user(user_id, {
             'type':'scan_results','data':cached['results'],
             'time':cached.get('time', datetime.now().strftime('%H:%M:%S')),
-            'count':len(cached['results']),'alerts':alert_log[:20],
+            'count':len(cached['results']),'alerts':alerts_for_user(user_id),
             'scan_status':done_status,'mode':mode,'filters':s['filters'],
         })
         await broadcast_to_user(user_id, {'type':'status','running':False,'mode':mode})
@@ -1254,11 +1273,22 @@ async def get_stock_profile(ticker: str):
 # ══════════════════════════════════════════════════════════
 
 @app.get("/api/paper/account")
-async def paper_account():
+async def paper_account(user: str = 'shafkat'):
     """Get paper trading account balance and positions"""
+    if user == DEMO_USER_ID:
+        with demo_paper_lock:
+            market_value = sum(float(p.get('cost_basis', 0)) for p in demo_paper['positions'].values())
+            cash = demo_paper['cash']
+        return {'balances': {
+            'account_number': 'DEMO',
+            'total_equity': round(cash + market_value, 2),
+            'total_cash': round(cash, 2),
+            'buying_power': round(cash, 2),
+            'demo': True,
+        }}
     try:
-        r = requests.get(f"{TRADIER_SANDBOX_URL}/accounts/{TRADIER_SANDBOX_ACCT}/balances",
-                         headers=TRADIER_SANDBOX_HDR, timeout=8)
+        r = requests.get(f"{TRADIER_SANDBOX_URL}/accounts/{get_tradier_sandbox_acct(user)}/balances",
+                         headers=get_tradier_sandbox_headers(user), timeout=8)
         if r.status_code == 200:
             return r.json()
         return {'error': f'Tradier sandbox HTTP {r.status_code}'}
@@ -1266,11 +1296,15 @@ async def paper_account():
         return {'error': str(e)}
 
 @app.get("/api/paper/positions")
-async def paper_positions():
+async def paper_positions(user: str = 'shafkat'):
     """Get open paper trading positions"""
+    if user == DEMO_USER_ID:
+        with demo_paper_lock:
+            positions = [dict(p) for p in demo_paper['positions'].values()]
+        return {'positions': {'position': positions}, 'demo': True}
     try:
-        r = requests.get(f"{TRADIER_SANDBOX_URL}/accounts/{TRADIER_SANDBOX_ACCT}/positions",
-                         headers=TRADIER_SANDBOX_HDR, timeout=8)
+        r = requests.get(f"{TRADIER_SANDBOX_URL}/accounts/{get_tradier_sandbox_acct(user)}/positions",
+                         headers=get_tradier_sandbox_headers(user), timeout=8)
         if r.status_code == 200:
             return r.json()
         return {'error': f'HTTP {r.status_code}'}
@@ -1278,11 +1312,15 @@ async def paper_positions():
         return {'error': str(e)}
 
 @app.get("/api/paper/orders")
-async def paper_orders():
+async def paper_orders(user: str = 'shafkat'):
     """Get paper trading order history"""
+    if user == DEMO_USER_ID:
+        with demo_paper_lock:
+            orders = [dict(o) for o in reversed(demo_paper['orders'][-50:])]
+        return {'orders': {'order': orders}, 'demo': True}
     try:
-        r = requests.get(f"{TRADIER_SANDBOX_URL}/accounts/{TRADIER_SANDBOX_ACCT}/orders",
-                         headers=TRADIER_SANDBOX_HDR, timeout=8)
+        r = requests.get(f"{TRADIER_SANDBOX_URL}/accounts/{get_tradier_sandbox_acct(user)}/orders",
+                         headers=get_tradier_sandbox_headers(user), timeout=8)
         if r.status_code == 200:
             return r.json()
         return {'error': f'HTTP {r.status_code}'}
@@ -1292,6 +1330,8 @@ async def paper_orders():
 @app.delete("/api/paper/order/{order_id}")
 async def cancel_paper_order(order_id: str, user: str = 'shafkat'):
     """Cancel a pending paper trading order"""
+    if user == DEMO_USER_ID:
+        return {'error': 'Demo orders fill instantly and cannot be cancelled.', 'demo': True}
     try:
         r = requests.delete(
             f"{TRADIER_SANDBOX_URL}/accounts/{get_tradier_sandbox_acct(user)}/orders/{order_id}",
@@ -1328,11 +1368,18 @@ async def auth_login(req: LoginRequest):
         return {'success': True, 'user_id': uid}
     return {'success': False, 'error': 'Incorrect password'}
 
+@app.post("/api/auth/demo")
+async def auth_demo():
+    """Password-free entry for the isolated public demonstration profile."""
+    return {'success': True, 'user_id': DEMO_USER_ID, 'demo': True}
+
 @app.get("/api/ai/memory/{user_id}")
 async def get_ai_memory(user_id: str):
     uid = user_id.lower().strip()
     if uid not in user_state:
         uid = 'shafkat'
+    if uid == DEMO_USER_ID:
+        return {'profile': _empty_copilot_profile(uid), 'demo': True}
     with copilot_memory_lock:
         store = _read_copilot_memory_store()
         profile = store.get(uid) or _empty_copilot_profile(uid)
@@ -1343,6 +1390,9 @@ async def save_ai_memory(user_id: str, req: AIMemoryRequest):
     uid = user_id.lower().strip()
     if uid not in user_state:
         return {'error': 'Unknown user'}
+    if uid == DEMO_USER_ID:
+        profile = _trim_copilot_profile(req.profile, uid)
+        return {'status': 'ok', 'profile': profile, 'demo': True, 'persisted': False}
     profile = _trim_copilot_profile(req.profile, uid)
     with copilot_memory_lock:
         store = _read_copilot_memory_store()
@@ -1384,7 +1434,7 @@ async def ai_health(user_id: str):
             'filters': s.get('filters'),
             'history_runs': len(get_scan_history_summary(uid, limit=50)),
         },
-        'recent_logs': alert_log[:8],
+        'recent_logs': [] if uid == DEMO_USER_ID else alert_log[:8],
     }
 
 def compact_ai_context(context: dict):
@@ -1444,7 +1494,7 @@ async def ai_context(user_id: str, ticker: str = ''):
         'scanner_count': len(current_results),
         'scan_history': get_scan_history_summary(uid, limit=8),
         'scan_comparison': compare_scan_to_previous(uid, s.get('mode'), current_results),
-        'recent_logs': alert_log[:20],
+        'recent_logs': [] if uid == DEMO_USER_ID else alert_log[:20],
     }
     symbol = (ticker or '').upper().strip()
     if symbol:
@@ -1761,6 +1811,53 @@ async def paper_order(req: PaperOrderRequest):
         if duration in ('pre', 'post') and req.limit_price <= 0:
             return {'error': f'Pre/Post market orders require a limit price'}
 
+        if req.user_id == DEMO_USER_ID:
+            quote = await get_stock_quote(ticker, DEMO_USER_ID)
+            fill_price = float(req.limit_price or quote.get('c') or quote.get('last') or 0)
+            if fill_price <= 0:
+                return {'error': 'A market price was not available for the demo fill.'}
+            quantity = int(req.qty)
+            notional = round(fill_price * quantity, 2)
+            with demo_paper_lock:
+                current = demo_paper['positions'].get(ticker, {
+                    'symbol': ticker, 'quantity': 0, 'cost_basis': 0.0,
+                })
+                old_qty = int(current.get('quantity', 0))
+                old_cost = float(current.get('cost_basis', 0))
+                if req.side == 'buy':
+                    if notional > demo_paper['cash']:
+                        return {'error': 'Demo account has insufficient virtual cash.'}
+                    current['quantity'] = old_qty + quantity
+                    current['cost_basis'] = round(old_cost + notional, 2)
+                    demo_paper['cash'] = round(demo_paper['cash'] - notional, 2)
+                    demo_paper['positions'][ticker] = current
+                else:
+                    if quantity > old_qty:
+                        return {'error': 'Demo account cannot sell more shares than it owns.'}
+                    average_cost = old_cost / old_qty if old_qty else 0
+                    new_qty = old_qty - quantity
+                    demo_paper['cash'] = round(demo_paper['cash'] + notional, 2)
+                    if new_qty:
+                        current['quantity'] = new_qty
+                        current['cost_basis'] = round(average_cost * new_qty, 2)
+                        demo_paper['positions'][ticker] = current
+                    else:
+                        demo_paper['positions'].pop(ticker, None)
+                order = {
+                    'id': f"DEMO-{uuid.uuid4().hex[:8].upper()}",
+                    'symbol': ticker,
+                    'side': req.side,
+                    'quantity': quantity,
+                    'type': req.order_type,
+                    'duration': duration,
+                    'price': round(fill_price, 4),
+                    'status': 'filled',
+                    'demo': True,
+                    'create_date': datetime.now(timezone.utc).isoformat(),
+                }
+                demo_paper['orders'].append(order)
+            return {'order': order, 'demo': True}
+
         payload = {
             'class':    'equity',
             'symbol':   ticker,
@@ -1798,11 +1895,11 @@ async def paper_order(req: PaperOrderRequest):
         return {'error': str(e)}
 
 @app.get("/api/paper/quote/{ticker}")
-async def paper_quote(ticker: str):
+async def paper_quote(ticker: str, user: str = 'shafkat'):
     """Get real-time Tradier quote (production key = real-time)"""
     try:
         r = requests.get(f"{TRADIER_API_URL}/markets/quotes",
-                         headers=TRADIER_HEADERS,
+                         headers=get_tradier_headers(user),
                          params={'symbols': ticker.upper(), 'greeks': 'false'},
                          timeout=8)
         if r.status_code == 200:
@@ -4013,7 +4110,7 @@ async def background_scan_cache_loop():
     await asyncio.sleep(5)
     while True:
         try:
-            for user_id in user_state:
+            for user_id in (uid for uid in user_state if uid != DEMO_USER_ID):
                 for mode in SCAN_BACKGROUND_MODES:
                     await refresh_scan_cache(user_id, mode)
                     await asyncio.sleep(2)
@@ -4049,7 +4146,7 @@ async def scanner_loop(user_id, scan_id):
             await broadcast_to_user(user_id, {
                 'type':'scan_results','data':results,
                 'time':datetime.now().strftime('%H:%M:%S'),
-                'count':len(results),'alerts':alert_log[:20],
+                'count':len(results),'alerts':alerts_for_user(user_id),
                 'scan_status':done_status,'mode':s['mode'],'filters':s['filters'],
             })
             save_scan_history(user_id, s['mode'], s['filters'], results, done_status, source='live')
@@ -4061,7 +4158,7 @@ async def scanner_loop(user_id, scan_id):
             await broadcast_to_user(user_id, {
                 'type':'scan_results','data':s.get('scan_results', []),
                 'time':datetime.now().strftime('%H:%M:%S'),
-                'count':len(s.get('scan_results', [])),'alerts':alert_log[:20],
+                'count':len(s.get('scan_results', [])),'alerts':alerts_for_user(user_id),
                 'scan_status':{'phase':'error','message':msg,'progress':0,'total':0},
                 'mode':s['mode'],'filters':s['filters'],
             })
@@ -4088,7 +4185,7 @@ async def websocket_endpoint(websocket: WebSocket):
 
     s = user_state[user_id]
     await websocket.send_json({
-        'type':'scan_results','data':s['scan_results'],'alerts':alert_log[:20],
+        'type':'scan_results','data':s['scan_results'],'alerts':alerts_for_user(user_id),
         'time':datetime.now().strftime('%H:%M:%S'),'count':len(s['scan_results']),
         'scan_status':{'phase':'idle'},'mode':s['mode'],'filters':s['filters'],
     })

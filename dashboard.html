@@ -64,6 +64,10 @@
     .user-avatar img{width:100%;height:100%;object-fit:cover;border-radius:50%;}
     .user-avatar.shafkat{background:#ffffff;color:#fff;}
     .user-avatar.irfan  {background:#0d1525;color:#000;}
+    .user-avatar.demo   {background:linear-gradient(135deg,#063b2a,#00a86b);color:#fff;border-color:#31d6a0;}
+    .user-card.demo{border-color:#145c48;background:linear-gradient(135deg,#081812,#0a2019);}
+    .user-card.demo:hover{border-color:#31d6a0;box-shadow:0 6px 20px rgba(49,214,160,.13);}
+    .demo-pill{display:inline-block;margin-left:6px;padding:2px 6px;border-radius:999px;background:#0c4937;color:#72f0c3;font-size:.5rem;font-weight:900;letter-spacing:.5px;}
     .user-name{font-size:.9rem;font-weight:700;color:#fff;}
     .user-role{font-size:.64rem;color:#4a6a8a;margin-top:1px;}
     .user-arrow{margin-left:auto;color:#2a3f6f;font-size:1.1rem;}
@@ -194,6 +198,7 @@
     .user-mini-avatar img{width:100%;height:100%;object-fit:cover;border-radius:50%;}
     .user-mini-avatar.shafkat{background:#ffffff;}
     .user-mini-avatar.irfan  {background:#0d1525;}
+    .user-mini-avatar.demo   {background:#063b2a;}
     .active-user-name{font-size:.66rem;font-weight:600;color:#a0b0d0;}
     .switch-btn{font-size:.52rem;color:#4a6a8a;}
     .status-pill{display:flex;align-items:center;gap:5px;padding:3px 8px;border-radius:20px;background:#0f1729;border:1px solid #1e2d4a;}
@@ -851,6 +856,11 @@
         <div class="user-avatar irfan" id="loginAvatarIrfan">I</div>
         <div><div class="user-name">Irfan Payda</div><div class="user-role">Payda Capital</div></div>
         <div class="user-arrow">🔐</div>
+      </div>
+      <div class="user-card demo" onclick="selectDemoUser()">
+        <div class="user-avatar demo">D</div>
+        <div><div class="user-name">Demo Account <span class="demo-pill">NO LOGIN</span></div><div class="user-role">Uyghurkid, LLC data · isolated virtual trading</div></div>
+        <div class="user-arrow">→</div>
       </div>
     </div>
   </div>
@@ -3834,6 +3844,17 @@ window.addEventListener('message',ev=>{const d=ev.data||{};if(d.type!=='ticker-l
     }
   }
 
+  async function selectDemoUser(){
+    try{
+      const r=await fetch(`${API_URL}/api/auth/demo`,{method:'POST'});
+      const d=await r.json();
+      if(!d.success)throw new Error(d.error||'Demo unavailable');
+      selectUser('demo','Demo Account','D');
+    }catch(e){
+      alert('Demo account is temporarily unavailable.');
+    }
+  }
+
   function selectUser(id,name,initial){
     if(ws){ws.close();ws=null;}
     stopPolling();
@@ -3841,7 +3862,7 @@ window.addEventListener('message',ev=>{const d=ev.data||{};if(d.type!=='ticker-l
     sessionStorage.setItem('tradingUser',JSON.stringify(currentUser));
     document.getElementById('loginScreen').classList.add('hidden');
     const av=document.getElementById('headerAvatar');
-    const logoSrc=id==='shafkat'?UYGHUR_LOGO:PAYDA_LOGO;
+    const logoSrc=id==='irfan'?PAYDA_LOGO:UYGHUR_LOGO;
     av.innerHTML=`<img src="${logoSrc}" style="width:100%;height:100%;border-radius:50%;object-fit:cover;" onerror="this.parentNode.textContent='${initial}'">`;
     av.className=`user-mini-avatar ${id}`;
     document.getElementById('headerUserName').textContent=name;
@@ -3915,7 +3936,7 @@ window.addEventListener('message',ev=>{const d=ev.data||{};if(d.type!=='ticker-l
     document.getElementById('paperQuoteChange').textContent='';
     document.getElementById('paperQuoteCompany').textContent='';
     try{
-      const r=await fetch(`${API_URL}/api/paper/quote/${ticker}`);
+      const r=await fetch(`${API_URL}/api/paper/quote/${ticker}?user=${encodeURIComponent(currentUser?.id||'shafkat')}`);
       const d=await r.json();
       const q=d?.quotes?.quote;
       if(!q||q.symbol===undefined){
@@ -3962,7 +3983,7 @@ window.addEventListener('message',ev=>{const d=ev.data||{};if(d.type!=='ticker-l
     const el=document.getElementById('paperAccount');
     el.innerHTML='<div style="color:#4a6a8a;font-size:.58rem;">⏳ Loading...</div>';
     try{
-      const r=await fetch(`${API_URL}/api/paper/account`);
+      const r=await fetch(`${API_URL}/api/paper/account?user=${encodeURIComponent(currentUser?.id||'shafkat')}`);
       const d=await r.json();
       const b=d?.balances;
       if(!b){el.innerHTML=`<div style="color:#ff6666;font-size:.58rem;">Error: ${d?.error||JSON.stringify(d).substring(0,100)}</div>`;return;}
@@ -3990,7 +4011,7 @@ window.addEventListener('message',ev=>{const d=ev.data||{};if(d.type!=='ticker-l
     const el=document.getElementById('paperPositions');
     el.innerHTML='<span style="color:#4a6a8a;">⏳ Loading...</span>';
     try{
-      const r=await fetch(`${API_URL}/api/paper/positions`);
+      const r=await fetch(`${API_URL}/api/paper/positions?user=${encodeURIComponent(currentUser?.id||'shafkat')}`);
       const d=await r.json();
       const pos=d?.positions?.position;
       if(!pos){el.innerHTML='<span style="color:#4a6a8a;">No open positions</span>';return;}
@@ -4014,7 +4035,7 @@ window.addEventListener('message',ev=>{const d=ev.data||{};if(d.type!=='ticker-l
     const el=document.getElementById('paperOrders');
     el.innerHTML='<span style="color:#4a6a8a;">⏳ Loading...</span>';
     try{
-      const r=await fetch(`${API_URL}/api/paper/orders`);
+      const r=await fetch(`${API_URL}/api/paper/orders?user=${encodeURIComponent(currentUser?.id||'shafkat')}`);
       const d=await r.json();
       const orders=d?.orders?.order;
       if(!orders){el.innerHTML='<span style="color:#4a6a8a;">No orders yet</span>';return;}
@@ -4064,7 +4085,7 @@ window.addEventListener('message',ev=>{const d=ev.data||{};if(d.type!=='ticker-l
     const res=document.getElementById('paperCancelResult');
     if(res){res.textContent='⏳ Cancelling...';res.style.color='#ffd700';}
     try{
-      const r=await fetch(`${API_URL}/api/paper/order/${orderId}`,{method:'DELETE'});
+      const r=await fetch(`${API_URL}/api/paper/order/${orderId}?user=${encodeURIComponent(currentUser?.id||'shafkat')}`,{method:'DELETE'});
       const d=await r.json();
       if(d?.order?.status==='canceled'||d?.order?.id||r.ok){
         if(res){res.textContent='✅ Order cancelled';res.style.color='#00c853';}
@@ -4096,7 +4117,7 @@ window.addEventListener('message',ev=>{const d=ev.data||{};if(d.type!=='ticker-l
       const r=await fetch(`${API_URL}/api/paper/order`,{
         method:'POST',
         headers:{'Content-Type':'application/json'},
-        body:JSON.stringify({ticker,side,qty,order_type:orderType,limit_price:limitPrice,duration})
+        body:JSON.stringify({ticker,side,qty,order_type:orderType,limit_price:limitPrice,duration,user_id:currentUser?.id||'shafkat'})
       });
       const d=await r.json();
       if(d?.order?.id||d?.id){
